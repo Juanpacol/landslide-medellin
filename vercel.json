@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd static && pnpm install && pnpm build",
+  "buildCommand": "cd static && npm install && npm run build",
   "outputDirectory": "static/.next",
-  "installCommand": "cd static && pnpm install",
+  "installCommand": "cd static && npm install",
   "framework": "nextjs"
 }
