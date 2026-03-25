@@ -12,10 +12,19 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Chart } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 import { fetchChartData, type DailyChartData } from '@/lib/api';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 interface RainfallChartProps {
   communeId?: string | null;
@@ -70,7 +79,9 @@ export function RainfallChart({ communeId }: RainfallChartProps) {
       },
       title: {
         display: true,
-        text: communeId ? `Lluvia vs Deslizamientos — Comuna ${communeId}` : 'Lluvia vs Deslizamientos (todas las comunas)',
+        text: communeId
+          ? `Lluvia vs Deslizamientos — Comuna ${communeId}`
+          : 'Lluvia vs Deslizamientos (todas las comunas)',
         color: '#f1f5f9',
         font: { size: 14, weight: 'bold' as const },
         padding: { bottom: 16 },
@@ -87,19 +98,34 @@ export function RainfallChart({ communeId }: RainfallChartProps) {
     scales: {
       x: {
         grid: { color: 'rgba(51,65,85,0.5)' },
-        ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 45, font: { size: 10 } },
+        ticks: {
+          color: '#94a3b8',
+          maxRotation: 45,
+          minRotation: 45,
+          font: { size: 10 },
+        },
       },
       y: {
         type: 'linear' as const,
         position: 'left' as const,
-        title: { display: true, text: 'Lluvia (mm)', color: '#3b82f6', font: { size: 12, weight: 'bold' as const } },
+        title: {
+          display: true,
+          text: 'Lluvia (mm)',
+          color: '#3b82f6',
+          font: { size: 12, weight: 'bold' as const },
+        },
         grid: { color: 'rgba(51,65,85,0.5)' },
         ticks: { color: '#3b82f6' },
       },
       y1: {
         type: 'linear' as const,
         position: 'right' as const,
-        title: { display: true, text: 'Deslizamientos', color: '#ef4444', font: { size: 12, weight: 'bold' as const } },
+        title: {
+          display: true,
+          text: 'Deslizamientos',
+          color: '#ef4444',
+          font: { size: 12, weight: 'bold' as const },
+        },
         grid: { drawOnChartArea: false },
         ticks: { color: '#ef4444', stepSize: 1 },
       },
@@ -117,7 +143,7 @@ export function RainfallChart({ communeId }: RainfallChartProps) {
   return (
     <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
       <div className="h-[300px]">
-        <Chart type="bar" data={data} options={options} />
+        <Bar data={data as any} options={options} />
       </div>
     </div>
   );
