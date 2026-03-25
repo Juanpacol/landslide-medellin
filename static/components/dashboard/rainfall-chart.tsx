@@ -11,8 +11,10 @@ import {
   Title,
   Tooltip,
   Legend,
+  BarController,
+  LineController,
 } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
 import { fetchChartData, type DailyChartData } from '@/lib/api';
 
 ChartJS.register(
@@ -23,7 +25,9 @@ ChartJS.register(
   PointElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  BarController,
+  LineController
 );
 
 interface RainfallChartProps {
@@ -143,7 +147,7 @@ export function RainfallChart({ communeId }: RainfallChartProps) {
   return (
     <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
       <div className="h-[300px]">
-        <Bar data={data as any} options={options} />
+        <Chart type="bar" data={data} options={options} />
       </div>
     </div>
   );
