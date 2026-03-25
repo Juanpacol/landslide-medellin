@@ -1,8 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('⚠️ Variables de Supabase no configuradas: NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY');
+}
+
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  supabaseUrl ?? '',
+  supabaseKey ?? ''
 );
 
 // ── Tipos ──────────────────────────────────────────────────────
@@ -79,7 +86,7 @@ export async function fetchAlerts(): Promise<Alert[]> {
   const { data, error } = await supabase
     .from('alerts')
     .select('id, commune_id, nivel, precipitacion_valor, tipo_umbral, timestamp, communes(nombre_comuna)')
-    .order('nivel', { ascending: true }); // Rojo antes que Naranja alfabéticamente no funciona, ordenamos abajo
+    .order('nivel', { ascending: true });
 
   if (error) throw new Error(error.message);
 
@@ -120,7 +127,7 @@ export async function fetchChartData(communeId?: string | null): Promise<DailyCh
     if (day) countByDate[day] = (countByDate[day] ?? 0) + 1;
   }
 
-  // Precipitación: traer últimos 30 días disponibles de una estación
+  // Precipitación: traer últimos 30 días disponibles
   const { data: precip } = await supabase
     .from('precipitation')
     .select('fecha, precipitacion_mm')
@@ -133,7 +140,6 @@ export async function fetchChartData(communeId?: string | null): Promise<DailyCh
     precipByDate[p.fecha] = p.precipitacion_mm;
   }
 
-  // Unir los últimos 30 días con datos de eventos
   const allDates = Array.from(
     new Set([...Object.keys(countByDate), ...Object.keys(precipByDate)])
   ).sort().slice(-30);
