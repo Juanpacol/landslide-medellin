@@ -1,0 +1,20 @@
+{
+  "n_samples": 25,
+  "n_positive": 14,
+  "n_features": 7,
+  "best_model": "RandomForestClassifier",
+  "cv_mean_auc": 0.6168831168831168,
+  "cv_strategy": "LOO",
+  "target_strategy": "future_7d",
+  "train_auc_roc": 1.0,
+  "feature_names": [
+    "centroid_lat",
+    "centroid_lon",
+    "densidadmax",
+    "mean_precip_mm_snapshot",
+    "precip_records",
+    "precip_sum_mm_day",
+    "station_count"
+  ],
+  "model_version": "teyva-ml-1.0"
+}

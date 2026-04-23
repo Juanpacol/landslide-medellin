@@ -11,7 +11,7 @@ import joblib
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import LeaveOneOut, StratifiedKFold, cross_val_score
+from sklearn.model_selection import LeaveOneOut, StratifiedKFold, cross_val_predict, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -46,13 +46,25 @@ def _parse_event_date(fecha: str | None) -> date | None:
         return None
 
 
+def _normalize_commune_id(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if digits:
+        return str(int(digits))
+    return text
+
+
 def _load_events_index(session: Session) -> dict[str, list[date]]:
     by_commune: dict[str, list[date]] = {}
     rows = session.scalars(select(LandslideEvent)).all()
     for ev in rows:
-        if not ev.commune_id:
+        cid = _normalize_commune_id(ev.commune_id)
+        if cid is None:
             continue
-        cid = str(ev.commune_id)
         d = _parse_event_date(ev.fecha)
         if d is None:
             continue
@@ -60,7 +72,7 @@ def _load_events_index(session: Session) -> dict[str, list[date]]:
     return by_commune
 
 
-def _target_for_ref_day(
+def _target_for_ref_day_future(
     commune_id: str,
     ref_d: date,
     events_by_commune: dict[str, list[date]],
@@ -68,6 +80,18 @@ def _target_for_ref_day(
     end = ref_d + timedelta(days=7)
     for d in events_by_commune.get(commune_id, []):
         if ref_d < d <= end:
+            return 1
+    return 0
+
+
+def _target_for_ref_day_past(
+    commune_id: str,
+    ref_d: date,
+    events_by_commune: dict[str, list[date]],
+) -> int:
+    start = ref_d - timedelta(days=7)
+    for d in events_by_commune.get(commune_id, []):
+        if start <= d <= ref_d:
             return 1
     return 0
 
@@ -82,7 +106,9 @@ def _rows_until(commune_id: str, cutoff: datetime, all_rows: list[MLFeature]) ->
     return out
 
 
-def _build_supervised_matrix(session: Session) -> tuple[np.ndarray, np.ndarray, list[str], list[dict[str, Any]]]:
+def _build_supervised_matrix(
+    session: Session,
+) -> tuple[np.ndarray, np.ndarray, list[str], list[dict[str, Any]], str]:
     events_by_commune = _load_events_index(session)
     ml_rows = list(session.scalars(select(MLFeature)).all())
 
@@ -90,13 +116,17 @@ def _build_supervised_matrix(session: Session) -> tuple[np.ndarray, np.ndarray, 
     for row in ml_rows:
         if row.reference_date is None:
             continue
+        cid = _normalize_commune_id(row.commune_id)
+        if cid is None:
+            continue
         d = _ref_to_date(row.reference_date)
-        by_day[(row.commune_id, d)].append(row)
+        by_day[(cid, d)].append(row)
 
     builder = FeatureBuilder(MODELS_DIR)
 
     raw_rows: list[dict[str, float]] = []
-    targets: list[int] = []
+    targets_future: list[int] = []
+    targets_past: list[int] = []
     meta: list[dict[str, Any]] = []
 
     for (cid, d), grp in by_day.items():
@@ -105,9 +135,11 @@ def _build_supervised_matrix(session: Session) -> tuple[np.ndarray, np.ndarray, 
         if not hist:
             continue
         _, raw_aligned = builder.merge_with_median_impute(hist, feature_order=None)
-        y = _target_for_ref_day(cid, d, events_by_commune)
+        y_future = _target_for_ref_day_future(cid, d, events_by_commune)
+        y_past = _target_for_ref_day_past(cid, d, events_by_commune)
         raw_rows.append(dict(raw_aligned))
-        targets.append(y)
+        targets_future.append(y_future)
+        targets_past.append(y_past)
         meta.append(
             {
                 "commune_id": cid,
@@ -117,7 +149,7 @@ def _build_supervised_matrix(session: Session) -> tuple[np.ndarray, np.ndarray, 
         )
 
     if not raw_rows:
-        return np.zeros((0, 0)), np.array([]), [], []
+        return np.zeros((0, 0)), np.array([]), [], [], "future_7d"
 
     keys = sorted({k for r in raw_rows for k in r.keys()})
     matrix = np.zeros((len(raw_rows), len(keys)), dtype=float)
@@ -130,7 +162,12 @@ def _build_supervised_matrix(session: Session) -> tuple[np.ndarray, np.ndarray, 
     inds = np.where(np.isnan(matrix))
     matrix[inds] = np.take(col_medians, inds[1])
 
-    return matrix, np.array(targets, dtype=int), keys, meta
+    y_future = np.array(targets_future, dtype=int)
+    if int(np.sum(y_future)) > 0:
+        return matrix, y_future, keys, meta, "future_7d"
+
+    y_past = np.array(targets_past, dtype=int)
+    return matrix, y_past, keys, meta, "past_7d_fallback"
 
 
 def _cv_splitter(y: np.ndarray) -> tuple[Any, str]:
@@ -143,7 +180,10 @@ def _cv_splitter(y: np.ndarray) -> tuple[Any, str]:
 
 
 def _auc_scorer(model: Any, X: np.ndarray, y: np.ndarray, cv: Any) -> float:
-    scores = cross_val_score(model, X, y, cv=cv, scoring="roc_auc")
+    if isinstance(cv, LeaveOneOut):
+        proba = cross_val_predict(model, X, y, cv=cv, method="predict_proba", n_jobs=1)
+        return float(roc_auc_score(y, proba[:, 1]))
+    scores = cross_val_score(model, X, y, cv=cv, scoring="roc_auc", n_jobs=1)
     return float(np.mean(scores))
 
 
@@ -151,7 +191,7 @@ def train() -> dict[str, Any]:
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
     with SyncSessionLocal() as session:
-        X, y, feature_names, _meta = _build_supervised_matrix(session)
+        X, y, feature_names, _meta, target_strategy = _build_supervised_matrix(session)
 
     n_samples = int(X.shape[0])
     n_features = int(X.shape[1]) if n_samples else 0
@@ -164,6 +204,7 @@ def train() -> dict[str, Any]:
             "best_model": None,
             "cv_mean_auc": None,
             "cv_strategy": None,
+            "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "Sin filas válidas con reference_date para entrenar.",
         }
@@ -172,12 +213,14 @@ def train() -> dict[str, Any]:
 
     scaler = StandardScaler()
     Xs = scaler.fit_transform(X)
+    Xs = np.nan_to_num(Xs, nan=0.0, posinf=0.0, neginf=0.0)
 
     builder = FeatureBuilder(MODELS_DIR)
     builder.save_scaler(scaler)
     builder.save_feature_names(feature_names)
 
     cv, cv_name = _cv_splitter(y)
+    small_n = n_samples < 50
 
     if len(np.unique(y)) < 2:
         payload = {
@@ -187,26 +230,31 @@ def train() -> dict[str, Any]:
             "best_model": None,
             "cv_mean_auc": None,
             "cv_strategy": cv_name,
+            "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "La variable objetivo tiene una sola clase; no se entrena clasificador.",
         }
         METRICS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return payload
 
+    rf_trees = 80 if small_n else 200
+    xgb_trees = 60 if small_n else 120
+
     candidates: list[tuple[str, Any]] = [
         (
             "RandomForestClassifier",
             RandomForestClassifier(
-                n_estimators=200,
+                n_estimators=rf_trees,
                 max_depth=6,
                 random_state=42,
                 class_weight="balanced_subsample",
+                n_jobs=1,
             ),
         ),
         (
             "XGBClassifier",
             XGBClassifier(
-                n_estimators=120,
+                n_estimators=xgb_trees,
                 max_depth=3,
                 learning_rate=0.05,
                 subsample=0.9,
@@ -214,11 +262,15 @@ def train() -> dict[str, Any]:
                 reg_lambda=1.0,
                 random_state=42,
                 eval_metric="logloss",
+                n_jobs=1,
             ),
         ),
         (
             "GradientBoostingClassifier",
-            GradientBoostingClassifier(random_state=42),
+            GradientBoostingClassifier(
+                random_state=42,
+                n_estimators=80 if small_n else 100,
+            ),
         ),
     ]
 
@@ -244,6 +296,7 @@ def train() -> dict[str, Any]:
             "best_model": None,
             "cv_mean_auc": None,
             "cv_strategy": cv_name,
+            "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "Ningún modelo pudo evaluarse con AUC-ROC.",
         }
@@ -273,6 +326,7 @@ def train() -> dict[str, Any]:
         "best_model": best_name,
         "cv_mean_auc": float(best_auc),
         "cv_strategy": cv_name,
+        "target_strategy": target_strategy,
         "train_auc_roc": train_auc,
         "feature_names": feature_names,
         "model_version": model_version,
@@ -285,6 +339,12 @@ def main() -> None:
     _ = sync_engine  # noqa: F841
     out = train()
     print(json.dumps(out, indent=2, default=str))
+    try:
+        from ml.evaluation import generate_report
+
+        generate_report()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 if __name__ == "__main__":

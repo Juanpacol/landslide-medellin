@@ -97,7 +97,7 @@ class FeatureBuilder:
         stmt = (
             select(MLFeature)
             .where(MLFeature.commune_id == str(commune_id))
-            .order_by(MLFeature.reference_date.desc().nullslast(), MLFeature.id.desc())
+            .order_by(MLFeature.reference_date.desc().nulls_last(), MLFeature.id.desc())
         )
         return list(session.scalars(stmt).all())
 
@@ -105,7 +105,7 @@ class FeatureBuilder:
         stmt = (
             select(MLFeature)
             .where(MLFeature.commune_id == str(commune_id))
-            .order_by(MLFeature.reference_date.desc().nullslast(), MLFeature.id.desc())
+            .order_by(MLFeature.reference_date.desc().nulls_last(), MLFeature.id.desc())
         )
         result = await session.scalars(stmt)
         return list(result.all())
@@ -161,13 +161,13 @@ class FeatureBuilder:
 
     async def build_feature_vector(
         self,
-        commune_id: str | int,
+        comuna_id: str | int,
         db: AsyncSession,
         *,
         feature_order: list[str] | None = None,
         apply_scaler: bool = True,
     ) -> dict[str, Any]:
-        rows = await self.collect_rows_async(db, str(commune_id))
+        rows = await self.collect_rows_async(db, str(comuna_id))
         merged, raw_aligned = self.merge_with_median_impute(rows, feature_order=feature_order)
 
         order = feature_order if feature_order is not None else sorted(merged.keys())

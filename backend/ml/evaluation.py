@@ -63,7 +63,7 @@ def generate_report() -> str:
     model = artifact["model"]
 
     with SyncSessionLocal() as session:
-        X, y, _names, _meta = _build_supervised_matrix(session)
+        X, y, _names, _meta, _target_strategy = _build_supervised_matrix(session)
 
     if X.size == 0 or len(np.unique(y)) < 2:
         lines.append("_Datos insuficientes o una sola clase para métricas de clasificación._")
