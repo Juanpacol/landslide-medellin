@@ -150,3 +150,21 @@ export async function fetchChartData(communeId?: string | null): Promise<DailyCh
     landslides: countByDate[day] ?? 0,
   }));
 }
+
+// ── Chat (API TEYVA FastAPI) ───────────────────────────────────
+
+const teyvaApiBase = (process.env.NEXT_PUBLIC_TEYVA_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '');
+
+export async function sendChatMessage(message: string, sessionId: string): Promise<string> {
+  const res = await fetch(`${teyvaApiBase}/api/chat/message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, session_id: sessionId }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  const data = (await res.json()) as { reply: string };
+  return data.reply;
+}

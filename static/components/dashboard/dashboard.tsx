@@ -5,6 +5,7 @@ import { AlertBanner } from './alert-banner';
 import { MedellinMap } from './medellin-map';
 import { CommuneInfo } from './commune-info';
 import { RainfallChart } from './rainfall-chart';
+import { TeyvaChatWidget } from './teyva-chat';
 import type { CommuneFeature } from '@/lib/api';
 import { Mountain, BarChart3, MapPin } from 'lucide-react';
 
@@ -95,6 +96,8 @@ export function Dashboard() {
           <span>DAGRD — Departamento Administrativo de Gestión del Riesgo de Desastres</span>
         </div>
       </footer>
+
+      <TeyvaChatWidget />
     </div>
   );
 }
