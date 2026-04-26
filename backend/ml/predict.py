@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -14,6 +15,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from db.models.risk_prediction import RiskPrediction  # noqa: E402
+from db.session import AsyncSessionLocal  # noqa: E402
 from ml.features import FeatureBuilder  # noqa: E402
 
 MODELS_DIR = Path(__file__).resolve().parent / "models"
@@ -118,3 +120,12 @@ async def predict_all_comunas(db: AsyncSession) -> None:
             )
         )
     await db.commit()
+
+
+async def _run_standalone() -> None:
+    async with AsyncSessionLocal() as db:
+        await predict_all_comunas(db)
+
+
+if __name__ == "__main__":
+    asyncio.run(_run_standalone())
