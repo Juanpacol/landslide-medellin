@@ -138,15 +138,15 @@ export function RainfallChart({ communeId }: RainfallChartProps) {
 
   if (dailyData.length === 0) {
     return (
-      <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155] h-[300px] flex items-center justify-center">
-        <span className="text-[#94a3b8] text-sm">Cargando datos...</span>
+      <div className="h-full rounded-3xl border border-border/60 bg-card p-6 shadow-[var(--shadow-soft)] flex items-center justify-center">
+        <span className="text-muted-foreground text-sm">Sin datos disponibles por ahora</span>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
-      <div className="h-[300px]">
+    <div className="h-full rounded-3xl border border-border/60 bg-card p-6 shadow-[var(--shadow-soft)]">
+      <div className="h-full">
         <Chart type="bar" data={data} options={options} />
       </div>
     </div>

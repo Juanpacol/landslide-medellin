@@ -1,103 +1,89 @@
 'use client';
 
-import { useState } from 'react';
-import { AlertBanner } from './alert-banner';
+import { useEffect, useState } from 'react';
+import { Header } from './header';
+import { KpiCards } from './kpi-cards';
 import { MedellinMap } from './medellin-map';
 import { CommuneInfo } from './commune-info';
 import { RainfallChart } from './rainfall-chart';
 import { TeyvaChatWidget } from './teyva-chat';
-import type { CommuneFeature } from '@/lib/api';
-import { Mountain, BarChart3, MapPin } from 'lucide-react';
+import { fetchCommuneDetail, type CommuneDetail, type CommuneFeature } from '@/lib/api';
 
 type CommuneProps = CommuneFeature['properties'];
 
 export function Dashboard() {
   const [selectedCommune, setSelectedCommune] = useState<CommuneProps | null>(null);
+  const [communeDetail, setCommuneDetail] = useState<CommuneDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const chartCommuneId =
+    selectedCommune?.parent_commune_id && /^\d+$/.test(selectedCommune.parent_commune_id)
+      ? selectedCommune.parent_commune_id
+      : null;
+
+  useEffect(() => {
+    if (!chartCommuneId) {
+      setCommuneDetail(null);
+      return;
+    }
+    setDetailLoading(true);
+    fetchCommuneDetail(chartCommuneId)
+      .then((data) => setCommuneDetail(data))
+      .catch(() => setCommuneDetail(null))
+      .finally(() => setDetailLoading(false));
+  }, [chartCommuneId]);
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex flex-col">
-      {/* Header */}
-      <header className="bg-[#1e293b] border-b border-[#334155] px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#3b82f6]/20 rounded-lg">
-              <Mountain className="h-6 w-6 text-[#3b82f6]" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-[#f1f5f9]">
-                Sistema de Análisis de Riesgo de Deslizamientos
-              </h1>
-              <p className="text-sm text-[#94a3b8]">
-                Medellín, Colombia — Monitoreo en Tiempo Real
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-[#94a3b8]">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              <span>21 Comunas</span>
-            </div>
-            <div className="h-4 w-px bg-[#475569]" />
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span>Datos reales — Supabase</span>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background text-foreground">
+      <Header />
 
-      {/* Alert Banner */}
-      <AlertBanner />
+      <main className="mx-auto max-w-[1600px] space-y-5 px-6 py-6">
+        <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-[image:var(--gradient-hero)] p-6 text-white shadow-[var(--shadow-soft)] md:p-8">
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle at 20% 80%, rgba(255,255,255,0.15), transparent 40%), radial-gradient(circle at 80% 20%, rgba(242,201,76,0.25), transparent 40%)',
+            }}
+          />
+          <div className="relative max-w-2xl">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-white/70">Plataforma TEYVA · Antioquia</div>
+            <h2 className="mt-2 font-display text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
+              Monitoreo de riesgo de deslizamientos para Medellin
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-white/80 md:text-base">
+              Datos geoespaciales, precipitacion y alertas en tiempo real para proteger las laderas y las comunidades del
+              valle.
+            </p>
+          </div>
+        </section>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6">
-        <div className="flex gap-6 h-full" style={{ minHeight: 'calc(100vh - 200px)' }}>
-          {/* Left Panel - Map (60%) */}
-          <div className="w-[60%] flex flex-col gap-4">
-            <div className="bg-[#1e293b] rounded-lg p-4 border border-[#334155]">
-              <h2 className="text-lg font-semibold text-[#f1f5f9] mb-1">
-                Mapa de Riesgo — Zonas Críticas
-              </h2>
-              <p className="text-sm text-[#94a3b8]">
-                Popular (C1) · Santa Cruz (C2) · Villa Hermosa (C8) — Haga clic para ver detalles
-              </p>
-            </div>
-            <div className="flex-1 bg-[#1e293b] rounded-lg border border-[#334155] overflow-hidden">
-              <MedellinMap
-                onCommuneSelect={setSelectedCommune}
-                selectedCommuneId={selectedCommune?.commune_id ?? null}
-              />
-            </div>
+        <KpiCards />
+
+        <section className="grid gap-5 xl:grid-cols-[1fr_420px]">
+          <div className="h-[640px]">
+            <MedellinMap
+              onCommuneSelect={setSelectedCommune}
+              selectedCommuneId={selectedCommune?.commune_id ?? null}
+            />
           </div>
 
-          {/* Right Panel (40%) */}
-          <div className="w-[40%] flex flex-col gap-6">
-            <div>
-              <h2 className="text-lg font-semibold text-[#f1f5f9] mb-3">
-                Información de Comuna
-              </h2>
-              <CommuneInfo commune={selectedCommune} />
+          <div className="space-y-5">
+            <div className="h-[390px]">
+              <CommuneInfo commune={selectedCommune} detail={communeDetail} loading={detailLoading} />
             </div>
-
-            <div className="flex-1">
-              <h2 className="text-lg font-semibold text-[#f1f5f9] mb-3">
-                Análisis Temporal (30 días)
-              </h2>
-              <RainfallChart communeId={selectedCommune?.commune_id ?? null} />
+            <div className="h-[225px]">
+              <RainfallChart communeId={chartCommuneId} />
             </div>
           </div>
-        </div>
+        </section>
+
+        <footer className="pt-6 pb-10 text-center text-xs text-muted-foreground">
+          TEYVA · Sistema institucional de analisis de riesgo · Medellin, Antioquia
+        </footer>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-[#1e293b] border-t border-[#334155] px-6 py-3">
-        <div className="flex items-center justify-between text-sm text-[#94a3b8]">
-          <span>Fuentes: DAGRD · IDEAM · Alcaldía de Medellín</span>
-          <span>DAGRD — Departamento Administrativo de Gestión del Riesgo de Desastres</span>
-        </div>
-      </footer>
-
-      <TeyvaChatWidget />
+      <TeyvaChatWidget selectedCommune={selectedCommune} />
     </div>
   );
 }

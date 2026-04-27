@@ -18,6 +18,11 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(scraper.router, prefix="/api/scraper", tags=["scraper"])
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}

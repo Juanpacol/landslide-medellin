@@ -171,6 +171,28 @@ async def get_top_risk_comunas(n: int, db: AsyncSession) -> list[dict[str, Any]]
     ]
 
 
+async def get_top_event_comunas(n: int, db: AsyncSession) -> list[dict[str, Any]]:
+    """Top comunas por número de eventos históricos en landslide_events."""
+    le = LandslideEvent
+    stmt = (
+        select(le.commune_id, func.count(le.id).label("n_eventos"))
+        .where(le.commune_id.is_not(None))
+        .group_by(le.commune_id)
+        .order_by(func.count(le.id).desc(), le.commune_id.asc())
+        .limit(n)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+    return [
+        {
+            "commune_id": str(cid),
+            "nombre": commune_display_name(str(cid)),
+            "n_eventos": int(n_eventos or 0),
+        }
+        for cid, n_eventos in rows
+    ]
+
+
 async def compare_comunas(lista_comunas: list[str], db: AsyncSession) -> list[dict[str, Any]]:
     resolved: list[str] = []
     for item in lista_comunas:

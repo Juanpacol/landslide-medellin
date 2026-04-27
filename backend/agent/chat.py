@@ -1,36 +1,202 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
-import re
 import unicodedata
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
-import google.generativeai as genai
+from dotenv import load_dotenv
+import httpx
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.memory import get_history, save_turn
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import (
-    compare_comunas,
     commune_display_name,
     find_communes_in_text,
-    get_alert_status,
-    get_historical_events,
     get_risk_by_comuna,
     get_top_risk_comunas,
 )
+from db.models import LandslideEvent, MLFeature, RiskPrediction
 
-_key = os.getenv("GEMINI_API_KEY")
-if _key:
-    genai.configure(api_key=_key)
+# Cargar backend/.env explícitamente para evitar depender del cwd del proceso.
+_BACKEND_ENV = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(dotenv_path=_BACKEND_ENV, override=True)
 
-model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash",
-    generation_config={"temperature": 0.3, "max_output_tokens": 1024},
-    system_instruction=SYSTEM_PROMPT,
-)
+
+def _get_gemini_key() -> str:
+    # Recargar por si el usuario actualizó .env con el server ya arriba.
+    load_dotenv(dotenv_path=_BACKEND_ENV, override=True)
+    return (os.getenv("GEMINI_API_KEY") or "").strip()
+
+
+def _safe_num(v: Any) -> float | None:
+    try:
+        if v is None:
+            return None
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _risk_level_from_score(score: Any) -> str:
+    value = _safe_num(score)
+    if value is None:
+        return "riesgo sin información reciente"
+    if value > 0.8:
+        return "riesgo crítico"
+    if value > 0.6:
+        return "riesgo alto"
+    if value > 0.3:
+        return "riesgo medio"
+    return "riesgo bajo"
+
+
+def _humanize_updated_at(created_at: Any) -> str:
+    if not created_at:
+        return "sin hora de actualización disponible"
+    try:
+        dt = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+    except ValueError:
+        return "con actualización reciente"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    delta = datetime.now(timezone.utc) - dt
+    mins = max(1, int(delta.total_seconds() // 60))
+    if mins < 60:
+        return f"última actualización hace {mins} minutos"
+    hours = mins // 60
+    if hours < 24:
+        return f"última actualización hace {hours} horas"
+    days = hours // 24
+    return f"última actualización hace {days} días"
+
+
+def _natural_db_context_row(row: dict[str, Any] | None) -> str:
+    if not row:
+        return "No hay datos recientes para la comuna consultada."
+    nombre = row.get("nombre") or row.get("commune_id") or "la comuna consultada"
+    risk_text = _risk_level_from_score(row.get("risk_score"))
+    updated_text = _humanize_updated_at(row.get("created_at"))
+    return f"Comuna {nombre}: {risk_text}, {updated_text}."
+
+
+def _natural_db_context_rows(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return "No hay datos recientes para construir contexto territorial."
+    return " ".join(_natural_db_context_row(r) for r in rows)
+
+
+def _should_add_emergency_line(text: str) -> bool:
+    tnorm = _norm_msg(text)
+    return "riesgo alto" in tnorm or "riesgo critico" in tnorm or "riesgo crítico" in tnorm
+
+
+def _append_emergency_line_if_needed(text: str) -> str:
+    if not _should_add_emergency_line(text):
+        return text
+    emergency = "Si hay emergencia: DAGRD 4444444 · Bomberos 119 · Cruz Roja 132"
+    if emergency in text:
+        return text
+    return f"{text}\n\n{emergency}"
+
+
+def _as_iso(value: Any) -> str | None:
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+async def _load_prompt_context(db: AsyncSession) -> str:
+    predictions_stmt = (
+        select(
+            RiskPrediction.commune_id,
+            RiskPrediction.risk_category,
+            RiskPrediction.risk_score,
+            RiskPrediction.created_at,
+        )
+        .order_by(RiskPrediction.risk_score.desc())
+    )
+    predictions_rows = (await db.execute(predictions_stmt)).all()
+    predictions_text = (
+        "\n".join(
+            f"- Comuna {commune_display_name(str(r.commune_id))} ({r.commune_id}): "
+            f"riesgo {r.risk_category or 'Sin datos'} "
+            f"(score={r.risk_score if r.risk_score is not None else 'Sin datos'}), "
+            f"predicho en {_as_iso(r.created_at) or 'Sin datos'}"
+            for r in predictions_rows
+        )
+        or "- Sin datos"
+    )
+
+    events_stmt = (
+        select(LandslideEvent.commune_id, LandslideEvent.fecha, LandslideEvent.tipo_emergencia)
+        .order_by(desc(LandslideEvent.fecha))
+        .limit(20)
+    )
+    events_rows = (await db.execute(events_stmt)).all()
+    events_text = (
+        "\n".join(
+            f"- Comuna {r.commune_id or 'Sin datos'}: fecha {r.fecha or 'Sin datos'}, "
+            f"tipo {r.tipo_emergencia or 'Sin datos'}"
+            for r in events_rows
+        )
+        or "- Sin datos"
+    )
+
+    rain_stmt = (
+        select(MLFeature.commune_id, MLFeature.reference_date, MLFeature.features)
+        .order_by(MLFeature.reference_date.desc())
+        .limit(50)
+    )
+    rain_rows = (await db.execute(rain_stmt)).all()
+    rain_text = (
+        "\n".join(
+            f"- Comuna {r.commune_id}: fecha {_as_iso(r.reference_date) or 'Sin datos'}, "
+            f"lluvia diaria {((r.features or {}).get('precip_sum_mm_day') if isinstance(r.features, dict) else None) or 'Sin datos'} mm"
+            for r in rain_rows
+        )
+        or "- Sin datos"
+    )
+
+    alerts_stmt = (
+        select(
+            RiskPrediction.commune_id,
+            RiskPrediction.risk_category,
+            RiskPrediction.risk_score,
+            RiskPrediction.created_at,
+        )
+        .where(func.lower(RiskPrediction.risk_category).in_(["alto", "crítico", "critico"]))
+        .order_by(RiskPrediction.risk_score.desc())
+    )
+    alert_rows = (await db.execute(alerts_stmt)).all()
+    alerts_text = (
+        "\n".join(
+            f"- Comuna {commune_display_name(str(r.commune_id))} ({r.commune_id}): "
+            f"{r.risk_category or 'Sin datos'} "
+            f"(score={r.risk_score if r.risk_score is not None else 'Sin datos'}) "
+            f"@ {_as_iso(r.created_at) or 'Sin datos'}"
+            for r in alert_rows
+        )
+        or "- Sin datos"
+    )
+
+    return (
+        "DATOS REALES PARA RESPONDER:\n"
+        "Predicciones actuales por comuna:\n"
+        f"{predictions_text}\n\n"
+        "Últimos eventos de deslizamiento:\n"
+        f"{events_text}\n\n"
+        "Lluvia reciente por comuna:\n"
+        f"{rain_text}\n\n"
+        "Alertas activas (alto/crítico):\n"
+        f"{alerts_text}"
+    )
 
 
 def _norm_msg(message: str) -> str:
@@ -38,159 +204,73 @@ def _norm_msg(message: str) -> str:
     return "".join(c for c in nkfd if unicodedata.category(c) != "Mn")
 
 
-async def _build_tool_context(message: str, db: AsyncSession) -> str:
-    mnorm = _norm_msg(message)
-    communes = find_communes_in_text(message)
-    chunks: list[str] = []
-
-    compare_hit = bool(
-        re.search(r"\b(compar|versus|vs\.?|frente a|respecto a)\b", mnorm)
-        or re.search(r"\bentre\b.+\by\b", mnorm)
-    )
-    if compare_hit and len(communes) >= 2:
-        tab = await compare_comunas(communes[:6], db)
-        chunks.append(
-            "Comparativa de comunas (última predicción ML por comuna):\n"
-            + json.dumps(tab, ensure_ascii=False, default=str)
-        )
-        risk_ids: set[str] = set()
-    else:
-        risk_ids = set(communes)
-
-    top_hit = any(
-        p in mnorm
-        for p in (
-            "mas riesgo",
-            "mayor riesgo",
-            "top riesgo",
-            "comuna con mas",
-            "donde hay mas",
-            "quien tiene mas",
-            "peor riesgo",
-            "mas peligro",
-            "mas vulnerable",
-        )
-    ) or ("mas" in mnorm and "riesgo" in mnorm and "comuna" in mnorm)
-
-    if top_hit:
-        top = await get_top_risk_comunas(5, db)
-        chunks.append(
-            "Top comunas por risk_score (última predicción por comuna):\n"
-            + json.dumps(top, ensure_ascii=False, default=str)
-        )
-
-    alert_hit = any(p in mnorm for p in ("alerta", "alertas", "en alerta", "riesgo critico"))
-    if alert_hit and not compare_hit:
-        alerts = await get_alert_status(db)
-        chunks.append(
-            "Comunas con categoría ALTO o CRÍTICO (última predicción en risk_predictions):\n"
-            + json.dumps(alerts, ensure_ascii=False, default=str)
-        )
-
-    history_hit = any(
-        p in mnorm
-        for p in (
-            "paso",
-            "sucedio",
-            "historial",
-            "eventos",
-            "emergencias",
-            "hubo",
-            "ultimo mes",
-            "ultimos dias",
-            "ultimas semanas",
-        )
-    )
-    if history_hit and communes:
-        days_back: int | None = None
-        if "mes" in mnorm or "30 dias" in mnorm:
-            days_back = 30
-        elif "semana" in mnorm:
-            days_back = 7
-        cid = communes[0]
-        ev = await get_historical_events(cid, db, limit=15, days_back=days_back)
-        chunks.append(
-            f"Eventos en landslide_events (comuna {commune_display_name(cid)}):\n"
-            + json.dumps(ev, ensure_ascii=False, default=str)
-        )
-
-    if not compare_hit:
-        for cid in list(risk_ids)[:3]:
-            r = await get_risk_by_comuna(cid, db)
-            chunks.append(
-                f"Predicción actual ({commune_display_name(cid)}):\n" + json.dumps(r, ensure_ascii=False, default=str)
-            )
-
-    if not chunks:
-        top = await get_top_risk_comunas(3, db)
-        chunks.append(
-            "Contexto mínimo (sin coincidencias claras de intención): top-3 riesgo actual\n"
-            + json.dumps(top, ensure_ascii=False, default=str)
-        )
-
-    return "\n\n---\n\n".join(chunks)
-
-
-def _contents_for_model(history: list[dict[str, str]], augmented_user_message: str) -> list[dict[str, Any]]:
-    contents: list[dict[str, Any]] = []
-    for h in history:
-        if h["role"] == "user":
-            contents.append({"role": "user", "parts": [h["content"]]})
-        elif h["role"] == "assistant":
-            contents.append({"role": "model", "parts": [h["content"]]})
-    contents.append({"role": "user", "parts": [augmented_user_message]})
-    return contents
-
-
-def _extract_reply(response: Any) -> str:
-    try:
-        text = response.text
-        if text:
-            return text.strip()
-    except (ValueError, AttributeError):
-        pass
-    try:
-        parts = response.candidates[0].content.parts
-        return "".join(getattr(p, "text", "") for p in parts).strip()
-    except (AttributeError, IndexError, KeyError):
-        return "No pude obtener una respuesta del modelo. Intenta de nuevo en unos segundos."
+async def _ask_gemini(system_text: str, user_text: str, api_key: str) -> str:
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+    payload = {
+        "systemInstruction": {"parts": [{"text": system_text}]},
+        "contents": [{"role": "user", "parts": [{"text": user_text}]}],
+        "generationConfig": {
+            "temperature": 0.5,
+            "maxOutputTokens": 500,
+        },
+    }
+    async with httpx.AsyncClient(timeout=25.0) as client:
+        res = await client.post(url, params={"key": api_key}, json=payload)
+    res.raise_for_status()
+    data = res.json()
+    candidates = data.get("candidates") or []
+    if not candidates:
+        return "No pude generar una respuesta en este momento."
+    parts = ((candidates[0].get("content") or {}).get("parts")) or []
+    text = "".join((p.get("text") or "") for p in parts).strip()
+    return text or "No pude generar una respuesta en este momento."
 
 
 async def chat(message: str, session_id: str, db: AsyncSession) -> str:
-    if not os.getenv("GEMINI_API_KEY"):
-        return (
-            "TEYVA no puede consultar el modelo: falta la variable de entorno GEMINI_API_KEY. "
-            "Configúrala en backend/.env según AGENTS.MD."
-        )
-
-    history = await get_history(session_id, db, limit=10)
+    api_key = _get_gemini_key()
+    history = await get_history(session_id, db, limit=6)
     await save_turn(session_id, "user", message, db)
 
-    tool_blob = await _build_tool_context(message, db)
-    augmented = (
-        "[Consulta automática a la base de datos TEYVA — usa solo estos hechos; si faltan datos, dilo]\n"
-        f"{tool_blob}\n\n"
-        f"[Pregunta del usuario]\n{message}"
-    )
-
-    contents = _contents_for_model(history, augmented)
-
-    def _call_model() -> Any:
-        return model.generate_content(contents)
-
     try:
-        response = await asyncio.wait_for(asyncio.to_thread(_call_model), timeout=90.0)
-        reply = _extract_reply(response)
-    except asyncio.TimeoutError:
-        reply = (
-            "TEYVA: la respuesta del modelo tardó demasiado. Intenta de nuevo con una pregunta más corta "
-            "o verifica tu conexión. Si el problema continúa, revisa GEMINI_API_KEY y cuotas del API."
-        )
-    except Exception as e:
-        reply = (
-            "TEYVA: no pude completar la consulta al modelo en este momento ("
-            f"{type(e).__name__}). Verifica GEMINI_API_KEY y vuelve a intentar."
-        )
+        communes = find_communes_in_text(message)
+        context_parts: list[str] = []
+        if communes:
+            row = await get_risk_by_comuna(communes[0], db)
+            context_parts.append("Consulta puntual por comuna.")
+            context_parts.append(_natural_db_context_row(row))
+        else:
+            top = await get_top_risk_comunas(3, db)
+            if not top:
+                context_parts.append(
+                    "No hay predicciones recientes en risk_predictions; responder de forma preventiva y educativa."
+                )
+            else:
+                context_parts.append("Consulta general sin comuna explícita.")
+                context_parts.append(_natural_db_context_rows(top))
 
+        if history:
+            last_turns = history[-3:]
+            context_parts.append(
+                "Contexto breve de conversación previa: "
+                + " | ".join(f"{t.get('role')}: {t.get('content')}" for t in last_turns)
+            )
+
+        global_data_context = await _load_prompt_context(db)
+        local_context = "\n".join(p for p in context_parts if p.strip()) or "Sin datos recientes disponibles."
+        data_context = f"{global_data_context}\n\nCONTEXTO DE LA PREGUNTA ACTUAL:\n{local_context}"
+        system_with_context = f"{SYSTEM_PROMPT}\n\nCONTEXTO ACTUAL:\n{data_context}"
+        if not api_key:
+            reply = "Servicio no disponible"
+        else:
+            try:
+                reply = await _ask_gemini(system_with_context, message, api_key)
+            except Exception:
+                reply = "Servicio no disponible"
+    except asyncio.TimeoutError:
+        reply = "Servicio no disponible"
+    except Exception:
+        reply = "Servicio no disponible"
+
+    reply = _append_emergency_line_if_needed(reply)
     await save_turn(session_id, "assistant", reply, db)
     return reply

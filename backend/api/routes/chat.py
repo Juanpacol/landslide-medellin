@@ -22,9 +22,22 @@ class ChatResponse(BaseModel):
     session_id: str
 
 
+@router.post("", response_model=ChatResponse)
 @router.post("/message", response_model=ChatResponse)
 async def post_message(body: ChatRequest, db: AsyncSession = Depends(get_async_db)) -> ChatResponse:
+    user_row = AgentConversation(
+        session_id=body.session_id,
+        role="user",
+        content=body.message,
+    )
+    db.add(user_row)
     reply = await agent_chat(body.message, body.session_id, db)
+    assistant_row = AgentConversation(
+        session_id=body.session_id,
+        role="assistant",
+        content=reply,
+    )
+    db.add(assistant_row)
     await db.commit()
     return ChatResponse(reply=reply, session_id=body.session_id)
 
