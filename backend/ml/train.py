@@ -9,10 +9,13 @@ from typing import Any
 
 import joblib
 import numpy as np
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.metrics import roc_auc_score
+from imblearn.over_sampling import SMOTE
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import LeaveOneOut, StratifiedKFold, cross_val_predict, cross_val_score
 from sklearn.preprocessing import StandardScaler
+from sklearn.utils import class_weight
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from xgboost import XGBClassifier
@@ -219,9 +222,6 @@ def train() -> dict[str, Any]:
     builder.save_scaler(scaler)
     builder.save_feature_names(feature_names)
 
-    cv, cv_name = _cv_splitter(y)
-    small_n = n_samples < 50
-
     if len(np.unique(y)) < 2:
         payload = {
             "n_samples": n_samples,
@@ -237,6 +237,17 @@ def train() -> dict[str, Any]:
         METRICS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return payload
 
+    sm = SMOTE(random_state=42)
+    X_res, y_res = sm.fit_resample(Xs, y)
+
+    class_values = np.array([0, 1], dtype=int)
+    weights = class_weight.compute_class_weight(class_weight="balanced", classes=class_values, y=y_res)
+    class_weight_map = {int(cls): float(w) for cls, w in zip(class_values, weights)}
+    scale_pos_weight = class_weight_map[1] / max(class_weight_map[0], 1e-9)
+
+    cv, cv_name = _cv_splitter(y_res)
+    small_n = len(y_res) < 50
+
     rf_trees = 80 if small_n else 200
     xgb_trees = 60 if small_n else 120
 
@@ -247,7 +258,7 @@ def train() -> dict[str, Any]:
                 n_estimators=rf_trees,
                 max_depth=6,
                 random_state=42,
-                class_weight="balanced_subsample",
+                class_weight=class_weight_map,
                 n_jobs=1,
             ),
         ),
@@ -262,14 +273,16 @@ def train() -> dict[str, Any]:
                 reg_lambda=1.0,
                 random_state=42,
                 eval_metric="logloss",
+                scale_pos_weight=scale_pos_weight,
                 n_jobs=1,
             ),
         ),
         (
-            "GradientBoostingClassifier",
-            GradientBoostingClassifier(
+            "LogisticRegression",
+            LogisticRegression(
                 random_state=42,
-                n_estimators=80 if small_n else 100,
+                max_iter=2000,
+                class_weight=class_weight_map,
             ),
         ),
     ]
@@ -280,7 +293,7 @@ def train() -> dict[str, Any]:
 
     for name, model in candidates:
         try:
-            auc = _auc_scorer(model, Xs, y, cv)
+            auc = _auc_scorer(model, X_res, y_res, cv)
         except Exception:  # noqa: BLE001
             auc = float("nan")
         if (not np.isnan(auc)) and auc > best_auc:
@@ -303,13 +316,18 @@ def train() -> dict[str, Any]:
         METRICS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return payload
 
-    best_model.fit(Xs, y)
+    best_model.fit(X_res, y_res)
 
     try:
-        train_proba = best_model.predict_proba(Xs)[:, 1]
-        train_auc = float(roc_auc_score(y, train_proba))
+        train_proba = best_model.predict_proba(X_res)[:, 1]
+        train_auc = float(roc_auc_score(y_res, train_proba))
+        y_pred = (train_proba >= 0.3).astype(int)
+        train_precision = float(precision_score(y_res, y_pred, zero_division=0))
+        train_recall = float(recall_score(y_res, y_pred, zero_division=0))
     except Exception:  # noqa: BLE001
         train_auc = float("nan")
+        train_precision = float("nan")
+        train_recall = float("nan")
 
     artifact = {
         "model": best_model,
@@ -323,11 +341,17 @@ def train() -> dict[str, Any]:
         "n_samples": n_samples,
         "n_positive": n_positive,
         "n_features": n_features,
+        "n_samples_after_smote": int(len(y_res)),
+        "n_positive_after_smote": int(np.sum(y_res)),
         "best_model": best_name,
         "cv_mean_auc": float(best_auc),
         "cv_strategy": cv_name,
         "target_strategy": target_strategy,
         "train_auc_roc": train_auc,
+        "classification_threshold": 0.3,
+        "train_precision_at_0_3": train_precision,
+        "train_recall_at_0_3": train_recall,
+        "class_weight": class_weight_map,
         "feature_names": feature_names,
         "model_version": model_version,
     }

@@ -27,6 +27,7 @@ _BACKEND_ENV = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=_BACKEND_ENV, override=True)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+OLLAMA_FALLBACK_MODEL = os.getenv("OLLAMA_FALLBACK_MODEL", "qwen2.5:0.5b")
 
 
 def _safe_num(v: Any) -> float | None:
@@ -100,6 +101,27 @@ def _append_emergency_line_if_needed(text: str) -> str:
     return f"{text}\n\n{emergency}"
 
 
+def _looks_like_refusal(text: str) -> bool:
+    t = _norm_msg(text)
+    refusal_patterns = (
+        "no puedo ayudar",
+        "no puedo asistir",
+        "no tengo acceso",
+        "no tengo informacion especifica",
+        "necesito mas detalles",
+        "necesito mas informacion",
+        "podriamos tener mas informacion",
+        "podriamos tener mas detalles",
+        "podrias tener mas informacion",
+        "cual es su area geografica",
+        "cual es el numero de habitantes",
+        "pregunta especifica",
+        "podrias proporcionar mas",
+        "podria proporcionar mas",
+    )
+    return any(p in t for p in refusal_patterns)
+
+
 def _as_iso(value: Any) -> str | None:
     if value is None:
         return None
@@ -109,89 +131,50 @@ def _as_iso(value: Any) -> str | None:
 
 
 async def _load_prompt_context(db: AsyncSession) -> str:
-    predictions_stmt = (
-        select(
-            RiskPrediction.commune_id,
-            RiskPrediction.risk_category,
-            RiskPrediction.risk_score,
-            RiskPrediction.created_at,
-        )
-        .order_by(RiskPrediction.risk_score.desc())
-    )
+    predictions_stmt = select(
+        RiskPrediction.commune_id, RiskPrediction.risk_category, RiskPrediction.risk_score, RiskPrediction.created_at
+    ).order_by(RiskPrediction.risk_score.desc()).limit(3)
     predictions_rows = (await db.execute(predictions_stmt)).all()
-    predictions_text = (
-        "\n".join(
-            f"- Comuna {commune_display_name(str(r.commune_id))} ({r.commune_id}): "
-            f"riesgo {r.risk_category or 'Sin datos'} "
-            f"(score={r.risk_score if r.risk_score is not None else 'Sin datos'}), "
-            f"predicho en {_as_iso(r.created_at) or 'Sin datos'}"
-            for r in predictions_rows
-        )
-        or "- Sin datos"
-    )
+    predictions_text = "; ".join(
+        f"{commune_display_name(str(r.commune_id))}: {r.risk_category or 'Sin datos'} ({round(float(r.risk_score), 3) if r.risk_score is not None else 'Sin datos'})"
+        for r in predictions_rows
+    ) or "Sin datos"
 
-    events_stmt = (
-        select(LandslideEvent.commune_id, LandslideEvent.fecha, LandslideEvent.tipo_emergencia)
-        .order_by(desc(LandslideEvent.fecha))
-        .limit(20)
-    )
+    events_stmt = select(LandslideEvent.commune_id, LandslideEvent.fecha, LandslideEvent.tipo_emergencia).order_by(
+        desc(LandslideEvent.fecha)
+    ).limit(5)
     events_rows = (await db.execute(events_stmt)).all()
-    events_text = (
-        "\n".join(
-            f"- Comuna {r.commune_id or 'Sin datos'}: fecha {r.fecha or 'Sin datos'}, "
-            f"tipo {r.tipo_emergencia or 'Sin datos'}"
-            for r in events_rows
-        )
-        or "- Sin datos"
-    )
+    events_text = "; ".join(
+        f"{r.commune_id or 'Sin datos'}-{r.fecha or 'Sin datos'}-{r.tipo_emergencia or 'Sin datos'}"
+        for r in events_rows
+    ) or "Sin datos"
 
-    rain_stmt = (
-        select(MLFeature.commune_id, MLFeature.reference_date, MLFeature.features)
-        .order_by(MLFeature.reference_date.desc())
-        .limit(50)
-    )
+    rain_stmt = select(MLFeature.commune_id, MLFeature.reference_date, MLFeature.features).order_by(
+        MLFeature.reference_date.desc()
+    ).limit(6)
     rain_rows = (await db.execute(rain_stmt)).all()
-    rain_text = (
-        "\n".join(
-            f"- Comuna {r.commune_id}: fecha {_as_iso(r.reference_date) or 'Sin datos'}, "
-            f"lluvia diaria {((r.features or {}).get('precip_sum_mm_day') if isinstance(r.features, dict) else None) or 'Sin datos'} mm"
-            for r in rain_rows
-        )
-        or "- Sin datos"
-    )
+    rain_text = "; ".join(
+        f"{r.commune_id}:{((r.features or {}).get('precip_sum_mm_day') if isinstance(r.features, dict) else 'Sin datos')}"
+        for r in rain_rows
+    ) or "Sin datos"
 
-    alerts_stmt = (
-        select(
-            RiskPrediction.commune_id,
-            RiskPrediction.risk_category,
-            RiskPrediction.risk_score,
-            RiskPrediction.created_at,
-        )
-        .where(func.lower(RiskPrediction.risk_category).in_(["alto", "crítico", "critico"]))
-        .order_by(RiskPrediction.risk_score.desc())
-    )
+    alerts_stmt = select(
+        RiskPrediction.commune_id, RiskPrediction.risk_category, RiskPrediction.risk_score
+    ).where(func.lower(RiskPrediction.risk_category).in_(["alto", "crítico", "critico"])).order_by(
+        RiskPrediction.risk_score.desc()
+    ).limit(3)
     alert_rows = (await db.execute(alerts_stmt)).all()
-    alerts_text = (
-        "\n".join(
-            f"- Comuna {commune_display_name(str(r.commune_id))} ({r.commune_id}): "
-            f"{r.risk_category or 'Sin datos'} "
-            f"(score={r.risk_score if r.risk_score is not None else 'Sin datos'}) "
-            f"@ {_as_iso(r.created_at) or 'Sin datos'}"
-            for r in alert_rows
-        )
-        or "- Sin datos"
-    )
+    alerts_text = ", ".join(
+        f"{commune_display_name(str(r.commune_id))} ({r.risk_category or 'Sin datos'})" for r in alert_rows
+    ) or "Sin datos"
 
     return (
-        "DATOS REALES PARA RESPONDER:\n"
-        "Predicciones actuales por comuna:\n"
-        f"{predictions_text}\n\n"
-        "Últimos eventos de deslizamiento:\n"
-        f"{events_text}\n\n"
-        "Lluvia reciente por comuna:\n"
-        f"{rain_text}\n\n"
-        "Alertas activas (alto/crítico):\n"
-        f"{alerts_text}"
+        "DATOS REALES RESUMIDOS:\n"
+        f"Top riesgo: {predictions_text}\n"
+        f"Eventos recientes: {events_text}\n"
+        f"Lluvia reciente: {rain_text}\n"
+        f"Alertas activas: {alerts_text}\n"
+        "Si falta algún dato, responde 'Sin datos'."
     )
 
 
@@ -200,17 +183,19 @@ def _norm_msg(message: str) -> str:
     return "".join(c for c in nkfd if unicodedata.category(c) != "Mn")
 
 
-async def _ask_ollama(system_text: str, user_text: str) -> str:
+async def _ask_ollama(system_text: str, user_text: str, model: str) -> str:
     url = f"{OLLAMA_URL}/api/chat"
     payload = {
-        "model": OLLAMA_MODEL,
+        "model": model,
         "messages": [
             {"role": "system", "content": system_text},
             {"role": "user", "content": user_text},
         ],
         "stream": False,
+        "options": {"num_predict": 120, "temperature": 0.2},
     }
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    timeout = httpx.Timeout(360.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         res = await client.post(url, json=payload)
     res.raise_for_status()
     return (res.json().get("message") or {}).get("content") or "Servicio no disponible"
@@ -222,7 +207,27 @@ async def chat(message: str, session_id: str, db: AsyncSession) -> str:
 
     try:
         communes = find_communes_in_text(message)
+        mnorm = _norm_msg(message)
         context_parts: list[str] = []
+        direct_commune_query = (
+            len(communes) == 1
+            and any(token in mnorm for token in ("como esta", "cómo esta", "estado", "situacion", "situación"))
+        )
+        if direct_commune_query:
+            row = await get_risk_by_comuna(communes[0], db)
+            if row and row.get("risk_score") is not None:
+                reply = (
+                    f"Según nuestros sensores, {_natural_db_context_row(row)} "
+                    "Si quieres, también te resumo lluvia reciente y alertas activas de esa comuna."
+                )
+            else:
+                reply = (
+                    f"Según nuestros sensores, no hay datos recientes para {communes[0]}. "
+                    "Intenta de nuevo en unos minutos."
+                )
+            reply = _append_emergency_line_if_needed(reply)
+            await save_turn(session_id, "assistant", reply, db)
+            return reply
         if communes:
             row = await get_risk_by_comuna(communes[0], db)
             context_parts.append("Consulta puntual por comuna.")
@@ -248,7 +253,32 @@ async def chat(message: str, session_id: str, db: AsyncSession) -> str:
         local_context = "\n".join(p for p in context_parts if p.strip()) or "Sin datos recientes disponibles."
         data_context = f"{global_data_context}\n\nCONTEXTO DE LA PREGUNTA ACTUAL:\n{local_context}"
         system_with_context = f"{SYSTEM_PROMPT}\n\nCONTEXTO ACTUAL:\n{data_context}"
-        reply = await _ask_ollama(system_with_context, message)
+        selected_row: dict[str, Any] | None = None
+        if communes:
+            selected_row = await get_risk_by_comuna(communes[0], db)
+        try:
+            reply = await _ask_ollama(system_with_context, message, OLLAMA_MODEL)
+        except Exception as first_error:
+            print(f"OLLAMA primary model error ({OLLAMA_MODEL}): {type(first_error).__name__}: {first_error}")
+            reply = await _ask_ollama(system_with_context, message, OLLAMA_FALLBACK_MODEL)
+        if _looks_like_refusal(reply):
+            if selected_row:
+                reply = (
+                    f"Según nuestros sensores, {_natural_db_context_row(selected_row)} "
+                    "Si quieres, también te resumo lluvia reciente y eventos reportados para esa comuna."
+                )
+            else:
+                top = await get_top_risk_comunas(3, db)
+                if top:
+                    reply = (
+                        f"Según nuestros sensores, {_natural_db_context_rows(top[:3])} "
+                        "Si me dices una comuna específica, te doy detalle puntual."
+                    )
+                else:
+                    reply = (
+                        "En este momento no hay predicciones recientes cargadas para responder con precisión. "
+                        "Intenta de nuevo en unos minutos."
+                    )
     except asyncio.TimeoutError:
         reply = "Servicio no disponible"
     except Exception as e:

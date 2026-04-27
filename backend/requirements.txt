@@ -15,5 +15,6 @@ apscheduler
 geopandas
 scipy
 scikit-learn
+imbalanced-learn
 xgboost
 joblib

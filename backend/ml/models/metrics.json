@@ -2,11 +2,20 @@
   "n_samples": 8429,
   "n_positive": 26,
   "n_features": 7,
+  "n_samples_after_smote": 16806,
+  "n_positive_after_smote": 8403,
   "best_model": "XGBClassifier",
-  "cv_mean_auc": 0.7653357659839666,
+  "cv_mean_auc": 0.9434888411896998,
   "cv_strategy": "5-fold",
   "target_strategy": "future_7d",
-  "train_auc_roc": 0.8965662446562126,
+  "train_auc_roc": 0.9443055201677135,
+  "classification_threshold": 0.3,
+  "train_precision_at_0_3": 0.7360757828260679,
+  "train_recall_at_0_3": 0.9986909437105795,
+  "class_weight": {
+    "0": 1.0,
+    "1": 1.0
+  },
   "feature_names": [
     "centroid_lat",
     "centroid_lon",

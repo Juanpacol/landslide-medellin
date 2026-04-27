@@ -24,11 +24,12 @@ METRICS_PATH = MODELS_DIR / "metrics.json"
 
 
 def _risk_level_from_score(score: float) -> str:
-    if score < 0.3:
+    # Umbrales más conservadores para evitar sobre-alertar tras reentrenos con SMOTE.
+    if score < 0.35:
         return "bajo"
-    if score < 0.6:
+    if score < 0.65:
         return "medio"
-    if score < 0.8:
+    if score < 0.90:
         return "alto"
     return "critico"
 
