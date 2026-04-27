@@ -1,12 +1,12 @@
 {
-  "n_samples": 25,
-  "n_positive": 14,
+  "n_samples": 8429,
+  "n_positive": 26,
   "n_features": 7,
-  "best_model": "RandomForestClassifier",
-  "cv_mean_auc": 0.6168831168831168,
-  "cv_strategy": "LOO",
+  "best_model": "XGBClassifier",
+  "cv_mean_auc": 0.7653357659839666,
+  "cv_strategy": "5-fold",
   "target_strategy": "future_7d",
-  "train_auc_roc": 1.0,
+  "train_auc_roc": 0.8965662446562126,
   "feature_names": [
     "centroid_lat",
     "centroid_lon",

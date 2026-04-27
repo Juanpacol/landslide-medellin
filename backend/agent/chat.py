@@ -38,7 +38,7 @@ def _safe_num(v: Any) -> float | None:
         return None
 
 
-def _risk_level_from_score(score: Any) -> str:
+def _risk_category_from_score(score: Any) -> str:
     value = _safe_num(score)
     if value is None:
         return "riesgo sin información reciente"
@@ -75,9 +75,9 @@ def _natural_db_context_row(row: dict[str, Any] | None) -> str:
     if not row:
         return "No hay datos recientes para la comuna consultada."
     nombre = row.get("nombre") or row.get("commune_id") or "la comuna consultada"
-    risk_text = _risk_level_from_score(row.get("risk_score"))
+    risk_category_text = _risk_category_from_score(row.get("risk_score"))
     updated_text = _humanize_updated_at(row.get("created_at"))
-    return f"Comuna {nombre}: {risk_text}, {updated_text}."
+    return f"Comuna {nombre}: {risk_category_text}, {updated_text}."
 
 
 def _natural_db_context_rows(rows: list[dict[str, Any]]) -> str:

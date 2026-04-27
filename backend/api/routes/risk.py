@@ -288,8 +288,8 @@ async def get_comuna_detalle(commune_id: str, db: AsyncSession = Depends(get_asy
         "commune_id": commune_id,
         "nombre_comuna": nombre,
         "risk_score": float(pred.risk_score) if pred and pred.risk_score is not None else None,
-        "risk_level": pred.risk_category if pred and pred.risk_category else "Sin datos",
-        "predicted_at": pred.created_at.isoformat() if pred and pred.created_at else None,
+        "risk_category": pred.risk_category if pred and pred.risk_category else "Sin datos",
+        "created_at": pred.created_at.isoformat() if pred and pred.created_at else None,
         "rainfall_last_7d_daily": rain_7d_series,
         "rainfall_last_7d_total": rain_7d if rain_by_day else "Sin datos",
         "rainfall_last_30d_total": rain_30d if rain_by_day else "Sin datos",
@@ -354,7 +354,7 @@ async def get_historia(commune_id: str, db: AsyncSession = Depends(get_async_db)
         if current is None or (current.get("created_at") or datetime.min.replace(tzinfo=timezone.utc)) < p.created_at:
             pred_by_day[d] = {
                 "risk_score": float(p.risk_score) if p.risk_score is not None else None,
-                "risk_level": p.risk_category or "Sin datos",
+                "risk_category": p.risk_category or "Sin datos",
                 "created_at": p.created_at,
             }
 
@@ -368,7 +368,7 @@ async def get_historia(commune_id: str, db: AsyncSession = Depends(get_async_db)
                 "rainfall": round(rain_by_day.get(d, 0.0), 2),
                 "landslides": int(events_by_day.get(d, 0)),
                 "risk_score": pred_info.get("risk_score"),
-                "risk_level": pred_info.get("risk_level", "Sin datos"),
+                "risk_category": pred_info.get("risk_category", "Sin datos"),
             }
         )
 
