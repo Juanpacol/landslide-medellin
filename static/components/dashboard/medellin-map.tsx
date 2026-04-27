@@ -84,7 +84,8 @@ export function MedellinMap({ onCommuneSelect, selectedCommuneId }: MedellinMapP
         maxZoom: 19,
       }).addTo(map);
 
-      // Cargar riesgo por comuna desde API y geometria por barrio desde JSON (401 poligonos)
+      // Cargar riesgo por comuna desde API y geometría por barrio desde JSON.
+      // Si barrios falla, usar fallback por comuna para no romper el mapa.
       try {
         const comunaGeo = await fetchGeoJSON();
         const comunaById = new Map(
@@ -94,7 +95,7 @@ export function MedellinMap({ onCommuneSelect, selectedCommuneId }: MedellinMapP
         const barrios = barriosGeo as BarriosCollection;
         const cleaned = {
           ...barrios,
-          features: barrios.features.filter((f) => !!f.geometry && !!f.properties?.codigo),
+          features: (barrios.features ?? []).filter((f) => !!f.geometry && !!f.properties?.codigo),
         } as BarriosCollection;
 
         const buildBarrioView = (feature: BarrioFeature) => {
@@ -166,8 +167,51 @@ export function MedellinMap({ onCommuneSelect, selectedCommuneId }: MedellinMapP
           return acc + (filters.has(view.categoria_riesgo) && (!hillsideOnly || !!view.is_zona_ladera) ? 1 : 0);
         }, 0);
         setVisibleCount(visible);
-      } catch {
-        console.error('No se pudo cargar el mapa de barrios');
+      } catch (barriosError) {
+        console.warn('Mapa por barrios no disponible; usando fallback por comuna.', barriosError);
+        try {
+          const comunaGeo = await fetchGeoJSON();
+          const cleanedComunas = {
+            ...comunaGeo,
+            features: comunaGeo.features.filter((f) => !!f.geometry && !!f.properties?.commune_id),
+          } as GeoJSON.FeatureCollection;
+
+          const layer = L.geoJSON(cleanedComunas, {
+            style: (feature) => {
+              const props = feature?.properties as CommuneFeature['properties'] | undefined;
+              const risk = props?.categoria_riesgo ?? 'Bajo';
+              const color = riskColors[risk] ?? '#22c55e';
+              const isSelected = props?.commune_id === selectedCommuneId;
+              const isVisible = !!props && filters.has(risk) && (!hillsideOnly || !!props.is_zona_ladera);
+              return {
+                color: isVisible ? color : 'transparent',
+                fillColor: isVisible ? color : 'transparent',
+                fillOpacity: isVisible ? (isSelected ? 0.8 : 0.58) : 0,
+                weight: isVisible ? (isSelected ? 2.6 : 1.2) : 0,
+              };
+            },
+            onEachFeature: (feature, layer) => {
+              const props = feature.properties as CommuneFeature['properties'];
+              layer.bindTooltip(props.nombre_comuna, {
+                permanent: false,
+                direction: 'center',
+                className: 'commune-tooltip',
+              });
+              layer.on('click', () => onCommuneSelect(props));
+            },
+          }).addTo(map);
+
+          const bounds = layer.getBounds();
+          if (bounds.isValid()) map.fitBounds(bounds, { padding: [16, 16] });
+          const visible = cleanedComunas.features.reduce((acc, f) => {
+            const p = f.properties as CommuneFeature['properties'] | undefined;
+            if (!p) return acc;
+            return acc + (filters.has(p.categoria_riesgo) && (!hillsideOnly || !!p.is_zona_ladera) ? 1 : 0);
+          }, 0);
+          setVisibleCount(visible);
+        } catch (fallbackError) {
+          console.warn('También falló el fallback por comuna.', fallbackError);
+        }
       }
 
       } finally {

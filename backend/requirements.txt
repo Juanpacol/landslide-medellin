@@ -17,4 +17,3 @@ scipy
 scikit-learn
 xgboost
 joblib
-google-genai

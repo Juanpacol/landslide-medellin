@@ -3,7 +3,7 @@
 ## Capa compartida
 - backend/db/session.py   → get_db(), async_engine, sync_engine
 - backend/db/models/      → todos los modelos SQLAlchemy
-- .env                    → DATABASE_URL, DATABASE_URL_SYNC, GEMINI_API_KEY
+- .env                    → DATABASE_URL, DATABASE_URL_SYNC, OLLAMA_URL, OLLAMA_MODEL
 
 ## Agente 1 (ML) produce
 - predict_risk(comuna_id, db) → dict
@@ -15,7 +15,7 @@
 - predict_risk() del Agente 1
 - Tablas: risk_predictions, landslide_events, agent_conversations
 - Produce: chat(message, session_id, db) → str
-- LLM: Gemini 2.0 Flash (GEMINI_API_KEY)
+- LLM: Ollama local (OLLAMA_URL, OLLAMA_MODEL)
 
 ## Agente 3 (Scraper) alimenta
 - Tablas: ml_features, landslide_events, scraping_logs
@@ -29,4 +29,5 @@
 ## Variables de entorno
 DATABASE_URL=postgresql+asyncpg://...neon.tech/neondb?sslmode=require
 DATABASE_URL_SYNC=postgresql://...neon.tech/neondb?sslmode=require
-GEMINI_API_KEY=AIza...
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2

@@ -1,1 +1,1 @@
-"""Agente conversacional TEYVA (Gemini + datos Neon)."""
+"""Agente conversacional TEYVA (Ollama + datos Neon)."""

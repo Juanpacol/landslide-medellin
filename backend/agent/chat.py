@@ -25,12 +25,8 @@ from db.models import LandslideEvent, MLFeature, RiskPrediction
 # Cargar backend/.env explícitamente para evitar depender del cwd del proceso.
 _BACKEND_ENV = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=_BACKEND_ENV, override=True)
-
-
-def _get_gemini_key() -> str:
-    # Recargar por si el usuario actualizó .env con el server ya arriba.
-    load_dotenv(dotenv_path=_BACKEND_ENV, override=True)
-    return (os.getenv("GEMINI_API_KEY") or "").strip()
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 
 def _safe_num(v: Any) -> float | None:
@@ -204,30 +200,23 @@ def _norm_msg(message: str) -> str:
     return "".join(c for c in nkfd if unicodedata.category(c) != "Mn")
 
 
-async def _ask_gemini(system_text: str, user_text: str, api_key: str) -> str:
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+async def _ask_ollama(system_text: str, user_text: str) -> str:
+    url = f"{OLLAMA_URL}/api/chat"
     payload = {
-        "systemInstruction": {"parts": [{"text": system_text}]},
-        "contents": [{"role": "user", "parts": [{"text": user_text}]}],
-        "generationConfig": {
-            "temperature": 0.5,
-            "maxOutputTokens": 500,
-        },
+        "model": OLLAMA_MODEL,
+        "messages": [
+            {"role": "system", "content": system_text},
+            {"role": "user", "content": user_text},
+        ],
+        "stream": False,
     }
-    async with httpx.AsyncClient(timeout=25.0) as client:
-        res = await client.post(url, params={"key": api_key}, json=payload)
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        res = await client.post(url, json=payload)
     res.raise_for_status()
-    data = res.json()
-    candidates = data.get("candidates") or []
-    if not candidates:
-        return "No pude generar una respuesta en este momento."
-    parts = ((candidates[0].get("content") or {}).get("parts")) or []
-    text = "".join((p.get("text") or "") for p in parts).strip()
-    return text or "No pude generar una respuesta en este momento."
+    return (res.json().get("message") or {}).get("content") or "Servicio no disponible"
 
 
 async def chat(message: str, session_id: str, db: AsyncSession) -> str:
-    api_key = _get_gemini_key()
     history = await get_history(session_id, db, limit=6)
     await save_turn(session_id, "user", message, db)
 
@@ -259,16 +248,11 @@ async def chat(message: str, session_id: str, db: AsyncSession) -> str:
         local_context = "\n".join(p for p in context_parts if p.strip()) or "Sin datos recientes disponibles."
         data_context = f"{global_data_context}\n\nCONTEXTO DE LA PREGUNTA ACTUAL:\n{local_context}"
         system_with_context = f"{SYSTEM_PROMPT}\n\nCONTEXTO ACTUAL:\n{data_context}"
-        if not api_key:
-            reply = "Servicio no disponible"
-        else:
-            try:
-                reply = await _ask_gemini(system_with_context, message, api_key)
-            except Exception:
-                reply = "Servicio no disponible"
+        reply = await _ask_ollama(system_with_context, message)
     except asyncio.TimeoutError:
         reply = "Servicio no disponible"
-    except Exception:
+    except Exception as e:
+        print(f"OLLAMA ERROR: {type(e).__name__}: {e}")
         reply = "Servicio no disponible"
 
     reply = _append_emergency_line_if_needed(reply)
