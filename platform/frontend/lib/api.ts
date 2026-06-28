@@ -377,3 +377,18 @@ export async function fetchScraperHealth(): Promise<ScraperHealthResponse> {
 export async function fetchScraperTimeline(): Promise<ScraperTimelineResponse> {
   return apiRequest<ScraperTimelineResponse>('/scraper/timeline');
 }
+
+// ── Risk explanations ──────────────────────────────────────────────────────────
+
+export interface RiskExplanationResponse {
+  commune_id: string;
+  risk_score: number | null;
+  risk_category: string | null;
+  explanation: string | null;
+  generated_by: string | null;
+  generated_at: string | null;
+}
+
+export async function fetchRiskExplanation(communeId: string): Promise<RiskExplanationResponse> {
+  return apiRequest<RiskExplanationResponse>(`/risk/explanation/${communeId}`);
+}
