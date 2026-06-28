@@ -1,12 +1,130 @@
-version: '3.8'
+# TEYVA — stack completo. Levanta todo con:  docker compose up
+# Luego abre http://localhost:3000
+#
+# Servicios: PostgreSQL + Ollama (+ descarga de modelo) + Backend (FastAPI) + Frontend (Next.js)
+# Las migraciones de la BD se aplican solas al arrancar el backend.
+
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-teyva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-teyva}
+      POSTGRES_DB: ${POSTGRES_DB:-teyva}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-teyva} -d ${POSTGRES_DB:-teyva}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   ollama:
     image: ollama/ollama:latest
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
 
+  # One-shot: descarga el modelo del chat la primera vez. Termina y no se reinicia.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: ollama:11434
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-llama3.2}"]
+    restart: "no"
+
+  backend:
+    build:
+      context: ./platform/backend
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
+      DB_SSL: "false"
+      ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      API_TOKEN: ${API_TOKEN:-}
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_FALLBACK_MODEL: ${OLLAMA_FALLBACK_MODEL:-qwen2.5:0.5b}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./platform/frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    depends_on:
+      - backend
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  # Scraper daemon: SIATA (30min), DAGRD (1h), IDEAM (6h), Medellín Datos (24h)
+  scraper:
+    build:
+      context: ./platform/backend
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
+      DB_SSL: "false"
+      OLLAMA_URL: http://ollama:11434
+    entrypoint: ["python", "-m", "scraper.scheduler"]
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ML predictor daemon: genera predicciones cada 6 horas
+  ml-predictor:
+    build:
+      context: ./platform/backend
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
+      DB_SSL: "false"
+    entrypoint: >
+      sh -c "
+      while true; do
+        echo '[ML Predictor] Running predictions...'
+        python -m ml.predict
+        echo '[ML Predictor] Sleeping for 6 hours...'
+        sleep 21600
+      done
+      "
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
+  pg_data:
   ollama_data:
