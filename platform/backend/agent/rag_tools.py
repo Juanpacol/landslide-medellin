@@ -167,7 +167,9 @@ async def search_knowledge(query: str, source: Optional[str] = None) -> str:
     if not results:
         return "No se encontró información relevante en la base de conocimiento."
 
-    lines = [f"Resultados de la base de conocimiento para «{query}»:"]
+    # Envuelve los resultados en XML tags para claridad estructural
+    lines = ["<retrieved_documents>"]
+    lines.append(f"Resultados de la base de conocimiento para «{query}»:")
     for i, r in enumerate(results, 1):
         meta = r.get("metadata", {})
         citation = format_citation(meta)
@@ -176,7 +178,11 @@ async def search_knowledge(query: str, source: Optional[str] = None) -> str:
         if len(text) > 600:
             text = text[:600] + "…"
         # La línea FUENTE permite que el modelo cite inline si quiere.
-        lines.append(f"\n[{i}] FUENTE: {citation}\n{text}")
+        lines.append(f"\n<document id=\"{i}\">")
+        lines.append(f"<source>{citation}</source>")
+        lines.append(f"<content>{text}</content>")
+        lines.append("</document>")
+    lines.append("</retrieved_documents>")
     return "\n".join(lines)
 
 

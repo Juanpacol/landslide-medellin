@@ -182,21 +182,51 @@ OLLAMA_FALLBACK_MODEL=qwen2.5:0.5b
 
 ## 9) Como correr el proyecto
 
-## Backend (desde `backend/`)
+### Opcion A — Docker (recomendado: un solo comando)
+
+Requisito unico: tener Docker instalado y corriendo.
 
 ```bash
-python -m venv .venv
+git clone <repo> && cd teyva
+docker compose up
+```
+
+Esto levanta TODO automaticamente:
+
+- PostgreSQL (con migraciones aplicadas al arrancar el backend)
+- Ollama + descarga del modelo del chat (`llama3.2`)
+- Backend FastAPI en http://localhost:8000
+- Frontend Next.js en http://localhost:3000
+
+Abre **http://localhost:3000**. Para detener: `Ctrl+C` (o `docker compose down`).
+Para borrar tambien los datos (BD + modelos): `docker compose down -v`.
+
+> La primera vez tarda varios minutos (build de imagenes + descarga del modelo ~2 GB).
+> No necesitas crear `.env`: el `docker-compose.yml` trae valores por defecto.
+
+### Opcion B — Local (sin Docker)
+
+Requisitos: Python 3.11+, Node 20+, pnpm, PostgreSQL y Ollama instalados.
+
+**Backend** (desde `platform/backend/`):
+
+```bash
+python3.11 -m venv .venv
 # Windows
 .venv\Scripts\activate
 # macOS/Linux
 source .venv/bin/activate
 
 pip install -r requirements.txt
+export PYTHONPATH=.
+export DATABASE_URL="postgresql+asyncpg://USER@localhost:5432/teyva"
+export DATABASE_URL_SYNC="postgresql://USER@localhost:5432/teyva"
+export DB_SSL=false
 alembic upgrade head
 uvicorn api.main:app --reload --port 8000
 ```
 
-## Frontend (desde `static/`)
+**Frontend** (desde `platform/frontend/`):
 
 ```bash
 pnpm install
@@ -205,7 +235,7 @@ pnpm dev
 
 ## Entrenamiento y prediccion
 
-Desde `backend/`:
+Desde `platform/backend/`:
 
 ```bash
 python -m ml.train
@@ -214,7 +244,7 @@ python -m ml.predict
 
 ## Scheduler de scraping
 
-Desde `backend/`:
+Desde `platform/backend/`:
 
 ```bash
 python -m scraper.scheduler

@@ -4,27 +4,28 @@ Risk Explanation Service
 Generates natural-language explanations for commune risk scores.
 
 Behavior:
-  - OPENROUTER_API_KEY set  → calls GPT-4 Mini via OpenRouter with tool use
-  - OPENROUTER_API_KEY unset → builds a deterministic template explanation
+  - ANTHROPIC_API_KEY set  → calls Claude (Anthropic) with tool use + salida
+    JSON estructurada (`output_config.format`, garantiza que cumpla el schema)
+  - ANTHROPIC_API_KEY unset → builds a deterministic template explanation
     (honest, data-driven, zero hallucinations possible)
 
 Prompt engineering techniques used:
   - Role priming + negative constraints ("NUNCA inventes")
   - Tool-use grounding (model must call tools before answering)
   - Low temperature (0.3) for consistency
-  - Strict token budget (max_tokens=200)
+  - Strict token budget (max_tokens=400)
   - Structured human message with all numeric context explicit
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,8 +37,18 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-_OPENROUTER_BASE = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
+_anthropic_client = None
+
+
+def _get_anthropic_client():
+    """Cliente lazy: solo exige ANTHROPIC_API_KEY si realmente se usa."""
+    global _anthropic_client
+    if _anthropic_client is None:
+        import anthropic
+
+        _anthropic_client = anthropic.Anthropic()
+    return _anthropic_client
 
 _NOMBRES: dict[str, str] = {
     "1": "Popular", "2": "Santa Cruz", "3": "Manrique", "4": "Aranjuez",
@@ -55,28 +66,89 @@ _IS_LADERA: dict[str, bool] = {
     "16": True, "50": True, "60": True, "70": True, "80": False, "90": True,
 }
 
+# ── Structured output schema (JSON mode, OpenAI-compatible) ────────────────────
+
+_EXPLANATION_SCHEMA_HINT = """
+Responde ÚNICAMENTE con un objeto JSON (sin markdown, sin texto fuera del JSON) con esta forma exacta:
+{
+  "title": "string — una frase (máx 12 palabras) resumiendo la situación",
+  "factors": ["string", "..."],  // 1 a 3 factores concretos, cada uno una frase corta con datos reales
+  "urgency": "bajo" | "medio" | "alto" | "critico",
+  "recommended_action": "string — una acción concreta para el operario"
+}
+"""
+
 # ── System prompt (applied once, high token efficiency) ────────────────────────
 
-_SYSTEM_PROMPT = """Eres un experto en análisis de riesgo de deslizamientos para el sistema TEYVA de Medellín, Colombia.
+_SYSTEM_PROMPT = """TAREA: Genera un análisis estructurado (JSON) sobre POR QUÉ una comuna
+de Medellín tiene su nivel de riesgo de deslizamiento actual, listo
+para que un operario de campo actúe de inmediato.
 
-MISIÓN: Generar una explicación clara de 2-3 oraciones sobre POR QUÉ una comuna tiene su nivel de riesgo actual.
+ERES: experto en análisis de riesgo de deslizamientos del sistema TEYVA.
 
 REGLAS ESTRICTAS:
 1. Usa SOLO los datos numéricos que el usuario te proporciona o que obtienes vía tools.
 2. NUNCA inventes valores, eventos, fechas o predicciones no presentes en los datos.
-3. Máximo 100 palabras. Mínimo 30 palabras.
-4. Estructura: factor principal → factor secundario → recomendación operativa.
-5. Tono: técnico-operativo, directo. Urgente si categoría es "alto" o "critico".
-6. NUNCA uses: "podría", "tal vez", "aparentemente", "posiblemente".
-7. Siempre termina con una acción concreta para el operario.
+3. Cada factor es una frase corta y concreta con datos reales (no más de 20 palabras).
+4. Tono: técnico-operativo, directo. Urgente si categoría es "alto" o "critico".
+5. NUNCA uses: "podría", "tal vez", "aparentemente", "posiblemente".
+6. `recommended_action` siempre debe ser una acción concreta e inmediata para el operario (no "monitorear algo").
 
 CATEGORÍAS:
 - bajo (<0.35): Monitoreo rutinario.
 - medio (0.35-0.65): Vigilancia activa.
 - alto (0.65-0.90): Alerta operativa — inspección de campo.
-- critico (≥0.90): Acción inmediata — evaluar evacuación."""
+- critico (≥0.90): Acción inmediata — evaluar evacuación.
 
-# ── Tool definitions (OpenAI-compatible format for OpenRouter) ─────────────────
+EJEMPLOS DE SALIDAS IDEALES (uno por categoría):
+
+EJEMPLO 1 — CATEGORÍA BAJO (precip 20mm, umbral 35mm, 0 eventos):
+{
+  "title": "Popular presenta nivel BAJO de riesgo (20.0%)",
+  "factors": ["Lluvia acumulada: 20mm (umbral: 35mm) — no supera límites de alerta"],
+  "urgency": "bajo",
+  "recommended_action": "Continuar monitoreo rutinario."
+}
+Razón: Es conciso (no exagera), cita datos precisos, acción simple.
+
+EJEMPLO 2 — CATEGORÍA MEDIO (precip 45mm, umbral 60mm, 2 eventos):
+{
+  "title": "Manrique muestra nivel MEDIO de riesgo (50.0%)",
+  "factors": ["Lluvia acumulada 45mm se aproxima al umbral 60mm", "Monitorear evolución de precipitaciones en próximas 24 horas"],
+  "urgency": "medio",
+  "recommended_action": "Revisar canales de drenaje y mantener informada a la comunidad."
+}
+Razón: Cita el factor crítico (lluvia), proporciona threshold para comparar, acción proactiva.
+
+EJEMPLO 3 — CATEGORÍA ALTO (precip 90mm, umbral 70mm, 5 eventos):
+{
+  "title": "Castilla alcanza nivel ALTO de riesgo (75.0%)",
+  "factors": ["Lluvia acumulada 90mm supera umbral operativo en 20mm", "5 evento(s) reciente(s) reportado(s)"],
+  "urgency": "alto",
+  "recommended_action": "Realizar inspección de campo hoy e informar al comité local de gestión del riesgo."
+}
+Razón: Múltiples factores con datos concretos, acción inmediata y específica.
+
+EJEMPLO 4 — CATEGORÍA CRÍTICO (precip 200mm, umbral 90mm, 15 eventos):
+{
+  "title": "Robledo en nivel CRÍTICO (95.0%)",
+  "factors": ["Lluvia acumulada 200mm supera umbral crítico en 110mm", "15 evento(s) reportado(s) en 7 días", "Topografía de ladera agrava el riesgo"],
+  "urgency": "critico",
+  "recommended_action": "Activar protocolo de emergencia, evaluar evacuación inmediata y notificar al DAGRD."
+}
+Razón: Múltiples factores críticos, lenguaje urgente, acciones escaladas (evacuación).
+
+CONTRA-EJEMPLO — NO HAGAS ESTO (vago, sin datos):
+{
+  "title": "Castilla podría tener riesgo",
+  "factors": ["Tal vez hay mucha lluvia", "Podrían ocurrir eventos"],
+  "urgency": "alto",
+  "recommended_action": "Monitorear la situación"
+}
+Errores: vaguedad ("podría", "tal vez"), sin números, acción genérica.
+""" + _EXPLANATION_SCHEMA_HINT
+
+# ── Tool definitions (formato OpenAI; se convierten a formato Claude abajo) ────
 
 _TOOLS = [
     {
@@ -130,6 +202,40 @@ _TOOLS = [
         }
     }
 ]
+
+
+def _openai_tools_to_claude(tools: list[dict]) -> list[dict]:
+    """Convierte _TOOLS (formato OpenAI) a formato Claude — misma conversión
+    que `chat_rag._openai_tools_to_claude`, duplicada aquí porque este es un
+    catálogo de tools distinto (propio de explicaciones de riesgo)."""
+    return [
+        {
+            "name": t["function"]["name"],
+            "description": t["function"].get("description", ""),
+            "input_schema": t["function"].get("parameters", {"type": "object", "properties": {}}),
+        }
+        for t in tools
+    ]
+
+
+_CLAUDE_TOOLS = _openai_tools_to_claude(_TOOLS)
+
+# JSON Schema real (no solo texto de instrucción) para forzar la forma exacta
+# de la salida vía `output_config.format` de Claude — más confiable que pedirlo
+# por prosa en el system prompt (que es lo único que puede hacer el template
+# determinístico / lo que hacía OpenRouter con `response_format: json_object`,
+# que solo garantiza JSON válido, no que cumpla este schema).
+_EXPLANATION_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "factors": {"type": "array", "items": {"type": "string"}},
+        "urgency": {"type": "string", "enum": ["bajo", "medio", "alto", "critico"]},
+        "recommended_action": {"type": "string"},
+    },
+    "required": ["title", "factors", "urgency", "recommended_action"],
+    "additionalProperties": False,
+}
 
 # ── Tool handlers (run against real DB) ───────────────────────────────────────
 
@@ -206,7 +312,7 @@ async def _dispatch_tool(name: str, args: dict, commune_id: str, db: AsyncSessio
 
 # ── Template fallback (no API key needed) ──────────────────────────────────────
 
-def _template_explanation(
+def _template_explanation_structured(
     commune_id: str,
     nombre: str,
     risk_score: float,
@@ -215,8 +321,13 @@ def _template_explanation(
     threshold_mm: float,
     n_events_7d: int,
     is_ladera: bool,
-) -> str:
-    """Genera explicación determinística basada en datos reales. Sin hallucinations."""
+) -> dict[str, Any]:
+    """Genera explicación determinística estructurada basada en datos reales.
+
+    Sin hallucinations: cada campo se arma con los mismos fragmentos que antes
+    se concatenaban en un párrafo — ahora cada pieza va a su propio campo del
+    schema (`title`, `factors`, `urgency`, `recommended_action`).
+    """
 
     cat = risk_category.lower().replace("í", "i")
     score_pct = round(risk_score * 100, 1)
@@ -229,14 +340,16 @@ def _template_explanation(
             f"en {exceso:.1f} mm" if exceso > 0 else
             f"El score de riesgo es {score_pct}% (umbral crítico)"
         )
-        evento_frag = (
-            f", con {n_events_7d} evento(s) reportado(s) en los últimos 7 días" if n_events_7d > 0 else ""
-        )
-        return (
-            f"{nombre} está en nivel CRÍTICO ({score_pct}%). {lluvia_frag}{evento_frag}. "
-            f"La topografía de {terrain} agrava el riesgo de deslizamiento. "
-            f"Activar protocolo de emergencia, evaluar evacuación inmediata y notificar al DAGRD."
-        )
+        factors = [lluvia_frag]
+        if n_events_7d > 0:
+            factors.append(f"{n_events_7d} evento(s) reportado(s) en los últimos 7 días")
+        factors.append(f"La topografía de {terrain} agrava el riesgo de deslizamiento")
+        return {
+            "title": f"{nombre} en nivel CRÍTICO ({score_pct}%)",
+            "factors": factors,
+            "urgency": "critico",
+            "recommended_action": "Activar protocolo de emergencia, evaluar evacuación inmediata y notificar al DAGRD.",
+        }
 
     if cat == "alto":
         lluvia_frag = (
@@ -244,14 +357,16 @@ def _template_explanation(
             if exceso > 0 else
             f"El modelo estima {score_pct}% de probabilidad de evento"
         )
-        evento_frag = (
-            f", sumado a {n_events_7d} evento(s) reciente(s)" if n_events_7d > 0 else ""
-        )
-        return (
-            f"{nombre} alcanza nivel ALTO de riesgo ({score_pct}%). {lluvia_frag}{evento_frag}. "
-            f"Se trata de una zona de {terrain} con historial de deslizamientos. "
-            f"Realizar inspección de campo hoy e informar al comité local de gestión del riesgo."
-        )
+        factors = [lluvia_frag]
+        if n_events_7d > 0:
+            factors.append(f"{n_events_7d} evento(s) reciente(s) reportado(s)")
+        factors.append(f"Zona de {terrain} con historial de deslizamientos")
+        return {
+            "title": f"{nombre} alcanza nivel ALTO de riesgo ({score_pct}%)",
+            "factors": factors,
+            "urgency": "alto",
+            "recommended_action": "Realizar inspección de campo hoy e informar al comité local de gestión del riesgo.",
+        }
 
     if cat == "medio":
         lluvia_frag = (
@@ -259,83 +374,147 @@ def _template_explanation(
             if precip_acum_mm > threshold_mm * 0.6 else
             f"El modelo estima {score_pct}% de probabilidad de evento en 7 días"
         )
-        return (
-            f"{nombre} muestra nivel MEDIO de riesgo ({score_pct}%). {lluvia_frag}. "
-            f"Monitorear evolución de precipitaciones en las próximas 24 horas. "
-            f"Revisar canales de drenaje y mantener informada a la comunidad."
-        )
+        return {
+            "title": f"{nombre} muestra nivel MEDIO de riesgo ({score_pct}%)",
+            "factors": [lluvia_frag, "Monitorear evolución de precipitaciones en las próximas 24 horas"],
+            "urgency": "medio",
+            "recommended_action": "Revisar canales de drenaje y mantener informada a la comunidad.",
+        }
 
     # bajo
-    return (
-        f"{nombre} presenta nivel BAJO de riesgo ({score_pct}%). "
-        f"Las condiciones actuales (lluvia: {precip_acum_mm:.1f} mm, "
-        f"umbral: {threshold_mm} mm) no superan los límites de alerta. "
-        f"Continuar monitoreo rutinario."
-    )
+    return {
+        "title": f"{nombre} presenta nivel BAJO de riesgo ({score_pct}%)",
+        "factors": [
+            f"Lluvia acumulada: {precip_acum_mm:.1f} mm (umbral: {threshold_mm} mm) — no supera los límites de alerta"
+        ],
+        "urgency": "bajo",
+        "recommended_action": "Continuar monitoreo rutinario.",
+    }
+
+
+def _render_narrative(structured: dict[str, Any]) -> str:
+    """Arma el párrafo humano de siempre a partir del dict estructurado.
+
+    La usan tanto el camino template como el camino LLM, así el texto
+    narrativo que ya consumen Slack/API/frontend no cambia de "voz", solo
+    cambia su origen (ahora se deriva de la estructura, no al revés).
+    """
+    title = str(structured.get("title") or "").strip()
+    factors = [str(f).strip() for f in (structured.get("factors") or []) if str(f).strip()]
+    recommended_action = str(structured.get("recommended_action") or "").strip()
+
+    parts = [p for p in [title, *factors, recommended_action] if p]
+    narrative = ". ".join(p.rstrip(".") for p in parts)
+    return f"{narrative}." if narrative else ""
 
 # ── OpenRouter client ──────────────────────────────────────────────────────────
 
-async def _call_openrouter(
+def _validate_structured(data: Any) -> dict[str, Any] | None:
+    """Valida que el JSON parseado tenga las 4 claves esperadas y bien formadas.
+
+    Si algo falta o tiene el tipo equivocado, se trata como fallo (se cae a
+    template en el llamador) — cero campos nulos toleran salir de acá.
+    """
+    if not isinstance(data, dict):
+        return None
+
+    title = data.get("title")
+    factors = data.get("factors")
+    urgency = data.get("urgency")
+    recommended_action = data.get("recommended_action")
+
+    if not isinstance(title, str) or not title.strip():
+        return None
+    if not isinstance(factors, list) or not factors:
+        return None
+    factors_clean = [str(f).strip() for f in factors if str(f).strip()]
+    if not factors_clean:
+        return None
+    if not isinstance(urgency, str) or urgency.strip().lower() not in {"bajo", "medio", "alto", "critico"}:
+        return None
+    if not isinstance(recommended_action, str) or not recommended_action.strip():
+        return None
+
+    return {
+        "title": title.strip(),
+        "factors": factors_clean,
+        "urgency": urgency.strip().lower(),
+        "recommended_action": recommended_action.strip(),
+    }
+
+
+async def _call_anthropic(
     commune_id: str,
     human_msg: str,
     db: AsyncSession,
-    api_key: str,
 ) -> str | None:
-    """Llama a GPT-4 Mini con tool use. Maneja hasta 1 ronda de tool calls."""
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://teyva.co",
-        "X-Title": "TEYVA Risk Analysis",
-    }
+    """Llama a Claude con tool use. Maneja hasta 1 ronda de tool calls.
+
+    A diferencia de OpenRouter/OpenAI (donde `response_format` no se puede
+    combinar con `tools` en la misma llamada, por eso el código viejo hacía
+    dos rondas con configuraciones distintas), Claude sí soporta `tools` +
+    `output_config.format` juntos: el modelo puede decidir llamar una tool y,
+    cuando ya no necesita más, su respuesta final llega garantizada conforme
+    al JSON schema — sin depender de que respete la instrucción de prosa.
+    """
+    client = _get_anthropic_client()
     messages: list[dict] = [{"role": "user", "content": human_msg}]
-    payload: dict[str, Any] = {
-        "model": _MODEL,
-        "messages": messages,
-        "system": _SYSTEM_PROMPT,
-        "tools": _TOOLS,
-        "tool_choice": "auto",
+    kwargs: dict[str, Any] = {
+        "model": ANTHROPIC_MODEL,
+        "max_tokens": 400,
         "temperature": 0.3,
-        "max_tokens": 200,
+        "system": _SYSTEM_PROMPT,
+        "tools": _CLAUDE_TOOLS,
+        "output_config": {"format": {"type": "json_schema", "schema": _EXPLANATION_JSON_SCHEMA}},
     }
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(f"{_OPENROUTER_BASE}/chat/completions", json=payload, headers=headers)
-        r.raise_for_status()
-        data = r.json()
+    response = await asyncio.to_thread(client.messages.create, messages=messages, **kwargs)
 
-    choice = data.get("choices", [{}])[0]
-    msg = choice.get("message", {})
-
-    # — Tool calls: ejecutar y hacer segunda llamada —
-    tool_calls = msg.get("tool_calls") or []
+    tool_calls = [b for b in response.content if b.type == "tool_use"]
     if tool_calls:
-        messages.append(msg)
+        messages.append({"role": "assistant", "content": response.content})
+        tool_results = []
         for tc in tool_calls:
-            fn = tc.get("function", {})
-            try:
-                args = json.loads(fn.get("arguments", "{}"))
-            except json.JSONDecodeError:
-                args = {}
-            result = await _dispatch_tool(fn.get("name", ""), args, commune_id, db)
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.get("id", ""),
+            result = await _dispatch_tool(tc.name, tc.input, commune_id, db)
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": tc.id,
                 "content": json.dumps(result, ensure_ascii=False),
             })
+        messages.append({"role": "user", "content": tool_results})
 
-        payload["messages"] = messages
-        payload.pop("tools", None)        # segunda vuelta sin tools → respuesta final
-        payload.pop("tool_choice", None)
+        response = await asyncio.to_thread(client.messages.create, messages=messages, **kwargs)
 
-        async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.post(f"{_OPENROUTER_BASE}/chat/completions", json=payload, headers=headers)
-            r.raise_for_status()
-            data = r.json()
+    text = next((b.text for b in response.content if b.type == "text"), None)
+    return text.strip() if text else None
 
-        msg = data.get("choices", [{}])[0].get("message", {})
 
-    return (msg.get("content") or "").strip() or None
+async def _call_anthropic_structured(
+    commune_id: str,
+    human_msg: str,
+    db: AsyncSession,
+) -> dict[str, Any] | None:
+    """Llama a Claude y devuelve el dict estructurado ya validado, o None.
+
+    None significa "no se pudo obtener una estructura confiable" — el
+    llamador (`generate_risk_explanation`) debe caer al template determinístico
+    en ese caso (mismo criterio de "cero alucinaciones toleradas" del resto
+    del archivo).
+    """
+    raw = await _call_anthropic(commune_id, human_msg, db)
+    if not raw:
+        return None
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        logger.warning("Claude devolvió JSON inválido para commune %s: %s", commune_id, exc)
+        return None
+
+    structured = _validate_structured(parsed)
+    if structured is None:
+        logger.warning("Claude devolvió estructura incompleta para commune %s: %r", commune_id, parsed)
+    return structured
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
@@ -347,48 +526,57 @@ async def generate_risk_explanation(
     threshold_mm: float,
     n_events_7d: int,
     db: AsyncSession,
-) -> tuple[str, str]:
+) -> tuple[str, str, dict[str, Any]]:
     """
-    Retorna (explanation_text, generated_by).
-    generated_by es 'template' o el model id de OpenRouter.
+    Retorna (explanation_text, generated_by, structured).
+    generated_by es 'template' o el model id de Anthropic (ANTHROPIC_MODEL).
+    structured es el dict {title, factors, urgency, recommended_action}
+    del que `explanation_text` es derivado (vía `_render_narrative`).
     """
     nombre = _NOMBRES.get(commune_id, f"Comuna {commune_id}")
     is_ladera = _IS_LADERA.get(commune_id, False)
 
-    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
     if not api_key:
         # Sin API key → template determinístico
-        text = _template_explanation(
+        structured = _template_explanation_structured(
             commune_id, nombre, risk_score, risk_category,
             precip_acum_mm, threshold_mm, n_events_7d, is_ladera,
         )
-        return text, "template"
+        return _render_narrative(structured), "template", structured
 
-    # Con API key → GPT-4 Mini + tool use
+    # Con API key → Claude + tool use
     exceso_pct = round((precip_acum_mm - threshold_mm) / max(threshold_mm, 1) * 100, 1)
     human_msg = (
-        f"DATOS DE {nombre.upper()} (ID: {commune_id}):\n"
-        f"- Risk score: {risk_score:.4f} → categoría: {risk_category}\n"
-        f"- Lluvia acumulada 24h: {precip_acum_mm:.1f} mm (umbral: {threshold_mm} mm, "
-        f"exceso: {exceso_pct:+.1f}%)\n"
-        f"- Eventos DAGRD últimos 7 días: {n_events_7d}\n"
-        f"- Zona ladera: {'Sí' if is_ladera else 'No'}\n\n"
-        f"Llama a las tools disponibles para enriquecer el análisis, luego genera la explicación."
+        f"<commune_data>\n"
+        f"<name>{nombre}</name>\n"
+        f"<id>{commune_id}</id>\n"
+        f"<risk_score>{risk_score:.4f}</risk_score>\n"
+        f"<risk_category>{risk_category}</risk_category>\n"
+        f"<precipitation_7d_mm>{precip_acum_mm:.1f}</precipitation_7d_mm>\n"
+        f"<threshold_mm>{threshold_mm}</threshold_mm>\n"
+        f"<precipitation_excess_pct>{exceso_pct:+.1f}</precipitation_excess_pct>\n"
+        f"<events_7d>{n_events_7d}</events_7d>\n"
+        f"<is_ladera>{'Sí' if is_ladera else 'No'}</is_ladera>\n"
+        f"</commune_data>\n\n"
+        f"<task>\n"
+        f"Llama a las tools disponibles para enriquecer el análisis, luego genera la explicación estructurada.\n"
+        f"</task>"
     )
 
     try:
-        text = await _call_openrouter(commune_id, human_msg, db, api_key)
-        if text:
-            return text, _MODEL
-        # Fallback si respuesta vacía
-        logger.warning("OpenRouter devolvió respuesta vacía para commune %s", commune_id)
+        structured = await _call_anthropic_structured(commune_id, human_msg, db)
+        if structured:
+            return _render_narrative(structured), ANTHROPIC_MODEL, structured
+        # Fallback si no se pudo obtener estructura confiable
+        logger.warning("Claude no devolvió estructura válida para commune %s", commune_id)
     except Exception as exc:
-        logger.warning("OpenRouter error para commune %s: %s — usando template", commune_id, exc)
+        logger.warning("Claude error para commune %s: %s — usando template", commune_id, exc)
 
     # Fallback siempre disponible
-    text = _template_explanation(
+    structured = _template_explanation_structured(
         commune_id, nombre, risk_score, risk_category,
         precip_acum_mm, threshold_mm, n_events_7d, is_ladera,
     )
-    return text, "template"
+    return _render_narrative(structured), "template", structured

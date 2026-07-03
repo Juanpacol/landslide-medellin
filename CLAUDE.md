@@ -64,7 +64,7 @@ teyva/
 │   │   │   ├── chat.py               # Chat clásico (single response)
 │   │   │   ├── chat_rag.py           # Chat con RAG + tools (Ollama loop)
 │   │   │   ├── rag_tools.py          # 5 tools (search_knowledge, risk, events, rainfall, health)
-│   │   │   ├── mcp_server.py         # FastMCP (para GPT-4o-mini via OpenRouter)
+│   │   │   ├── mcp_server.py         # FastMCP (expone las tools a clientes MCP externos)
 │   │   │   ├── prompts.py, memory.py
 │   │   ├── rag/                # Vector store + ingesta (ChromaDB)
 │   │   │   ├── chroma_store.py       # ChromaDB persistence, búsqueda + detección de zona
@@ -138,13 +138,13 @@ python -m scraper.scheduler                  # scraper daemon
 ### RAG + Conversational AI
 - **Vector Store:** ChromaDB (persistent, local)
 - **Embeddings:** sentence-transformers (paraphrase-multilingual-MiniLM-L12-v2)
-- **LLM (local):** Ollama (llama3.2 3B with tool-calling)
-- **LLM (cloud):** OpenRouter (GPT-4o-mini, optional for better results)
-- **Tool Protocol:** FastMCP (bridges Ollama tools → OpenRouter/GPT)
+- **LLM (primary):** Claude (Anthropic API) — `ANTHROPIC_MODEL` (default `claude-haiku-4-5`)
+- **LLM (fallback):** Ollama (llama3.2 3B, local) — auto-fallback if Claude fails/unavailable, or forced via `LLM_PROVIDER=ollama`
+- **Tool Protocol:** FastMCP (bridges the same tools to external MCP clients)
 
 ### Infrastructure
-- **Containerization:** Docker (Ollama service)
-- **LLM:** Ollama (local, privacy-first)
+- **Containerization:** Docker (Ollama service, kept for the local fallback)
+- **LLM:** Claude (Anthropic API, primary) + Ollama (local fallback, privacy-first offline mode)
 - **CI/CD:** GitHub Actions (5 workflows: scraper jobs + ML predictions)
 
 ---
@@ -235,7 +235,7 @@ scraping_logs
 - `POST /api/risk/predict-commune` - Single prediction
 
 ### Chat Endpoints
-- `POST /api/chat` - Send message, get reply (Ollama + context)
+- `POST /api/chat` - Send message, get reply (Claude primary, Ollama fallback + context)
 - `GET /api/chat/history/{session_id}` - Fetch conversation history
 
 ### Scraper Endpoints
@@ -246,7 +246,11 @@ scraping_logs
 
 ## 🤖 Conversational AI + RAG
 
-**Mode:** Tool-calling loop (Ollama or GPT-4o-mini via OpenRouter).
+**Mode:** Tool-calling loop. `LLM_PROVIDER=anthropic` (default) uses Claude; falls back
+to Ollama automatically if `ANTHROPIC_API_KEY` is missing or the call fails. Both
+providers share the same `SYSTEM_PROMPT`, tool suffix, and tool definitions in
+`agent/rag_tools.py` — only the wire-format ("cableado") differs per provider, so
+switching back to Ollama-only is just `LLM_PROVIDER=ollama`, no code changes.
 
 **Features:**
 1. **RAG (Retrieval-Augmented Generation)**
@@ -270,14 +274,15 @@ scraping_logs
 **How to activate:**
 ```bash
 export ENABLE_RAG=true
+export LLM_PROVIDER=anthropic   # default; set ANTHROPIC_API_KEY in .env
+# OR for fully local/offline:
+export LLM_PROVIDER=ollama
 ollama serve    # llama3.2 with tool-calling (local)
-# OR for better results:
-# Set OPENROUTER_API_KEY and mcp_server.py will expose same tools to GPT-4o-mini
 ```
 
 **Model behavior:**
-- **Ollama (llama3.2 3B, local):** Fast, privacy-first; prone to minor hallucinations
-- **GPT-4o-mini (OpenRouter, cloud):** Better reasoning, accurate tool calls (ready to plug in)
+- **Claude (Anthropic API, primary):** Better tool-call precision and instruction-following; small marginal cost per request.
+- **Ollama (llama3.2 3B, local fallback):** Free, privacy-first, works offline; more prone to missed tool calls and minor hallucinations on ambiguous entities (e.g. barrio names not mapped to a comuna).
 
 ---
 
@@ -339,6 +344,27 @@ python -m ml.predict    # Runs inference, stores predictions
 cd platform/backend
 python -m scraper.scheduler  # Starts APScheduler daemon
 ```
+
+### Prompt Evaluation (Skill)
+
+**Available:** `/eval-prompt` skill for measuring prompt quality across 3 critical modules:
+
+```bash
+# Evaluate chat RAG prompt against 13 test cases
+/eval-prompt chat_rag --threshold 95 --verbose
+
+# Evaluate risk explanation generation (10 test cases)
+/eval-prompt risk_explanations --threshold 90
+
+# Evaluate Slack webhook payload generation (5 test cases)
+/eval-prompt slack_webhooks --threshold 85
+```
+
+**Output:** JSON reports saved to `tests/eval_results/` with accuracy %, pass/fail per test, and comparison vs previous runs.
+
+**Workflow:** Edit prompt → Run `/eval-prompt` → See accuracy metric → Iterate until threshold passed → Deploy with confidence.
+
+See [.claude/skills/eval-prompt.md](.claude/skills/eval-prompt.md) for full documentation and development workflow.
 
 ---
 
@@ -402,7 +428,8 @@ python -m scraper.scheduler  # Starts APScheduler daemon
 - ✓ All 4 P0 security issues closed
 - ✓ Test coverage > 70% (core paths)
 - ✓ All 19 communes returning predictions hourly
-- ✓ Chat responds to queries with data-backed answers (no hallucinations)
+- ✓ Chat responds to queries with data-backed answers (no hallucinations) — verified via `/eval-prompt chat_rag`
+- ✓ Risk explanations have no vague language (verified via `/eval-prompt risk_explanations`)
 - ✓ Scraper logs show all 4 sources healthy for 7+ days
 - ✓ Dashboard loads in < 2 seconds
 
