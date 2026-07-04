@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { CloudRain, History, LayoutDashboard, Radio } from 'lucide-react';
 import { Header } from './header';
 import { KpiCards } from './kpi-cards';
 import { MedellinMap } from './medellin-map';
@@ -8,15 +9,16 @@ import { CommuneInfo } from './commune-info';
 import { RainfallChart } from './rainfall-chart';
 import { RainMonitor } from './rain-monitor';
 import { ScraperHealth } from './scraper-health';
+import { ChatHistory } from './chat-history';
 import { TeyvaChatWidget } from './teyva-chat';
 import { fetchCommuneDetail, fetchRiskStats, type CommuneDetail, type CommuneFeature, type RiskStats } from '@/lib/api';
-
-type View = 'dashboard' | 'rain' | 'system';
+import type { View } from './header';
 
 type CommuneProps = CommuneFeature['properties'];
 
 export function Dashboard() {
   const [view, setView] = useState<View>('dashboard');
+  const mapSectionRef = useRef<HTMLElement>(null);
   const [selectedCommune, setSelectedCommune] = useState<CommuneProps | null>(null);
   const [communeDetail, setCommuneDetail] = useState<CommuneDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -53,70 +55,86 @@ export function Dashboard() {
         : 'El valle está estable hoy. Buen momento para revisar el histórico.'
       : 'Cargando el estado del valle…';
 
-  const navItems: { id: View; label: string; icon: string }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: '◉' },
-    { id: 'rain', label: 'Monitor de Lluvia', icon: '🌧' },
-    { id: 'system', label: 'Salud del Sistema', icon: '📡' },
+  const navItems: { id: View; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} /> },
+    { id: 'rain', label: 'Monitor de Lluvia', icon: <CloudRain size={16} /> },
+    { id: 'history', label: 'Historial de Chat', icon: <History size={16} /> },
+    { id: 'system', label: 'Salud del Sistema', icon: <Radio size={16} /> },
   ];
+
+  const renderNavButton = (item: (typeof navItems)[number], compact = false) => (
+    <button
+      key={item.id}
+      onClick={() => setView(item.id)}
+      className="press-scale"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: compact ? '7px' : '10px',
+        padding: compact ? '8px 13px' : '10px 14px',
+        borderRadius: '12px',
+        border: 'none',
+        background: view === item.id ? 'oklch(0.91 0.025 65)' : 'transparent',
+        color: view === item.id ? 'oklch(0.3 0.06 45)' : 'oklch(0.5 0.03 55)',
+        fontSize: compact ? '13px' : '14px',
+        fontWeight: view === item.id ? 700 : 500,
+        cursor: 'pointer',
+        textAlign: 'left',
+        width: compact ? 'auto' : '100%',
+        whiteSpace: 'nowrap',
+        transition: 'all 0.15s',
+        fontFamily: 'var(--font-sans)',
+      }}
+      onMouseEnter={(e) => { if (view !== item.id) e.currentTarget.style.background = 'oklch(0.94 0.018 70)'; }}
+      onMouseLeave={(e) => { if (view !== item.id) e.currentTarget.style.background = 'transparent'; }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', lineHeight: 1 }}>{item.icon}</span>
+      {item.label}
+    </button>
+  );
 
   return (
     <div style={{ minHeight: '100vh', background: 'oklch(0.96 0.014 75)', color: 'oklch(0.26 0.035 45)' }}>
       <Header activeView={view} onViewChange={setView} />
 
+      {/* Nav horizontal en móvil/tablet */}
+      <div
+        className="teyva-scroll flex gap-1 overflow-x-auto px-4 py-2 lg:hidden"
+        style={{ borderBottom: '1px solid var(--border)', background: 'var(--card)' }}
+      >
+        {navItems.map((item) => renderNavButton(item, true))}
+      </div>
+
       <div style={{ display: 'flex', maxWidth: '1320px', margin: '0 auto' }}>
 
-        {/* ── Sidebar ── */}
-        <aside style={{
-          width: '220px',
-          flexShrink: 0,
-          padding: '28px 14px 28px 0',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '4px',
-          position: 'sticky',
-          top: '66px',
-          height: 'calc(100vh - 66px)',
-        }}>
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setView(item.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px 14px',
-                borderRadius: '12px',
-                border: 'none',
-                background: view === item.id ? 'oklch(0.91 0.025 65)' : 'transparent',
-                color: view === item.id ? 'oklch(0.3 0.06 45)' : 'oklch(0.5 0.03 55)',
-                fontSize: '14px',
-                fontWeight: view === item.id ? 700 : 500,
-                cursor: 'pointer',
-                textAlign: 'left',
-                width: '100%',
-                transition: 'all 0.15s',
-                fontFamily: 'var(--font-sans)',
-              }}
-              onMouseEnter={(e) => { if (view !== item.id) e.currentTarget.style.background = 'oklch(0.94 0.018 70)'; }}
-              onMouseLeave={(e) => { if (view !== item.id) e.currentTarget.style.background = 'transparent'; }}
-            >
-              <span style={{ fontSize: '16px', lineHeight: 1 }}>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
+        {/* ── Sidebar (solo desktop) ── */}
+        <aside
+          className="hidden lg:flex"
+          style={{
+            width: '220px',
+            flexShrink: 0,
+            padding: '28px 14px 28px 0',
+            flexDirection: 'column',
+            gap: '4px',
+            position: 'sticky',
+            top: '66px',
+            height: 'calc(100vh - 66px)',
+          }}
+        >
+          {navItems.map((item) => renderNavButton(item))}
         </aside>
 
-      <main style={{ flex: 1, padding: '26px 28px 90px', display: 'flex', flexDirection: 'column', gap: '22px', minWidth: 0 }}>
+      <main className="px-4 md:px-7" style={{ flex: 1, padding: '26px 28px 90px', display: 'flex', flexDirection: 'column', gap: '22px', minWidth: 0 }}>
 
         {/* ===== HERO conversacional (solo en dashboard) ===== */}
         {view === 'dashboard' && <section
+          className="anim-fade-up"
           style={{
             position: 'relative',
             overflow: 'hidden',
             borderRadius: '28px',
             background: 'linear-gradient(140deg, oklch(0.32 0.06 42) 0%, oklch(0.38 0.08 38) 55%, oklch(0.34 0.07 30) 100%)',
-            padding: '40px 44px',
+            padding: 'clamp(24px, 4vw, 44px)',
             color: 'oklch(0.97 0.015 80)',
           }}
         >
@@ -159,7 +177,7 @@ export function Dashboard() {
                 style={{
                   fontFamily: 'var(--font-display)',
                   fontWeight: 700,
-                  fontSize: '40px',
+                  fontSize: 'clamp(27px, 3.4vw, 40px)',
                   lineHeight: 1.08,
                   letterSpacing: '-0.025em',
                   marginTop: '18px',
@@ -196,6 +214,8 @@ export function Dashboard() {
                   💬 Hablar con Teyva
                 </button>
                 <button
+                  onClick={() => mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  className="press-scale"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -209,7 +229,10 @@ export function Dashboard() {
                     fontFamily: 'var(--font-sans)',
                     fontSize: '14.5px',
                     fontWeight: 600,
+                    transition: 'background 0.15s ease',
                   }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'oklch(1 0 0 / 0.22)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'oklch(1 0 0 / 0.14)')}
                 >
                   Ver comunas en alerta
                 </button>
@@ -266,19 +289,23 @@ export function Dashboard() {
             <KpiCards />
 
             {/* ===== MAPA + PANEL LATERAL ===== */}
-            <section style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '18px', alignItems: 'start' }}>
-              <div style={{ height: '600px' }}>
+            <section
+              ref={mapSectionRef}
+              className="anim-fade-up grid gap-[18px] xl:grid-cols-[1fr_400px]"
+              style={{ alignItems: 'start', scrollMarginTop: '80px', animationDelay: '0.15s' }}
+            >
+              <div className="h-[420px] md:h-[600px]">
                 <MedellinMap
                   onCommuneSelect={setSelectedCommune}
                   selectedCommuneId={selectedCommune ? String(selectedCommune.commune_id) : null}
                 />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div className="grid gap-[18px] md:grid-cols-2 xl:grid-cols-1">
                 <div style={{ height: '360px' }}>
                   <CommuneInfo commune={selectedCommune} detail={communeDetail} loading={detailLoading} />
                 </div>
-                <div style={{ height: '210px' }}>
+                <div className="h-[360px] md:h-auto xl:h-[210px]">
                   <RainfallChart communeId={chartCommuneId} />
                 </div>
               </div>
@@ -286,8 +313,9 @@ export function Dashboard() {
           </>
         )}
 
-        {view === 'rain' && <RainMonitor />}
-        {view === 'system' && <ScraperHealth />}
+        {view === 'rain' && <div className="anim-fade-up"><RainMonitor /></div>}
+        {view === 'history' && <ChatHistory />}
+        {view === 'system' && <div className="anim-fade-up"><ScraperHealth /></div>}
 
         <footer style={{ paddingTop: '8px', textAlign: 'center', fontSize: '12px', color: 'oklch(0.55 0.035 55)' }}>
           TEYVA · Sistema de análisis de riesgo territorial · Medellín, Antioquia

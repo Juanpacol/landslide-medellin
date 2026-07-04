@@ -79,6 +79,24 @@ export interface ChatHistoryMessage {
   role: 'user' | 'assistant' | string;
   content: string;
   ts?: number;
+  created_at?: string | null;
+}
+
+export interface ChatSessionSummary {
+  session_id: string;
+  title: string;
+  preview: string;
+  preview_role: string | null;
+  message_count: number;
+  started_at: string | null;
+  last_message_at: string | null;
+}
+
+export interface ChatSessionsResponse {
+  sessions: ChatSessionSummary[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 // ── Rain monitor types ─────────────────────────────────────────────────────────
@@ -283,11 +301,82 @@ export async function sendChatMessage(
   return data.reply ?? data.response ?? data.answer ?? '';
 }
 
-export async function fetchChatHistory(sessionId: string): Promise<ChatHistoryMessage[]> {
+/**
+ * Variante en streaming (SSE) de `sendChatMessage()`. Consume
+ * `POST /chat/stream` con `fetch` + `ReadableStream` en vez de esperar el
+ * JSON completo, e invoca `onChunk` con el texto acumulado hasta el momento
+ * cada vez que llega un nuevo fragmento. Devuelve el string completo al
+ * finalizar el stream (equivalente al valor de retorno de `sendChatMessage`).
+ *
+ * No usa `apiRequest<T>()` porque ese helper espera un único `res.json()`;
+ * aquí necesitamos leer el body de forma incremental.
+ */
+export async function streamChatMessage(
+  message: string,
+  sessionId: string,
+  onChunk: (accumulated: string) => void,
+  context?: ChatContext | null
+): Promise<string> {
+  const res = await fetch(`${apiBase}/chat/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, session_id: sessionId, context: context ?? null }),
+  });
+
+  if (!res.ok || !res.body) {
+    const text = res.body ? await res.text().catch(() => '') : '';
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let full = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const payload = line.slice('data: '.length);
+      if (payload === '[DONE]') continue;
+
+      try {
+        const parsed = JSON.parse(payload) as { chunk?: string };
+        if (typeof parsed.chunk === 'string') {
+          full += parsed.chunk;
+          onChunk(full);
+        }
+      } catch {
+        // Fragmento SSE incompleto o malformado: se ignora, no rompe el stream.
+      }
+    }
+  }
+
+  return full;
+}
+
+export async function fetchChatHistory(sessionId: string, limit = 200): Promise<ChatHistoryMessage[]> {
   const data = await apiRequest<{ messages?: ChatHistoryMessage[]; history?: ChatHistoryMessage[] }>(
-    `/chat/history/${sessionId}`
+    `/chat/history/${sessionId}?limit=${limit}`
   );
   return data.messages ?? data.history ?? [];
+}
+
+export async function fetchChatSessions(
+  opts: { q?: string; limit?: number; offset?: number } = {}
+): Promise<ChatSessionsResponse> {
+  const params = new URLSearchParams();
+  if (opts.q) params.set('q', opts.q);
+  if (opts.limit) params.set('limit', String(opts.limit));
+  if (opts.offset) params.set('offset', String(opts.offset));
+  const qs = params.toString();
+  return apiRequest<ChatSessionsResponse>(`/chat/sessions${qs ? `?${qs}` : ''}`);
 }
 
 // ── Rain monitor ───────────────────────────────────────────────────────────────

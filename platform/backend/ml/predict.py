@@ -20,6 +20,7 @@ from db.models.risk_explanation import RiskExplanation  # noqa: E402
 from db.models.risk_prediction import RiskPrediction  # noqa: E402
 from db.session import AsyncSessionLocal  # noqa: E402
 from ml.features import FeatureBuilder  # noqa: E402
+from observability.predictions import log_prediction  # noqa: E402
 
 MODELS_DIR = Path(__file__).resolve().parent / "models"
 BEST_MODEL_PATH = MODELS_DIR / "best_model.pkl"
@@ -94,20 +95,21 @@ async def predict_all_comunas(db: AsyncSession) -> None:
         out = await predict_risk(cid, db)
         risk_score = float(out.get("risk_score") or 0.0)
         risk_level = str(out.get("risk_level") or "bajo")
+        confidence = float(out.get("confidence") or 0.0)
+        features_used = out.get("features_used") or {}
 
         raw_output = {
-            "features_used": out.get("features_used"),
-            "confidence": out.get("confidence"),
+            "features_used": features_used,
+            "confidence": confidence,
             "risk_level": risk_level,
             "error": out.get("error"),
         }
 
         # Generar explicación (GPT-4 Mini si hay API key, template si no)
         try:
-            features = out.get("features_used") or {}
-            precip_mm = float(features.get("precip_sum_mm_day") or features.get("mean_precip_mm_snapshot") or 0.0)
-            n_events = int(features.get("n_events_window") or 0)
-            explanation_text, generated_by = await generate_risk_explanation(
+            precip_mm = float(features_used.get("precip_sum_mm_day") or features_used.get("mean_precip_mm_snapshot") or 0.0)
+            n_events = int(features_used.get("n_events_window") or 0)
+            explanation_text, generated_by, explanation_structured = await generate_risk_explanation(
                 commune_id=str(cid),
                 risk_score=risk_score,
                 risk_category=risk_level,
@@ -121,6 +123,19 @@ async def predict_all_comunas(db: AsyncSession) -> None:
                 f"Probabilidad estimada de evento en 7 días: {risk_score:.3f} (nivel {risk_level})."
             )
             generated_by = "template"
+            explanation_structured = None
+
+        # Log prediction for observability
+        log_prediction(
+            commune_id=str(cid),
+            risk_score=risk_score,
+            risk_category=risk_level,
+            confidence=confidence,
+            model_version=model_version,
+            features_used=features_used,
+            explanation_text=explanation_text,
+            explanation_by=generated_by,
+        )
 
         db.add(
             RiskPrediction(
@@ -138,6 +153,7 @@ async def predict_all_comunas(db: AsyncSession) -> None:
                 risk_score=risk_score,
                 risk_category=risk_level,
                 explanation=explanation_text,
+                explanation_json=explanation_structured,
                 generated_by=generated_by,
             )
         )

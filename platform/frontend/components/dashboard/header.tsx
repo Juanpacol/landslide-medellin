@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { CloudRain, History, LayoutDashboard, Radio } from 'lucide-react';
 import { fetchBackendHealth } from '@/lib/api';
 
-type View = 'dashboard' | 'rain' | 'system';
+export type View = 'dashboard' | 'rain' | 'history' | 'system';
 
 interface HeaderProps {
   activeView?: View;
@@ -105,18 +106,23 @@ export function Header({ activeView = 'dashboard', onViewChange }: HeaderProps) 
         </div>
 
         {/* Nav */}
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-1 lg:flex">
           {([
-            { id: 'dashboard' as View, label: 'Dashboard' },
-            { id: 'rain' as View, label: '🌧 Monitor de Lluvia' },
-            { id: 'system' as View, label: '📡 Sistema' },
+            { id: 'dashboard' as View, label: 'Dashboard', icon: <LayoutDashboard size={14} /> },
+            { id: 'rain' as View, label: 'Monitor de Lluvia', icon: <CloudRain size={14} /> },
+            { id: 'history' as View, label: 'Historial', icon: <History size={14} /> },
+            { id: 'system' as View, label: 'Sistema', icon: <Radio size={14} /> },
           ] as const).map((item) => {
             const active = activeView === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => onViewChange?.(item.id)}
+                className="press-scale"
                 style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   padding: '8px 14px',
                   borderRadius: '10px',
                   fontSize: '14px',
@@ -126,8 +132,12 @@ export function Header({ activeView = 'dashboard', onViewChange }: HeaderProps) 
                   cursor: 'pointer',
                   border: 'none',
                   fontFamily: 'var(--font-sans)',
+                  transition: 'background 0.15s ease, color 0.15s ease',
                 }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'oklch(0.94 0.018 70)'; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
               >
+                {item.icon}
                 {item.label}
               </button>
             );

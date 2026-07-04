@@ -54,6 +54,19 @@ ALERT_COOLDOWN_RAINFALL_HOURS = 6  # Lluvia excede umbral
 ALERT_COOLDOWN_CRITICAL_RISK_HOURS = 1  # Riesgo crítico detectado
 ALERT_COOLDOWN_SCRAPER_HOURS = 6  # Scraper caído
 
+# --- Scrapers: intervalos esperados por fuente (minutos) ---
+# Fuente única de verdad: usada por /api/scraper/health (clasificación de estado)
+# y por el watchdog de alertas Slack (detección de staleness).
+SCRAPER_INTERVALS_MIN: dict[str, int] = {
+    "siata": 30,
+    "dagrd": 60,
+    "ideam": 360,
+    "medellin_datos": 1440,
+}
+# Una fuente sin éxito hace más de FACTOR × intervalo se considera caída,
+# aunque no haya filas de error (p. ej. GitHub Actions deshabilitado = silencio).
+SCRAPER_STALE_FACTOR = 3
+
 
 def risk_level_from_score(score: float | None) -> str:
     """Convierte un score [0,1] en categoría canónica (minúscula sin tilde)."""

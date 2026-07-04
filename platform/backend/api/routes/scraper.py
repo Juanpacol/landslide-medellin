@@ -6,18 +6,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from constants import SCRAPER_INTERVALS_MIN as SCRAPER_INTERVALS
 from db.models import ScrapingLog
 from db.session import get_async_db
 
 router = APIRouter()
-
-# Expected scrape intervals per source (minutes)
-SCRAPER_INTERVALS: dict[str, int] = {
-    "siata": 30,
-    "dagrd": 60,
-    "ideam": 360,
-    "medellin_datos": 1440,
-}
 
 _SUCCESS_STATUSES = {"ok", "completed", "success"}
 _FAILURE_STATUSES = {"failed", "error"}

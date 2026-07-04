@@ -1,0 +1,171 @@
+{
+  "prompt_module": "agent/risk_explanations",
+  "description": "Evaluation test cases for risk explanation generation",
+  "test_cases": [
+    {
+      "id": "bajo_normal",
+      "category": "bajo",
+      "risk_score": 0.25,
+      "commune_id": "1",
+      "nombre": "Popular",
+      "precip_7d": 20.0,
+      "threshold_mm": 35.0,
+      "n_events": 0,
+      "expected": {
+        "must_contain": ["bajo", "monitoreo"],
+        "must_not_contain": ["tal vez", "podría", "posiblemente"],
+        "has_title": true,
+        "has_factors": true,
+        "urgency_value": "bajo"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "bajo_high_precip",
+      "category": "bajo",
+      "risk_score": 0.30,
+      "commune_id": "2",
+      "nombre": "Santa Cruz",
+      "precip_7d": 80.0,
+      "threshold_mm": 100.0,
+      "n_events": 0,
+      "expected": {
+        "must_contain": ["bajo"],
+        "must_not_contain": ["critico", "alto"],
+        "urgency_value": "bajo"
+      },
+      "importance": "medium"
+    },
+    {
+      "id": "medio_normal",
+      "category": "medio",
+      "risk_score": 0.50,
+      "commune_id": "3",
+      "nombre": "Manrique",
+      "precip_7d": 45.0,
+      "threshold_mm": 60.0,
+      "n_events": 2,
+      "expected": {
+        "must_contain": ["medio", "alerta"],
+        "must_not_contain": ["tal vez", "posiblemente"],
+        "has_factors": true,
+        "urgency_value": "medio"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "medio_boundary",
+      "category": "medio",
+      "risk_score": 0.65,
+      "commune_id": "4",
+      "nombre": "Aranjuez",
+      "precip_7d": 60.0,
+      "threshold_mm": 60.0,
+      "n_events": 1,
+      "expected": {
+        "urgency_value": "medio"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "alto_normal",
+      "category": "alto",
+      "risk_score": 0.75,
+      "commune_id": "5",
+      "nombre": "Castilla",
+      "precip_7d": 90.0,
+      "threshold_mm": 70.0,
+      "n_events": 5,
+      "expected": {
+        "must_contain": ["alto", "campo"],
+        "must_not_contain": ["podría", "tal vez"],
+        "has_factors": true,
+        "urgency_value": "alto"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "alto_critical_precip",
+      "category": "alto",
+      "risk_score": 0.80,
+      "commune_id": "6",
+      "nombre": "Doce de Octubre",
+      "precip_7d": 150.0,
+      "threshold_mm": 70.0,
+      "n_events": 10,
+      "expected": {
+        "must_contain": ["alto", "lluvia"],
+        "urgency_value": "alto"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "critico_normal",
+      "category": "critico",
+      "risk_score": 0.95,
+      "commune_id": "7",
+      "nombre": "Robledo",
+      "precip_7d": 200.0,
+      "threshold_mm": 90.0,
+      "n_events": 15,
+      "expected": {
+        "must_contain": ["crítico", "inmediata"],
+        "must_not_contain": ["tal vez", "podría"],
+        "has_factors": true,
+        "urgency_value": "critico"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "critico_extreme",
+      "category": "critico",
+      "risk_score": 0.99,
+      "commune_id": "8",
+      "nombre": "Villa Hermosa",
+      "precip_7d": 250.0,
+      "threshold_mm": 90.0,
+      "n_events": 25,
+      "expected": {
+        "must_contain": ["crítico"],
+        "urgency_value": "critico"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "no_events_no_precip",
+      "category": "bajo",
+      "risk_score": 0.10,
+      "commune_id": "9",
+      "nombre": "Buenos Aires",
+      "precip_7d": 0.0,
+      "threshold_mm": 35.0,
+      "n_events": 0,
+      "expected": {
+        "must_not_contain": ["evento", "lluvia reciente"],
+        "urgency_value": "bajo"
+      },
+      "importance": "medium"
+    },
+    {
+      "id": "many_events_low_precip",
+      "category": "medio",
+      "risk_score": 0.55,
+      "commune_id": "10",
+      "nombre": "La Candelaria",
+      "precip_7d": 15.0,
+      "threshold_mm": 60.0,
+      "n_events": 20,
+      "expected": {
+        "must_contain": ["evento"],
+        "urgency_value": "medio"
+      },
+      "importance": "medium"
+    }
+  ],
+  "metadata": {
+    "created_at": "2026-07-02",
+    "author": "Claude",
+    "last_updated": "2026-07-02",
+    "version": "1.0"
+  }
+}

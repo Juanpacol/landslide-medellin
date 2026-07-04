@@ -3,6 +3,10 @@
 #
 # Servicios: PostgreSQL + Ollama (+ descarga de modelo) + Backend (FastAPI) + Frontend (Next.js)
 # Las migraciones de la BD se aplican solas al arrancar el backend.
+#
+# BASE DE DATOS: por defecto los servicios usan DATABASE_URL/DATABASE_URL_SYNC del
+# .env de la raíz (Supabase vía Connection Pooler — la misma BD que GitHub Actions).
+# Si el .env no define esas variables, caen a la Postgres local del compose (offline).
 
 services:
   db:
@@ -55,9 +59,9 @@ services:
       ollama:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
-      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
-      DB_SSL: "false"
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
+      DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
+      DB_SSL: ${DB_SSL:-false}
       ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
       API_TOKEN: ${API_TOKEN:-}
       OLLAMA_URL: http://ollama:11434
@@ -88,9 +92,9 @@ services:
       backend:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
-      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
-      DB_SSL: "false"
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
+      DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
+      DB_SSL: ${DB_SSL:-false}
       OLLAMA_URL: http://ollama:11434
     entrypoint: ["python", "-m", "scraper.scheduler"]
     restart: unless-stopped
@@ -107,9 +111,9 @@ services:
       backend:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
-      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}
-      DB_SSL: "false"
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
+      DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
+      DB_SSL: ${DB_SSL:-false}
     entrypoint: >
       sh -c "
       while true; do
@@ -119,6 +123,22 @@ services:
         sleep 21600
       done
       "
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # pgAdmin: interfaz visual para PostgreSQL
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@teyva.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-teyva}
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
     restart: unless-stopped
     logging:
       options:

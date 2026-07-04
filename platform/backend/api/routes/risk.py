@@ -18,6 +18,7 @@ from db.models import LandslideEvent, MLFeature, RiskPrediction
 from db.models.risk_explanation import RiskExplanation
 from db.session import get_async_db
 from integrations.agent_contracts import predict_all_comunas, predict_risk_stub
+from observability.predictions import get_prediction_logs
 
 router = APIRouter()
 
@@ -354,6 +355,7 @@ async def get_risk_explanation(
         return {
             "commune_id": commune_id,
             "explanation": None,
+            "explanation_json": None,
             "generated_by": None,
             "generated_at": None,
         }
@@ -362,6 +364,7 @@ async def get_risk_explanation(
         "risk_score": row.risk_score,
         "risk_category": row.risk_category,
         "explanation": row.explanation,
+        "explanation_json": row.explanation_json,
         "generated_by": row.generated_by,
         "generated_at": row.generated_at.isoformat() if row.generated_at else None,
     }
@@ -546,3 +549,46 @@ async def run_predict_commune(
     db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, Any]:
     return await predict_risk_stub(body.commune_id, db)
+
+
+@router.get("/observability/predictions")
+async def get_prediction_metrics(limit: int = 100, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    """Observability: recent prediction logs from DB for drift detection and monitoring."""
+    result = await db.execute(
+        select(RiskPrediction)
+        .order_by(RiskPrediction.created_at.desc())
+        .limit(limit)
+    )
+    predictions = result.scalars().all()
+    predictions.reverse()
+
+    if not predictions:
+        return {"total": 0, "predictions": []}
+
+    risk_by_category = {"bajo": 0, "medio": 0, "alto": 0, "critico": 0}
+    avg_score = 0.0
+    for pred in predictions:
+        category = str(pred.risk_category or "").lower()
+        if category in risk_by_category:
+            risk_by_category[category] += 1
+        avg_score += float(pred.risk_score or 0)
+
+    logs = [
+        {
+            "timestamp": pred.created_at.isoformat() if pred.created_at else None,
+            "commune_id": pred.commune_id,
+            "risk_score": pred.risk_score,
+            "risk_category": pred.risk_category,
+            "model_version": pred.model_version,
+        }
+        for pred in predictions
+    ]
+
+    return {
+        "total": len(predictions),
+        "summary": {
+            "risk_distribution": risk_by_category,
+            "avg_risk_score": round(avg_score / len(predictions), 3) if predictions else 0,
+        },
+        "predictions": logs,
+    }

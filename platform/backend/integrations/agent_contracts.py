@@ -1,5 +1,5 @@
 import os
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,11 +9,23 @@ try:
 except ImportError:
     _chat_impl: Callable[..., Awaitable[str]] | None = None
 
+# Variante streaming del chat clásico (sin RAG). Se usa desde chat_stream().
+try:
+    from agent.chat import chat_stream as _chat_stream_impl  # type: ignore[import-not-found]
+except ImportError:
+    _chat_stream_impl: Callable[..., AsyncIterator[str]] | None = None
+
 # Chat con RAG + tools (Ollama tool-calling). Se activa con ENABLE_RAG=true.
 try:
     from agent.chat_rag import chat_rag as _chat_rag_impl  # type: ignore[import-not-found]
 except ImportError:
     _chat_rag_impl: Callable[..., Awaitable[str]] | None = None
+
+# Variante streaming del chat con RAG + tools. Se usa desde chat_stream().
+try:
+    from agent.chat_rag import chat_rag_stream as _chat_rag_stream_impl  # type: ignore[import-not-found]
+except ImportError:
+    _chat_rag_stream_impl: Callable[..., AsyncIterator[str]] | None = None
 
 
 def _rag_enabled() -> bool:
@@ -40,6 +52,21 @@ async def chat(message: str, session_id: str, db: AsyncSession) -> str:
         "Asistente TEYVA (modo demo): el módulo del Agente 2 aún no está enlazado. "
         f"Mensaje recibido ({len(message)} caracteres), sesión `{session_id}`."
     )
+
+
+async def chat_stream(message: str, session_id: str, db: AsyncSession) -> AsyncIterator[str]:
+    """Variante en streaming de `chat()`. Enruta según `ENABLE_RAG` exactamente
+    igual que `chat()`, pero cede (yield) fragmentos de texto en vez de
+    esperar la respuesta completa."""
+    if _rag_enabled() and _chat_rag_stream_impl is not None:
+        async for chunk in _chat_rag_stream_impl(message, session_id, db):
+            yield chunk
+        return
+    if _chat_stream_impl is not None:
+        async for chunk in _chat_stream_impl(message, session_id, db):
+            yield chunk
+        return
+    yield "Streaming no disponible en este despliegue."
 
 
 async def predict_all_comunas(db: AsyncSession) -> None:

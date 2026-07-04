@@ -11,6 +11,7 @@ from scipy.stats import spearmanr
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.auth import require_token
 from db.models.alert_log import AlertLog
 from db.models.app_setting import AppSetting
 from db.models.commune_threshold import CommuneThreshold
@@ -206,7 +207,7 @@ async def get_thresholds(session: AsyncSession = Depends(get_async_db)) -> dict:
     }
 
 
-@router.put("/thresholds/{commune_id}")
+@router.put("/thresholds/{commune_id}", dependencies=[Depends(require_token)])
 async def set_threshold(
     commune_id: str,
     body: ThresholdIn,
@@ -238,7 +239,7 @@ async def get_webhook(session: AsyncSession = Depends(get_async_db)) -> dict:
     return {"configured": True, "masked_url": masked}
 
 
-@router.post("/settings/webhook")
+@router.post("/settings/webhook", dependencies=[Depends(require_token)])
 async def save_webhook(body: WebhookIn, session: AsyncSession = Depends(get_async_db)) -> dict:
     existing = await session.get(AppSetting, "slack_webhook_url")
     if existing:
@@ -250,7 +251,7 @@ async def save_webhook(body: WebhookIn, session: AsyncSession = Depends(get_asyn
     return {"ok": True}
 
 
-@router.post("/settings/webhook/test")
+@router.post("/settings/webhook/test", dependencies=[Depends(require_token)])
 async def test_webhook(session: AsyncSession = Depends(get_async_db)) -> dict:
     from alerts.slack import _build_slack_payload, _fire_slack
 
