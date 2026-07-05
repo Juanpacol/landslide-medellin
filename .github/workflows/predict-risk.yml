@@ -27,6 +27,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Run database migrations
+        working-directory: platform/backend
+        run: |
+          alembic upgrade head
+
       - name: Run risk prediction
         working-directory: platform/backend
         run: python -m ml.predict

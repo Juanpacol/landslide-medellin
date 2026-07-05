@@ -1,16 +1,18 @@
-name: Scraper SIATA
+name: Scraper SIATA Sismos
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "15,45 * * * *"
   workflow_dispatch:
 
 jobs:
-  run-siata:
+  run-siata-sismos:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       PYTHONPATH: ./platform/backend
     steps:
       - name: Checkout
@@ -32,6 +34,6 @@ jobs:
         run: |
           alembic upgrade head
 
-      - name: Run SIATA scraper
+      - name: Run SIATA sismos scraper
         working-directory: platform/backend
-        run: python -m scraper.siata
+        run: python -m scraper.siata_sismos
