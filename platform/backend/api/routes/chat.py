@@ -7,12 +7,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.rate_limit import rate_limit
 from db.models import AgentConversation
 from db.session import get_async_db
 from integrations.agent_contracts import chat as agent_chat
 from integrations.agent_contracts import chat_stream as agent_chat_stream
 
 router = APIRouter()
+
+# Cada mensaje de chat cuesta una llamada LLM: límite por IP contra abuso,
+# spam y loops accidentales del frontend.
+_chat_rate = rate_limit("chat", times=10, seconds=60)
 
 
 class ChatRequest(BaseModel):
@@ -25,8 +30,8 @@ class ChatResponse(BaseModel):
     session_id: str
 
 
-@router.post("", response_model=ChatResponse)
-@router.post("/message", response_model=ChatResponse)
+@router.post("", response_model=ChatResponse, dependencies=[Depends(_chat_rate)])
+@router.post("/message", response_model=ChatResponse, dependencies=[Depends(_chat_rate)])
 async def post_message(body: ChatRequest, db: AsyncSession = Depends(get_async_db)) -> ChatResponse:
     user_row = AgentConversation(
         session_id=body.session_id,
@@ -45,7 +50,7 @@ async def post_message(body: ChatRequest, db: AsyncSession = Depends(get_async_d
     return ChatResponse(reply=reply, session_id=body.session_id)
 
 
-@router.post("/stream")
+@router.post("/stream", dependencies=[Depends(_chat_rate)])
 async def stream_message(body: ChatRequest, db: AsyncSession = Depends(get_async_db)) -> StreamingResponse:
     """Variante en streaming (SSE) de `post_message()`.
 

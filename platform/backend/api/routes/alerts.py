@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,14 +76,24 @@ async def get_evacuation_routes_endpoint(
 
 @router.post("/report", dependencies=[Depends(require_token)])
 async def create_situation_report(
+    request: Request,
     send_to_slack: bool = Query(False, description="Además de devolverlo, publicarlo en Slack"),
     db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, Any]:
     """Genera el reporte de situación del valle en lenguaje plano (≤200 palabras)."""
+    from api.audit import log_audit_event
     from alerts.reports import generate_situation_report, send_situation_report_to_slack
 
+    log_audit_event(
+        session=db,
+        request=request,
+        action="situation_report",
+        resource="valley",
+        summary=f"Reporte de situación generado (slack={send_to_slack})",
+    )
     report = await generate_situation_report(db)
     slack_sent = False
     if send_to_slack:
         slack_sent = await send_situation_report_to_slack(db)
+    await db.commit()
     return {"report": report, "slack_sent": slack_sent}

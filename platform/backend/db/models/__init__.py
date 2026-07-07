@@ -1,6 +1,7 @@
 from db.base import Base
 from db.models.alert_log import AlertLog
 from db.models.app_setting import AppSetting
+from db.models.audit_log import AuditLog
 from db.models.barrio_hazard import BarrioHazard
 from db.models.citizen_report import CitizenReport
 from db.models.commune_threshold import CommuneThreshold
@@ -19,6 +20,7 @@ __all__ = [
     "Base",
     "AlertLog",
     "AppSetting",
+    "AuditLog",
     "BarrioHazard",
     "CitizenReport",
     "CommuneThreshold",

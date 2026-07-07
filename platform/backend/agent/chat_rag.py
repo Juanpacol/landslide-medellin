@@ -41,7 +41,10 @@ from agent.prompts import SYSTEM_PROMPT
 from agent.rag_tools import TOOL_SCHEMAS, call_tool, get_sources, reset_sources, set_report_session
 
 _BACKEND_ENV = Path(__file__).resolve().parents[1] / ".env"
-load_dotenv(dotenv_path=_BACKEND_ENV, override=True)
+# override=False: el entorno real (Docker/CI/prod) SIEMPRE gana sobre el
+# archivo .env — con override=True un `API_TOKEN=` vacío en .env pisaba
+# el token real exportado en producción.
+load_dotenv(dotenv_path=_BACKEND_ENV, override=False)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 RAG_CHAT_MODEL = os.getenv("RAG_CHAT_MODEL", os.getenv("OLLAMA_MODEL", "llama3.2"))

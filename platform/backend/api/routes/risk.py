@@ -5,10 +5,11 @@ from datetime import datetime, time, timedelta, timezone, date
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 import httpx
 
 from api.auth import require_token
+from api.rate_limit import rate_limit
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -802,18 +803,46 @@ async def get_alerts(db: AsyncSession = Depends(get_async_db)) -> list[dict[str,
     return alerts[:10]
 
 
-@router.post("/predict-all", dependencies=[Depends(require_token)])
-async def run_predict_all(db: AsyncSession = Depends(get_async_db)) -> dict[str, str]:
+@router.post(
+    "/predict-all",
+    dependencies=[Depends(require_token), Depends(rate_limit("predict", times=5, seconds=60))],
+)
+async def run_predict_all(request: Request, db: AsyncSession = Depends(get_async_db)) -> dict[str, str]:
+    from api.audit import log_audit_event
+
+    log_audit_event(
+        session=db,
+        request=request,
+        action="predict_all",
+        resource="communes:all",
+        summary="Predicción manual de las 21 comunas",
+    )
     await predict_all_comunas(db)
     return {"status": "accepted"}
 
 
-@router.post("/predict-commune", dependencies=[Depends(require_token)])
+@router.post(
+    "/predict-commune",
+    dependencies=[Depends(require_token), Depends(rate_limit("predict", times=5, seconds=60))],
+)
 async def run_predict_commune(
     body: PredictCommuneBody,
+    request: Request,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, Any]:
-    return await predict_risk_stub(body.commune_id, db)
+    from api.audit import log_audit_event
+
+    log_audit_event(
+        session=db,
+        request=request,
+        action="predict_commune",
+        resource=f"commune:{body.commune_id}",
+        payload=body.model_dump(),
+        summary=f"Predicción manual de la comuna {body.commune_id}",
+    )
+    result = await predict_risk_stub(body.commune_id, db)
+    await db.commit()
+    return result
 
 
 @router.get("/observability/predictions")

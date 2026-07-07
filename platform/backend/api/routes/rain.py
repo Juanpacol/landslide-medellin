@@ -5,8 +5,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
 from scipy.stats import spearmanr
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -192,7 +192,7 @@ async def get_spearman(session: AsyncSession = Depends(get_async_db)) -> dict:
 # ── Thresholds ─────────────────────────────────────────────────────────────────
 
 class ThresholdIn(BaseModel):
-    threshold_mm: float
+    threshold_mm: float = Field(..., ge=0.0, le=500.0, description="Umbral diario en mm (0-500)")
 
 
 @router.get("/thresholds")
@@ -211,8 +211,19 @@ async def get_thresholds(session: AsyncSession = Depends(get_async_db)) -> dict:
 async def set_threshold(
     commune_id: str,
     body: ThresholdIn,
+    request: Request,
     session: AsyncSession = Depends(get_async_db),
 ) -> dict:
+    from api.audit import log_audit_event
+
+    log_audit_event(
+        session,
+        request,
+        action="set_threshold",
+        resource=f"commune:{commune_id}",
+        payload=body.model_dump(),
+        summary=f"Umbral de lluvia de comuna {commune_id} → {body.threshold_mm} mm",
+    )
     existing = await session.get(CommuneThreshold, commune_id)
     if existing:
         existing.threshold_mm = body.threshold_mm
@@ -226,10 +237,10 @@ async def set_threshold(
 # ── Webhook settings ───────────────────────────────────────────────────────────
 
 class WebhookIn(BaseModel):
-    url: str
+    url: str = Field(..., min_length=12, max_length=500, pattern=r"^https://")
 
 
-@router.get("/settings/webhook")
+@router.get("/settings/webhook", dependencies=[Depends(require_token)])
 async def get_webhook(session: AsyncSession = Depends(get_async_db)) -> dict:
     row = await session.get(AppSetting, "slack_webhook_url")
     if not row or not row.value:
@@ -240,7 +251,19 @@ async def get_webhook(session: AsyncSession = Depends(get_async_db)) -> dict:
 
 
 @router.post("/settings/webhook", dependencies=[Depends(require_token)])
-async def save_webhook(body: WebhookIn, session: AsyncSession = Depends(get_async_db)) -> dict:
+async def save_webhook(
+    body: WebhookIn, request: Request, session: AsyncSession = Depends(get_async_db)
+) -> dict:
+    from api.audit import log_audit_event
+
+    log_audit_event(
+        session,
+        request,
+        action="save_webhook",
+        resource="app_setting:slack_webhook_url",
+        payload=body.model_dump(),  # solo se guarda el hash, no la URL
+        summary="Webhook de Slack actualizado",
+    )
     existing = await session.get(AppSetting, "slack_webhook_url")
     if existing:
         existing.value = body.url
@@ -252,7 +275,8 @@ async def save_webhook(body: WebhookIn, session: AsyncSession = Depends(get_asyn
 
 
 @router.post("/settings/webhook/test", dependencies=[Depends(require_token)])
-async def test_webhook(session: AsyncSession = Depends(get_async_db)) -> dict:
+async def test_webhook(request: Request, session: AsyncSession = Depends(get_async_db)) -> dict:
+    from api.audit import log_audit_event
     from alerts.slack import _build_slack_payload, _fire_slack
 
     row = await session.get(AppSetting, "slack_webhook_url")
@@ -264,6 +288,14 @@ async def test_webhook(session: AsyncSession = Depends(get_async_db)) -> dict:
         "text": {"type": "mrkdwn", "text": "✅ *Este es un mensaje de prueba del sistema TEYVA*"},
     })
     status, code = await _fire_slack(row.value, payload)
+    log_audit_event(
+        session,
+        request,
+        action="test_webhook",
+        resource="app_setting:slack_webhook_url",
+        summary=f"Mensaje de prueba a Slack (status={status})",
+    )
+    await session.commit()
     return {"ok": status == "sent", "status": status, "response_code": code}
 
 
