@@ -186,18 +186,10 @@ async def latest_predictions(
 async def get_comunas(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
     # Acota a predicciones recientes (las predicciones corren cada 6h, 7 días
     # cubre de sobra) en vez de traer toda la tabla y quedarnos con la última.
+    from infrastructure.repositories.risk_predictions import latest_by_commune
+
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-    rows = (
-        await db.execute(
-            select(RiskPrediction)
-            .where(RiskPrediction.created_at >= cutoff)
-            .order_by(RiskPrediction.created_at.desc())
-        )
-    ).scalars().all()
-    pred_by_commune: dict[str, RiskPrediction] = {}
-    for r in rows:
-        if r.commune_id not in pred_by_commune:
-            pred_by_commune[r.commune_id] = r
+    pred_by_commune: dict[str, RiskPrediction] = await latest_by_commune(db, since=cutoff)
 
     real_polygons = await _load_real_commune_polygons()
     geo_by_cid = {g["commune_id"]: g for g in real_polygons if g.get("commune_id")}

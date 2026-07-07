@@ -63,24 +63,11 @@ async def get_live_rainfall(session: AsyncSession = Depends(get_async_db)) -> di
             "acum_mm": round(running[cid], 2),
         })
 
-    threshold_rows = await session.execute(select(CommuneThreshold))
-    thresholds: dict[str, float] = {r.commune_id: r.threshold_mm for r in threshold_rows.scalars().all()}
+    from infrastructure.repositories.rainfall import thresholds_by_commune
+    from infrastructure.repositories.risk_predictions import latest_scores_by_commune
 
-    subq = (
-        select(RiskPrediction.commune_id, func.max(RiskPrediction.created_at).label("max_at"))
-        .group_by(RiskPrediction.commune_id)
-        .subquery()
-    )
-    risk_rows = await session.execute(
-        select(RiskPrediction).join(
-            subq,
-            (RiskPrediction.commune_id == subq.c.commune_id)
-            & (RiskPrediction.created_at == subq.c.max_at),
-        )
-    )
-    risks: dict[str, tuple[float, str]] = {
-        r.commune_id: (r.risk_score, r.risk_category) for r in risk_rows.scalars().all()
-    }
+    thresholds: dict[str, float] = await thresholds_by_commune(session)
+    risks = await latest_scores_by_commune(session)
 
     now_utc = datetime.now(timezone.utc)
     comunas_out = []

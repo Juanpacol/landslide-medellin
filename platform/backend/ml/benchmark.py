@@ -62,9 +62,9 @@ def _parse_date(s: str | None) -> date | None:
 
 def freeze_benchmark(session: Session) -> dict[str, Any]:
     """Congela el snapshot actual de casos en benchmark.json."""
-    events = session.scalars(
-        select(LandslideEvent).where(LandslideEvent.is_synthetic.is_(False))
-    ).all()
+    from infrastructure.repositories.landslide_events import real_events_sync
+
+    events = real_events_sync(session)
 
     positives: list[dict[str, str]] = []
     event_days: set[tuple[str, date]] = set()

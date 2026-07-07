@@ -61,34 +61,21 @@ async def _get_webhook_url(session: AsyncSession) -> str | None:
 
 
 async def _get_thresholds(session: AsyncSession) -> dict[str, float]:
-    result = await session.execute(select(CommuneThreshold))
-    return {r.commune_id: r.threshold_mm for r in result.scalars().all()}
+    from infrastructure.repositories.rainfall import thresholds_by_commune
+
+    return await thresholds_by_commune(session)
 
 
 async def _get_today_acum(session: AsyncSession) -> dict[str, float]:
-    midnight = _midnight_utc()
-    result = await session.execute(
-        select(RainfallTimeseries.commune_id, func.sum(RainfallTimeseries.precip_mm))
-        .where(RainfallTimeseries.snapshot_at >= midnight)
-        .group_by(RainfallTimeseries.commune_id)
-    )
-    return {row[0]: float(row[1]) for row in result.all()}
+    from infrastructure.repositories.rainfall import accumulated_since_by_commune
+
+    return await accumulated_since_by_commune(session, _midnight_utc())
 
 
 async def _get_latest_risk(session: AsyncSession) -> dict[str, tuple[float | None, str | None]]:
-    subq = (
-        select(RiskPrediction.commune_id, func.max(RiskPrediction.created_at).label("max_at"))
-        .group_by(RiskPrediction.commune_id)
-        .subquery()
-    )
-    result = await session.execute(
-        select(RiskPrediction).join(
-            subq,
-            (RiskPrediction.commune_id == subq.c.commune_id)
-            & (RiskPrediction.created_at == subq.c.max_at),
-        )
-    )
-    return {r.commune_id: (r.risk_score, r.risk_category) for r in result.scalars().all()}
+    from infrastructure.repositories.risk_predictions import latest_scores_by_commune
+
+    return await latest_scores_by_commune(session)
 
 
 async def _was_recently_alerted(session: AsyncSession, commune_id: str) -> bool:
@@ -589,19 +576,9 @@ async def check_and_fire_critical_risk_alerts(session: AsyncSession) -> list[str
         return []
 
     # Get latest predictions for all communes
-    subq = (
-        select(RiskPrediction.commune_id, func.max(RiskPrediction.created_at).label("max_at"))
-        .group_by(RiskPrediction.commune_id)
-        .subquery()
-    )
-    result = await session.execute(
-        select(RiskPrediction).join(
-            subq,
-            (RiskPrediction.commune_id == subq.c.commune_id)
-            & (RiskPrediction.created_at == subq.c.max_at),
-        )
-    )
-    predictions = result.scalars().all()
+    from infrastructure.repositories.risk_predictions import latest_by_commune
+
+    predictions = (await latest_by_commune(session)).values()
 
     critical_communes: list[tuple[str, float]] = []
     for pred in predictions:

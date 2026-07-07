@@ -98,11 +98,10 @@ def _load_events_index(session: Session) -> dict[str, list[date]]:
     """Índice (commune_id → fechas) de eventos REALES. Los sintéticos
     (is_synthetic=true, generados con Snake Line) se excluyen: entrenar con
     ellos y validar con la misma heurística sería contaminación circular."""
+    from infrastructure.repositories.landslide_events import real_events_sync
+
     by_commune: dict[str, list[date]] = {}
-    rows = session.scalars(
-        select(LandslideEvent).where(LandslideEvent.is_synthetic.is_(False))
-    ).all()
-    for ev in rows:
+    for ev in real_events_sync(session):
         cid = _normalize_commune_id(ev.commune_id)
         if cid is None:
             continue
