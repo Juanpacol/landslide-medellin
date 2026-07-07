@@ -17,7 +17,7 @@ from agent.risk_explanations import (
     _template_explanation_structured,
     _render_narrative,
 )
-from constants import RISK_THRESHOLD_ALTO, RISK_THRESHOLD_CRITICO, RISK_THRESHOLD_MEDIO
+from domain.risk_rules import RISK_THRESHOLD_ALTO, RISK_THRESHOLD_CRITICO, RISK_THRESHOLD_MEDIO
 from tests.eval_runner import (
     TestResult,
     format_report_summary,

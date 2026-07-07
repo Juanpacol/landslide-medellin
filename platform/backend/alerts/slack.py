@@ -9,15 +9,14 @@ import httpx
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.risk_rules import ANTECEDENT_INDEX_THRESHOLD_MM, compute_alert_state, normalize_category
 from constants import (
-    ALERT_COOLDOWN_RAINFALL_HOURS,
     ALERT_COOLDOWN_CRITICAL_RISK_HOURS,
+    ALERT_COOLDOWN_RAINFALL_HOURS,
     ALERT_COOLDOWN_SCRAPER_HOURS,
-    ANTECEDENT_INDEX_THRESHOLD_MM,
+    ALERT_COOLDOWN_YELLOW_HOURS,
     SCRAPER_INTERVALS_MIN,
     SCRAPER_STALE_FACTOR,
-    compute_alert_state,
-    normalize_category,
 )
 from alerts.charts import ascii_sparkline, rainfall_chart_for_commune
 from alerts.slack_media import (

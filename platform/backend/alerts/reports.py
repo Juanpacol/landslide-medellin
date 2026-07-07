@@ -162,7 +162,7 @@ def build_scraper_digest_payload(source: str, summary: str, n_items: int) -> dic
 
 async def _collect_situation_data(session: AsyncSession) -> dict:
     """Junta el panorama actual con las mismas fuentes que usan API y alertas."""
-    from constants import display_label, normalize_category
+    from domain.risk_rules import display_label, normalize_category
     from db.models import LandslideEvent, RiskPrediction, SeismicEvent
     from db.models.rainfall_timeseries import RainfallTimeseries
 

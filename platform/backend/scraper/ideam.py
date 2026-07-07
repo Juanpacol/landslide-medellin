@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.ml_feature import MLFeature
 from db.session import AsyncSessionLocal
-from scraper.commune import lookup_commune_for_point
+from infrastructure.external.arcgis_client import lookup_commune_for_point
 from scraper.common import httpx_client, log_scrape_run, ml_feature_exists, utcnow, with_retries
 
 SOCRATA_BASE = "https://www.datos.gov.co/resource/57sv-p2fu.json"

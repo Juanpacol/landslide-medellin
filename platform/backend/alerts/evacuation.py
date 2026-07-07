@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.ml_feature import MLFeature
 from db.models.safe_zone import SafeZone
-from scraper.commune import haversine_km
+from infrastructure.external.arcgis_client import haversine_km
 from scraper.common import httpx_client, with_retries
 
 logger = logging.getLogger(__name__)

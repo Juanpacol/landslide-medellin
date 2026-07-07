@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.ml_feature import MLFeature
 from db.models.seismic_event import SeismicEvent
-from scraper.commune import haversine_km
+from infrastructure.external.arcgis_client import haversine_km
 
 FEATURE_KEY = "seismic_recent_intensity"
 

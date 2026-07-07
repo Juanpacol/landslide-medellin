@@ -14,7 +14,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from constants import risk_level_from_score  # noqa: E402
+from domain.risk_rules import risk_level_from_score  # noqa: E402
 from db.session import AsyncSessionLocal  # noqa: E402
 from ml.features import FeatureBuilder  # noqa: E402
 

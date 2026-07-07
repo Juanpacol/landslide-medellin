@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from db.models.landslide_event import LandslideEvent
 from db.session import AsyncSessionLocal
-from scraper.commune import lookup_commune_for_point
+from infrastructure.external.arcgis_client import lookup_commune_for_point
 from scraper.common import httpx_client
 from scraper.historical_backfill import _commune_from_text
 

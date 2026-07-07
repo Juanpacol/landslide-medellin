@@ -9,7 +9,7 @@ esquemas de id conviviendo sin mapeo central:
 
 - **id canónico** ("1".."21"): el que usan los DATOS — ml_features,
   risk_predictions, rainfall_timeseries (los scrapers mapean corregimientos
-  a 17-21 vía scraper/commune.py::_CORREG_TO_ML).
+  a 17-21 vía infrastructure/external/arcgis_client.py).
 - **código oficial** ("01".."16", "50".."90"): el de la cartografía de
   Medellín (ArcGIS) y documentos institucionales.
 

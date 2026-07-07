@@ -14,7 +14,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from constants import alert_level, compute_alert_state, is_alert_category, normalize_category
+from domain.risk_rules import (
+    alert_level,
+    compute_alert_state,
+    is_alert_category,
+    normalize_category,
+)
 from db.models import LandslideEvent, MLFeature, RiskPrediction
 from db.models.rainfall_timeseries import RainfallTimeseries
 from db.models.risk_explanation import RiskExplanation
@@ -545,7 +550,7 @@ async def _alert_state_for_commune(
     ).scalars().first()
     risk_category = pred.risk_category if pred else None
 
-    from constants import ANTECEDENT_INDEX_THRESHOLD_MM
+    from domain.risk_rules import ANTECEDENT_INDEX_THRESHOLD_MM
 
     rainfall_pct = round(rain_today_mm / threshold_mm, 3) if threshold_mm else 0.0
     antecedent_pct = round(antecedent_index / ANTECEDENT_INDEX_THRESHOLD_MM, 3)

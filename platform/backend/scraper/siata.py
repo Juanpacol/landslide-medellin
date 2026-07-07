@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 from db.models.ml_feature import MLFeature
 from db.models.rainfall_timeseries import RainfallTimeseries
 from db.session import AsyncSessionLocal
-from scraper.commune import lookup_commune_for_point, parse_ml_commune_from_siata_field
+from infrastructure.external.arcgis_client import lookup_commune_for_point, parse_ml_commune_from_siata_field
 from scraper.common import httpx_client, log_scrape_run, ml_feature_exists, utcnow, with_retries
 
 SIATA_HOME = "https://www.siata.gov.co"

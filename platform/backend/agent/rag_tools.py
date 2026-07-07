@@ -27,7 +27,7 @@ from agent.tools import (
     get_top_risk_comunas,
     resolve_commune_id,
 )
-from constants import display_label, risk_level_from_score
+from domain.risk_rules import display_label, risk_level_from_score
 from db.models import LandslideEvent, RainfallTimeseries, RiskPrediction, ScrapingLog
 from db.session import AsyncSessionLocal
 

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models.landslide_event import LandslideEvent
 from db.models.ml_feature import MLFeature
 from db.session import AsyncSessionLocal
-from scraper.commune import lookup_commune_for_point
+from infrastructure.external.arcgis_client import lookup_commune_for_point
 from scraper.common import httpx_client, ml_feature_exists, with_retries
 
 WP_POSTS_URL = "https://www.medellin.gov.co/es/wp-json/wp/v2/posts"

@@ -25,7 +25,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from constants import normalize_category
+from domain.risk_rules import normalize_category
 from db.models.risk_explanation import RiskExplanation
 
 logger = logging.getLogger(__name__)

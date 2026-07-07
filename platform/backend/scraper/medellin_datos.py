@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.ml_feature import MLFeature
 from db.session import AsyncSessionLocal
-from scraper.commune import official_to_ml_commune, ring_centroid_lonlat
+from infrastructure.external.arcgis_client import official_to_ml_commune, ring_centroid_lonlat
 from scraper.common import httpx_client, log_scrape_run, ml_feature_exists, utcnow, with_retries
 
 GEOMEDELLIN_HUB = "https://geomedellin-m-medellin.opendata.arcgis.com/"

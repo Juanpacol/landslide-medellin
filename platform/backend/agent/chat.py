@@ -22,7 +22,7 @@ from agent.tools import (
     get_risk_by_comuna,
     get_top_risk_comunas,
 )
-from constants import display_label, risk_level_from_score
+from domain.risk_rules import display_label, risk_level_from_score
 from db.models import LandslideEvent, MLFeature, RiskPrediction
 
 # Cargar backend/.env explícitamente para evitar depender del cwd del proceso.
