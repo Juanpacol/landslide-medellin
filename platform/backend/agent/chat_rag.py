@@ -52,18 +52,10 @@ MAX_TOOL_ROUNDS = int(os.getenv("RAG_MAX_TOOL_ROUNDS", "3"))
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").strip().lower()
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
-_anthropic_client = None
-
-
 def _get_anthropic_client():
-    """Cliente lazy: solo se construye (y solo exige ANTHROPIC_API_KEY) si
-    realmente se llega a usar el proveedor Anthropic."""
-    global _anthropic_client
-    if _anthropic_client is None:
-        import anthropic
+    from infrastructure.external.llm_client import get_anthropic_client
 
-        _anthropic_client = anthropic.Anthropic()
-    return _anthropic_client
+    return get_anthropic_client()
 
 
 def _openai_tools_to_claude(tools: list[dict]) -> list[dict]:

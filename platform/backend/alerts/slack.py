@@ -91,13 +91,9 @@ async def _was_recently_alerted(session: AsyncSession, commune_id: str) -> bool:
 
 
 async def _fire_slack(webhook_url: str, payload: dict) -> tuple[str, int | None]:
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.post(webhook_url, json=payload)
-            return ("sent" if r.status_code == 200 else "failed"), r.status_code
-    except Exception as exc:
-        logger.warning("Slack webhook error: %s", exc)
-        return "failed", None
+    from infrastructure.external.slack_client import post_webhook
+
+    return await post_webhook(webhook_url, payload)
 
 
 def _build_slack_payload(

@@ -36,8 +36,6 @@ logger = logging.getLogger(__name__)
 COL_TZ = ZoneInfo("America/Bogota")
 
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
-_anthropic_client = None
-
 _SOURCE_LABELS: dict[str, str] = {
     "siata": "SIATA (lluvia)",
     "siata_sismos": "SIATA (sismos)",
@@ -48,13 +46,9 @@ _SOURCE_LABELS: dict[str, str] = {
 
 
 def _get_anthropic_client():
-    """Cliente lazy: solo exige ANTHROPIC_API_KEY si realmente se usa."""
-    global _anthropic_client
-    if _anthropic_client is None:
-        import anthropic
+    from infrastructure.external.llm_client import get_anthropic_client
 
-        _anthropic_client = anthropic.Anthropic()
-    return _anthropic_client
+    return get_anthropic_client()
 
 
 def _llm_available() -> bool:
