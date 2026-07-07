@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, time, timedelta, timezone, date
 from pathlib import Path
 from typing import Any
 
@@ -13,8 +13,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from constants import alert_level, is_alert_category, normalize_category
+from constants import alert_level, compute_alert_state, is_alert_category, normalize_category
 from db.models import LandslideEvent, MLFeature, RiskPrediction
+from db.models.rainfall_timeseries import RainfallTimeseries
 from db.models.risk_explanation import RiskExplanation
 from db.session import get_async_db
 from integrations.agent_contracts import predict_all_comunas, predict_risk_stub
@@ -262,6 +263,49 @@ async def get_comuna(commune_id: str, db: AsyncSession = Depends(get_async_db)) 
     }
 
 
+async def _rain_by_day_for_commune(
+    db: AsyncSession, commune_id: str, start_day: date, end_day: date
+) -> dict[date, float]:
+    """Lluvia diaria real de una comuna: suma de snapshots SIATA agrupados por
+    día (`rainfall_timeseries`, la tabla que SIATA sí llena cada 30 min — mismo
+    patrón que `alerts/slack.py::_get_today_acum`). Los días sin telemetría se
+    rellenan con el total diario de IDEAM (`features.precip_sum_mm_day`) si
+    existe. NO leer `MLFeature.precip_acum_7d`: ningún scraper la llena."""
+    start_dt = datetime.combine(start_day, time.min, tzinfo=timezone.utc)
+    stmt = (
+        select(
+            func.date(RainfallTimeseries.snapshot_at),
+            func.sum(RainfallTimeseries.precip_mm),
+        )
+        .where(
+            RainfallTimeseries.commune_id == commune_id,
+            RainfallTimeseries.snapshot_at >= start_dt,
+        )
+        .group_by(func.date(RainfallTimeseries.snapshot_at))
+    )
+    rain_by_day: dict[date, float] = {}
+    for day_value, total in (await db.execute(stmt)).all():
+        d = day_value if isinstance(day_value, date) else datetime.fromisoformat(str(day_value)).date()
+        if start_day <= d <= end_day:
+            rain_by_day[d] = round(float(total or 0.0), 2)
+
+    feats_stmt = select(MLFeature.reference_date, MLFeature.features).where(
+        MLFeature.commune_id == commune_id,
+        MLFeature.reference_date.isnot(None),
+    )
+    for ref, feats in (await db.execute(feats_stmt)).all():
+        d = ref.date()
+        if d < start_day or d > end_day or d in rain_by_day:
+            continue
+        value = feats.get("precip_sum_mm_day") if isinstance(feats, dict) else None
+        try:
+            if value is not None:
+                rain_by_day[d] = round(float(value), 2)
+        except (TypeError, ValueError):
+            continue
+    return rain_by_day
+
+
 @router.get("/comuna/{commune_id}/detalle")
 async def get_comuna_detalle(commune_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
     base = next((c for c in _COMUNAS_BASE if c[0] == commune_id), None)
@@ -280,24 +324,7 @@ async def get_comuna_detalle(commune_id: str, db: AsyncSession = Depends(get_asy
     start_30 = today - timedelta(days=29)
     start_7 = today - timedelta(days=6)
 
-    features_stmt = select(MLFeature).where(
-        MLFeature.commune_id == commune_id,
-        MLFeature.reference_date.isnot(None),
-    )
-    feature_rows = (await db.execute(features_stmt)).scalars().all()
-    rain_by_day: dict[date, float] = {}
-    for row in feature_rows:
-        if row.reference_date is None:
-            continue
-        day = row.reference_date.date()
-        if day < start_30 or day > today:
-            continue
-        feature_obj = row.features if isinstance(row.features, dict) else {}
-        rain_mm = feature_obj.get("precip_sum_mm_day")
-        try:
-            rain_by_day[day] = float(rain_mm) if rain_mm is not None else 0.0
-        except Exception:
-            rain_by_day[day] = 0.0
+    rain_by_day = await _rain_by_day_for_commune(db, commune_id, start_30, today)
 
     rain_7d = round(sum(v for d, v in rain_by_day.items() if d >= start_7), 2)
     rain_30d = round(sum(rain_by_day.values()), 2)
@@ -338,6 +365,262 @@ async def get_comuna_detalle(commune_id: str, db: AsyncSession = Depends(get_asy
     }
 
 
+@router.get("/barrios-hazard")
+async def get_barrios_hazard(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    """Grado de amenaza geomorfológica oficial por barrio (~401 polígonos).
+
+    Poblada por `scraper/barrio_hazard.py` (script puntual — la cartografía de
+    ordenamiento territorial cambia en meses/años). El frontend la une con
+    `barrios-medellin.json` por `codigo` para colorear la capa de barrios.
+    """
+    from db.models.barrio_hazard import BarrioHazard
+
+    rows = (await db.execute(select(BarrioHazard))).scalars().all()
+    return {
+        "barrios": {
+            r.barrio_codigo: {
+                "nombre": r.nombre,
+                "commune_id": r.commune_id,
+                "hazard_grade": r.hazard_grade,
+            }
+            for r in rows
+        },
+        "total": len(rows),
+    }
+
+
+@router.get("/seismic-events")
+async def get_seismic_events(
+    days: int = 365,
+    db: AsyncSession = Depends(get_async_db),
+) -> dict[str, Any]:
+    """Sismos recientes registrados por la red SIATA (sismógrafos/acelerógrafos).
+
+    Un mismo sismo lo registran varias estaciones; se deduplica por
+    (fecha_evento, epicentro) devolviendo un registro por sismo con las
+    estaciones que lo captaron.
+    """
+    from db.models.seismic_event import SeismicEvent
+
+    days = max(1, min(int(days), 3650))
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    stmt = (
+        select(SeismicEvent)
+        .where(
+            (SeismicEvent.event_local_at >= cutoff) | (SeismicEvent.event_local_at.is_(None))
+        )
+        .order_by(SeismicEvent.event_local_at.desc().nulls_last())
+        .limit(200)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    dedup: dict[tuple, dict[str, Any]] = {}
+    for r in rows:
+        key = (
+            r.event_local_at.isoformat() if r.event_local_at else None,
+            r.epicenter_label,
+        )
+        if key not in dedup:
+            dedup[key] = {
+                "event_local_at": r.event_local_at.isoformat() if r.event_local_at else None,
+                "magnitude": r.magnitude,
+                "depth_km": r.depth_km,
+                "epicenter_lat": r.epicenter_lat,
+                "epicenter_lon": r.epicenter_lon,
+                "epicenter_label": r.epicenter_label,
+                "stations": [],
+            }
+        if r.station_name not in dedup[key]["stations"]:
+            dedup[key]["stations"].append(r.station_name)
+
+    events = sorted(
+        dedup.values(),
+        key=lambda e: e["event_local_at"] or "",
+        reverse=True,
+    )
+    return {"events": events, "total": len(events)}
+
+
+async def _inherited_risk_for_communes(db: AsyncSession, commune_ids: list[str]) -> dict[str, Any]:
+    """Peor riesgo entre las comunas que intersecta una cuadrícula. No es una
+    predicción por cuadrícula — se hereda del modelo a nivel comuna."""
+    worst_score: float | None = None
+    worst_category: str | None = None
+    for cid in commune_ids:
+        pred = (
+            await db.execute(
+                select(RiskPrediction)
+                .where(RiskPrediction.commune_id == cid)
+                .order_by(RiskPrediction.created_at.desc())
+                .limit(1)
+            )
+        ).scalars().first()
+        if pred and pred.risk_score is not None:
+            if worst_score is None or pred.risk_score > worst_score:
+                worst_score = float(pred.risk_score)
+                worst_category = pred.risk_category
+    return {
+        "risk_score": worst_score,
+        "risk_category": worst_category or "Sin datos",
+        "risk_source": "inherited_from_commune",
+    }
+
+
+@router.get("/mesh-grid")
+async def get_mesh_grid(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    """Cuadrículas de ~1.5km (metodología JMA Mesh Maps). Generadas por
+    `scraper/mesh_grid.py`. El riesgo se hereda de la comuna (ver
+    `MeshQuadrant.__doc__`) — no es predicción por cuadrícula."""
+    from db.models.mesh_quadrant import MeshQuadrant
+
+    rows = (await db.execute(select(MeshQuadrant))).scalars().all()
+    return {
+        "quadrants": [
+            {
+                "id": r.id,
+                "geometry": r.geometry,
+                "commune_ids": r.commune_ids,
+                "barrio_codigos": r.barrio_codigos,
+                "hazard_grade": r.hazard_grade,
+                "n_barrios_alta": r.n_barrios_alta,
+            }
+            for r in rows
+        ],
+        "total": len(rows),
+    }
+
+
+@router.get("/mesh-grid/{quad_id}")
+async def get_mesh_quadrant_detail(quad_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    from db.models.mesh_quadrant import MeshQuadrant
+
+    row = await db.get(MeshQuadrant, quad_id)
+    if row is None:
+        return {"error": "Cuadrícula no encontrada"}
+
+    inherited = await _inherited_risk_for_communes(db, row.commune_ids)
+    return {
+        "id": row.id,
+        "geometry": row.geometry,
+        "commune_ids": row.commune_ids,
+        "barrio_codigos": row.barrio_codigos,
+        "hazard_grade": row.hazard_grade,
+        "n_barrios_alta": row.n_barrios_alta,
+        **inherited,
+    }
+
+
+@router.get("/snake-line/{commune_id}")
+async def get_snake_line(commune_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    """Punto actual + historial 48h del gráfico Snake Line (SWI × lluvia
+    intensa), metodología JMA. Ver `alerts/snake_line.py`."""
+    from alerts.snake_line import get_snake_line_status
+
+    return await get_snake_line_status(db, commune_id)
+
+
+@router.get("/soil-water-index")
+async def get_soil_water_index(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    """Saturación estimada del suelo (%) por comuna — metodología JMA (tanque
+    simplificado). Ver `ml/soil_water_index.py` para el detalle del modelo y
+    sus límites (MVP, drain_rate conservador sin calibrar)."""
+    from ml.soil_water_index import swi_for_all_communes
+
+    today = datetime.now(timezone.utc).date()
+    swi_by_commune = await swi_for_all_communes(db, today)
+
+    items = []
+    for cid, nombre, _ in _COMUNAS_BASE:
+        swi = swi_by_commune.get(cid)
+        items.append({
+            "commune_id": cid,
+            "nombre_comuna": nombre,
+            "swi_pct": swi,
+            "state": "ROJO" if swi is not None and swi >= 85 else "AMARILLO" if swi is not None and swi >= 60 else "VERDE",
+        })
+    return {"items": items, "total": len(items), "as_of": today.isoformat()}
+
+
+async def _alert_state_for_commune(
+    db: AsyncSession,
+    commune_id: str,
+    threshold_mm: float,
+    rain_today_mm: float,
+    antecedent_index: float,
+) -> dict[str, Any]:
+    pred = (
+        await db.execute(
+            select(RiskPrediction)
+            .where(RiskPrediction.commune_id == commune_id)
+            .order_by(RiskPrediction.created_at.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+    risk_category = pred.risk_category if pred else None
+
+    from constants import ANTECEDENT_INDEX_THRESHOLD_MM
+
+    rainfall_pct = round(rain_today_mm / threshold_mm, 3) if threshold_mm else 0.0
+    antecedent_pct = round(antecedent_index / ANTECEDENT_INDEX_THRESHOLD_MM, 3)
+    result = compute_alert_state(rainfall_pct, antecedent_pct, risk_category)
+
+    return {
+        "commune_id": commune_id,
+        "state": result["state"],
+        "action": result["action"],
+        "rainfall_today_mm": round(rain_today_mm, 1),
+        "rainfall_threshold_mm": threshold_mm,
+        "rainfall_pct": rainfall_pct,
+        "antecedent_index": antecedent_index,
+        "antecedent_pct": antecedent_pct,
+        "risk_category": risk_category or "Sin datos",
+        "risk_score": float(pred.risk_score) if pred and pred.risk_score is not None else None,
+    }
+
+
+@router.get("/alert-state/{commune_id}")
+async def get_alert_state(commune_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    """Estado operativo compuesto (Verde/Amarillo/Rojo) para una comuna: cruza
+    lluvia de hoy, índice de precipitación antecedente y categoría del modelo
+    ML. Reutiliza el mismo umbral por comuna que las alertas de Slack."""
+    from db.models.commune_threshold import CommuneThreshold
+    from ml.precip_index import antecedent_indexes_for_all_communes
+
+    today = datetime.now(timezone.utc).date()
+    threshold_row = await db.get(CommuneThreshold, commune_id)
+    threshold_mm = threshold_row.threshold_mm if threshold_row else 35.0
+
+    rain_by_day = await _rain_by_day_for_commune(db, commune_id, today, today)
+    rain_today = rain_by_day.get(today, 0.0)
+
+    antecedent_by_commune = await antecedent_indexes_for_all_communes(db, today)
+    antecedent_index = antecedent_by_commune.get(commune_id, 0.0)
+
+    return await _alert_state_for_commune(db, commune_id, threshold_mm, rain_today, antecedent_index)
+
+
+@router.get("/alert-state")
+async def get_alert_state_all(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    """Estado compuesto de las 21 comunas, para el dashboard."""
+    from db.models.commune_threshold import CommuneThreshold
+    from ml.precip_index import antecedent_indexes_for_all_communes
+
+    today = datetime.now(timezone.utc).date()
+    thresholds = {r.commune_id: r.threshold_mm for r in (await db.execute(select(CommuneThreshold))).scalars().all()}
+    antecedent_by_commune = await antecedent_indexes_for_all_communes(db, today)
+
+    items = []
+    for cid, _, _ in _COMUNAS_BASE:
+        threshold_mm = thresholds.get(cid, 35.0)
+        rain_by_day = await _rain_by_day_for_commune(db, cid, today, today)
+        rain_today = rain_by_day.get(today, 0.0)
+        antecedent_index = antecedent_by_commune.get(cid, 0.0)
+        items.append(await _alert_state_for_commune(db, cid, threshold_mm, rain_today, antecedent_index))
+
+    items.sort(key=lambda it: {"ROJO": 0, "AMARILLO": 1, "VERDE": 2}[it["state"]])
+    return {"items": items, "total": len(items)}
+
+
 @router.get("/explanation/{commune_id}")
 async def get_risk_explanation(
     commune_id: str,
@@ -375,25 +658,7 @@ async def get_historia(commune_id: str, db: AsyncSession = Depends(get_async_db)
     today = datetime.now(timezone.utc).date()
     start_day = today - timedelta(days=29)
 
-    rain_stmt = select(MLFeature.reference_date, MLFeature.precip_acum_7d).where(
-        MLFeature.commune_id == commune_id,
-        MLFeature.reference_date.isnot(None),
-    )
-    rain_rows = (await db.execute(rain_stmt)).all()
-    rain_by_day: dict[date, float] = {}
-    rain_count_by_day: dict[date, int] = {}
-    for row in rain_rows:
-        d = row.reference_date.date() if row.reference_date is not None else None
-        if d is None:
-            continue
-        if d < start_day or d > today:
-            continue
-        rain_by_day[d] = rain_by_day.get(d, 0.0) + float(row.precip_acum_7d or 0.0)
-        rain_count_by_day[d] = rain_count_by_day.get(d, 0) + 1
-
-    for d, total in list(rain_by_day.items()):
-        count = max(1, rain_count_by_day.get(d, 1))
-        rain_by_day[d] = total / count
+    rain_by_day = await _rain_by_day_for_commune(db, commune_id, start_day, today)
 
     events_stmt = select(LandslideEvent.fecha).where(LandslideEvent.commune_id == commune_id)
     event_rows = (await db.execute(events_stmt)).all()

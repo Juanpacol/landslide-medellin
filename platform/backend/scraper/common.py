@@ -63,7 +63,11 @@ async def log_scrape_run(
     records_valid: int | None = None,
     records_discarded: int | None = None,
     detail: str | None = None,
+    new_items_summary: list[dict] | None = None,
 ) -> None:
+    """Registra la corrida en scraping_logs. Si además trae registros NUEVOS
+    (`new_items_summary`: lista de dicts con titulo/detalle/fecha), publica el
+    digest en lenguaje plano a Slack. Ese envío nunca tumba al scraper."""
     log = ScrapingLog(
         source=source,
         status=status,
@@ -76,6 +80,11 @@ async def log_scrape_run(
     )
     session.add(log)
     await session.commit()
+
+    if new_items_summary:
+        from alerts.reports import maybe_send_scraper_digest
+
+        await maybe_send_scraper_digest(session, source, new_items_summary)
 
 
 async def ml_feature_exists(

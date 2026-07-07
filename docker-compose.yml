@@ -64,6 +64,10 @@ services:
       DB_SSL: ${DB_SSL:-false}
       ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
       API_TOKEN: ${API_TOKEN:-}
+      ENABLE_RAG: ${ENABLE_RAG:-true}
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-haiku-4-5}
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
       OLLAMA_FALLBACK_MODEL: ${OLLAMA_FALLBACK_MODEL:-qwen2.5:0.5b}

@@ -152,6 +152,7 @@ async def _run_dagrd(session: AsyncSession) -> int:
     discarded = 0
     inserted = 0
     detail: str | None = None
+    new_items: list[dict] = []
     try:
         events, downloaded, detail = await _collect_dagrd_events()
         for ev in events:
@@ -176,6 +177,13 @@ async def _run_dagrd(session: AsyncSession) -> int:
                 )
             )
             inserted += 1
+            new_items.append(
+                {
+                    "titulo": ev["tipo_emergencia"] or "Evento de emergencia",
+                    "detalle": f"comuna {ev['commune_id']}" if ev["commune_id"] else "ubicación sin asignar",
+                    "fecha": ev["fecha"] or "",
+                }
+            )
         await session.commit()
         status = "ok"
     except Exception as exc:  # noqa: BLE001
@@ -192,6 +200,7 @@ async def _run_dagrd(session: AsyncSession) -> int:
             records_valid=inserted,
             records_discarded=discarded,
             detail=detail,
+            new_items_summary=new_items if status == "ok" else None,
         )
     return inserted
 

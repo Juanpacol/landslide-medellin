@@ -75,6 +75,23 @@ def _load_events_index(session: Session) -> dict[str, list[date]]:
     return by_commune
 
 
+def _collect_all_numeric_keys(session: Session, communes: list[str]) -> set[str]:
+    """Detecta TODAS las claves numéricas presentes en MLFeature.features
+    (incluyendo sismos, API) para forzar que entren al modelo."""
+    all_keys: set[str] = {"centroid_lat", "centroid_lon", "precip_acum_7d", "n_events_window"}
+    rows = session.scalars(select(MLFeature)).all()
+    for row in rows:
+        if row.features:
+            for k, v in row.features.items():
+                if k not in ["source", "nombre", "official_codigo", "station_codes", "barrios"]:
+                    try:
+                        float(str(v).replace(",", "."))
+                        all_keys.add(k)
+                    except (ValueError, TypeError):
+                        pass
+    return all_keys
+
+
 def _target_for_ref_day_future(
     commune_id: str,
     ref_d: date,
@@ -155,6 +172,19 @@ def _build_supervised_matrix(
         return np.zeros((0, 0)), np.array([]), [], [], "future_7d"
 
     keys = sorted({k for r in raw_rows for k in r.keys()})
+
+    # Force inclusion of new features (sismos, API, amenaza por barrio) even
+    # if sparse data. This ensures they train into the model when data
+    # becomes available, instead of being silently dropped by the sorted-keys
+    # union above if no row happens to have them yet.
+    force_keys = {
+        "seismic_recent_intensity",
+        "antecedent_precip_index",
+        "pct_barrios_alta_amenaza",
+        "soil_water_index_pct",
+    }
+    keys = sorted(set(keys) | force_keys)
+
     matrix = np.zeros((len(raw_rows), len(keys)), dtype=float)
     for i, r in enumerate(raw_rows):
         for j, k in enumerate(keys):
@@ -218,24 +248,27 @@ def train() -> dict[str, Any]:
     Xs = scaler.fit_transform(X)
     Xs = np.nan_to_num(Xs, nan=0.0, posinf=0.0, neginf=0.0)
 
-    builder = FeatureBuilder(MODELS_DIR)
-    builder.save_scaler(scaler)
-    builder.save_feature_names(feature_names)
-
     if len(np.unique(y)) < 2:
+        # Abortar ANTES de persistir scaler/feature_names: si se guardan aquí y
+        # el clasificador no se entrena, quedan artefactos inconsistentes con el
+        # best_model.pkl anterior (vector de features distinto → predict roto).
         payload = {
             "n_samples": n_samples,
             "n_positive": n_positive,
             "n_features": n_features,
             "best_model": None,
             "cv_mean_auc": None,
-            "cv_strategy": cv_name,
+            "cv_strategy": None,
             "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "La variable objetivo tiene una sola clase; no se entrena clasificador.",
         }
         METRICS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return payload
+
+    builder = FeatureBuilder(MODELS_DIR)
+    builder.save_scaler(scaler)
+    builder.save_feature_names(feature_names)
 
     sm = SMOTE(random_state=42)
     X_res, y_res = sm.fit_resample(Xs, y)

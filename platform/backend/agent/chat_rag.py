@@ -38,7 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.memory import get_history, save_turn
 from agent.prompts import SYSTEM_PROMPT
-from agent.rag_tools import TOOL_SCHEMAS, call_tool, get_sources, reset_sources
+from agent.rag_tools import TOOL_SCHEMAS, call_tool, get_sources, reset_sources, set_report_session
 
 _BACKEND_ENV = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=_BACKEND_ENV, override=True)
@@ -96,12 +96,22 @@ HERRAMIENTAS DISPONIBLES:
 - get_recent_events: eventos/emergencias recientes.
 - get_rainfall_timeseries: lluvia acumulada reciente de una comuna.
 - get_scraper_health: estado de las fuentes de datos.
+- report_incident: registra un reporte ciudadano de una situación de riesgo observada.
+- get_situation_report: panorama completo del valle en lenguaje plano.
+- get_evacuation_routes: zonas seguras candidatas y rutas caminando desde una comuna.
 
 CUÁNDO USAR CADA UNA (ejemplos):
 - "¿Riesgo en Villatina?" → get_risk_predictions + get_rainfall_timeseries (+ search_knowledge si piden contexto/por qué)
 - "¿Qué pasó en Castilla?" / "¿Hubo emergencias?" → get_recent_events
 - "¿Cuánta lluvia ha caído en Robledo?" → get_rainfall_timeseries
 - "¿Están funcionando los sensores?" → get_scraper_health
+- "Veo grietas en mi casa" / "quiero reportar algo" → pregunta comuna y qué observa, luego report_incident
+- "Dame un resumen de la situación" / "¿cómo está todo hoy?" → get_situation_report
+- "¿Adónde evacuo?" / "rutas seguras" / "dónde me refugio" → get_evacuation_routes
+
+SOBRE REPORTES CIUDADANOS: si alguien describe una situación de peligro
+inminente (deslizamiento activo, personas en riesgo), dile PRIMERO que llame
+al DAGRD 4444444 o Bomberos 119, y además registra el reporte.
 
 SI LA PREGUNTA ES DE TIPO "POR QUÉ" (por qué subió/bajó el riesgo, por qué
 hay alerta, qué está pasando en una zona), sigue este proceso antes de
@@ -372,10 +382,10 @@ async def _run_tool_loop_claude_stream(system: str, messages: list[dict]) -> Asy
         tool_calls = _extract_claude_tool_calls(response)
 
         if not tool_calls:
-            content = _extract_claude_text(response)
-            if content:
-                yield content
-                return
+            # Sin más tools que llamar: la síntesis final se transmite de
+            # verdad más abajo. No reusamos el texto de esta llamada
+            # no-streamed — eso mostraría la respuesta completa de golpe
+            # en vez de palabra por palabra.
             break
 
         messages.append({"role": "assistant", "content": response.content})
@@ -437,6 +447,7 @@ async def chat_rag(message: str, session_id: str, db: AsyncSession) -> str:
     await save_turn(session_id, "user", message, db)
 
     reset_sources()  # colector de fuentes para este request
+    set_report_session(session_id)  # para la tool report_incident
 
     system = _build_system_prompt()
     conversation: list[dict] = []
@@ -565,6 +576,7 @@ async def chat_rag_stream(message: str, session_id: str, db: AsyncSession) -> As
     await save_turn(session_id, "user", message, db)
 
     reset_sources()  # colector de fuentes para este request
+    set_report_session(session_id)  # para la tool report_incident
 
     system = _build_system_prompt()
     conversation: list[dict] = []

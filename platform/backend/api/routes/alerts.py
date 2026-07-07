@@ -1,9 +1,12 @@
 """
-Endpoints de alertas: sirve las gráficas PNG que acompañan las alertas y
-permite disparar una alerta de prueba enriquecida.
+Endpoints de alertas: sirve las gráficas PNG que acompañan las alertas,
+permite disparar una alerta de prueba enriquecida y genera el reporte de
+situación en lenguaje plano (con envío opcional a Slack).
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -12,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.tools import commune_display_name
 from alerts.charts import rainfall_chart_for_commune
+from api.auth import require_token
 from db.models.commune_threshold import CommuneThreshold
 from db.models.risk_prediction import RiskPrediction
 from db.session import get_async_db
@@ -55,3 +59,31 @@ async def get_alert_chart(
         media_type="image/png",
         headers={"Cache-Control": "no-store"},
     )
+
+
+@router.get("/evacuation-routes/{commune_id}")
+async def get_evacuation_routes_endpoint(
+    commune_id: str,
+    db: AsyncSession = Depends(get_async_db),
+) -> dict[str, Any]:
+    """Zonas seguras candidatas (parques/colegios/estadios de OpenStreetMap)
+    más cercanas a una comuna, con ruta caminando. MVP sin validar por
+    Defensoría/DAGRD — ver `alerts/evacuation.py`."""
+    from alerts.evacuation import get_evacuation_routes
+
+    return await get_evacuation_routes(db, commune_id)
+
+
+@router.post("/report", dependencies=[Depends(require_token)])
+async def create_situation_report(
+    send_to_slack: bool = Query(False, description="Además de devolverlo, publicarlo en Slack"),
+    db: AsyncSession = Depends(get_async_db),
+) -> dict[str, Any]:
+    """Genera el reporte de situación del valle en lenguaje plano (≤200 palabras)."""
+    from alerts.reports import generate_situation_report, send_situation_report_to_slack
+
+    report = await generate_situation_report(db)
+    slack_sent = False
+    if send_to_slack:
+        slack_sent = await send_situation_report_to_slack(db)
+    return {"report": report, "slack_sent": slack_sent}

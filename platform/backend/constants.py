@@ -53,12 +53,14 @@ _ALERT_LEVEL: dict[str, str] = {
 ALERT_COOLDOWN_RAINFALL_HOURS = 6  # Lluvia excede umbral
 ALERT_COOLDOWN_CRITICAL_RISK_HOURS = 1  # Riesgo crítico detectado
 ALERT_COOLDOWN_SCRAPER_HOURS = 6  # Scraper caído
+ALERT_COOLDOWN_YELLOW_HOURS = 4  # Estado Amarillo (alistamiento)
 
 # --- Scrapers: intervalos esperados por fuente (minutos) ---
 # Fuente única de verdad: usada por /api/scraper/health (clasificación de estado)
 # y por el watchdog de alertas Slack (detección de staleness).
 SCRAPER_INTERVALS_MIN: dict[str, int] = {
     "siata": 30,
+    "siata_sismos": 30,
     "dagrd": 60,
     "ideam": 360,
     "medellin_datos": 1440,
@@ -108,3 +110,42 @@ def display_label(value: Any) -> str:
 def alert_level(value: Any) -> str | None:
     """Nivel de alerta (Rojo/Naranja) o None si la categoría no es de alerta."""
     return _ALERT_LEVEL.get(normalize_category(value))
+
+
+# --- Estado compuesto Verde/Amarillo/Rojo (alistamiento/evacuación) ---
+# Umbrales conservadores (MVP): porcentaje de lluvia acumulada hoy y de
+# índice antecedente respecto al umbral configurado por comuna. Se calibrarán
+# cuando existan series históricas de eventos con timestamp preciso.
+YELLOW_RAINFALL_PCT = 0.6
+YELLOW_ANTECEDENT_PCT = 0.6
+RED_RAINFALL_PCT = 1.0
+RED_ANTECEDENT_PCT = 0.8
+
+# El índice antecedente (ml/precip_index.py) no tiene umbral configurado por
+# comuna como la lluvia diaria (CommuneThreshold) — valor conservador de
+# referencia hasta calibrar con eventos históricos reales.
+ANTECEDENT_INDEX_THRESHOLD_MM = 100.0
+
+ALERT_STATE_ACTIONS: dict[str, str] = {
+    "ROJO": "Evacuación inmediata hacia zona segura",
+    "AMARILLO": "Alistamiento: verificar rutas de evacuación y kit de emergencia",
+    "VERDE": "Monitoreo rutinario",
+}
+
+
+def compute_alert_state(
+    rainfall_pct: float,
+    antecedent_pct: float,
+    risk_category: Any,
+) -> dict[str, str]:
+    """Combina lluvia de hoy, índice antecedente y categoría del modelo ML en
+    un estado operativo de 3 niveles. `rainfall_pct`/`antecedent_pct` son
+    fracciones del umbral configurado (1.0 = 100% del umbral)."""
+    category = normalize_category(risk_category)
+    if category == RISK_CRITICO or (rainfall_pct >= RED_RAINFALL_PCT and antecedent_pct >= RED_ANTECEDENT_PCT):
+        state = "ROJO"
+    elif category == RISK_ALTO or rainfall_pct >= YELLOW_RAINFALL_PCT or antecedent_pct >= YELLOW_ANTECEDENT_PCT:
+        state = "AMARILLO"
+    else:
+        state = "VERDE"
+    return {"state": state, "action": ALERT_STATE_ACTIONS[state]}

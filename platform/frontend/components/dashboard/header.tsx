@@ -1,17 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CloudRain, History, LayoutDashboard, Radio } from 'lucide-react';
 import { fetchBackendHealth } from '@/lib/api';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
-export type View = 'dashboard' | 'rain' | 'history' | 'system';
+export type View = 'dashboard' | 'rain' | 'events' | 'seismic' | 'decision' | 'comuna' | 'history' | 'system';
+
+export const VIEW_TITLES: Record<View, { title: string; crumb: string }> = {
+  dashboard: { title: 'Dashboard', crumb: 'Resumen del valle' },
+  rain: { title: 'Monitor de Lluvia', crumb: 'Monitoreo' },
+  events: { title: 'Historial de Eventos', crumb: 'Monitoreo' },
+  seismic: { title: 'Actividad Sísmica', crumb: 'Monitoreo' },
+  decision: { title: 'Monitor de Decisión', crumb: 'Monitoreo' },
+  comuna: { title: 'Perfil de Comuna', crumb: 'Comunas' },
+  history: { title: 'Historial de Chat', crumb: 'Sistema' },
+  system: { title: 'Salud del Sistema', crumb: 'Sistema' },
+};
 
 interface HeaderProps {
   activeView?: View;
-  onViewChange?: (view: View) => void;
 }
 
-export function Header({ activeView = 'dashboard', onViewChange }: HeaderProps) {
+export function Header({ activeView = 'dashboard' }: HeaderProps) {
   const [systemOnline, setSystemOnline] = useState(false);
 
   useEffect(() => {
@@ -32,117 +43,51 @@ export function Header({ activeView = 'dashboard', onViewChange }: HeaderProps) 
     };
   }, []);
 
+  const meta = VIEW_TITLES[activeView];
+
   return (
     <header
       className="sticky top-0 z-40 border-b"
       style={{
-        borderColor: 'oklch(0.89 0.018 70)',
-        background: 'oklch(0.97 0.012 75 / 0.85)',
+        borderColor: 'var(--border)',
+        background: 'var(--glass-bg)',
         backdropFilter: 'blur(14px)',
       }}
     >
-      <div className="mx-auto flex max-w-[1320px] items-center justify-between gap-4 px-7 py-[14px]">
-        {/* Logo + wordmark */}
-        <div className="flex items-center gap-[13px]">
-          <div
-            className="relative flex h-11 w-11 items-center justify-center"
-            style={{
-              borderRadius: '14px',
-              background: 'var(--gradient-brand)',
-              boxShadow: '0 6px 16px -6px oklch(0.55 0.13 40 / 0.5)',
-            }}
-          >
-            <span
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 800,
-                fontSize: '22px',
-                color: 'oklch(0.98 0.01 75)',
-                lineHeight: 1,
-              }}
-            >
-              T
-            </span>
-            <div
-              className="absolute"
-              style={{
-                bottom: '-3px',
-                right: '-3px',
-                height: '13px',
-                width: '13px',
-                borderRadius: '99px',
-                background: 'var(--gold)',
-                border: '2.5px solid oklch(0.97 0.012 75)',
-              }}
-            />
-          </div>
-
-          <div>
+      <div className="flex items-center justify-between gap-4 px-4 py-[12px] md:px-6">
+        {/* Trigger + breadcrumb */}
+        <div className="flex min-w-0 items-center gap-3">
+          <SidebarTrigger
+            className="press-scale"
+            style={{ color: 'var(--muted-foreground)' }}
+          />
+          <div className="min-w-0">
             <div
               style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 700,
-                fontSize: '25px',
-                letterSpacing: '-0.02em',
-                lineHeight: 1,
-                color: 'oklch(0.28 0.04 45)',
-              }}
-            >
-              TEYVA
-            </div>
-            <div
-              style={{
-                marginTop: '3px',
                 fontSize: '10.5px',
                 fontWeight: 600,
                 textTransform: 'uppercase',
-                letterSpacing: '0.16em',
-                color: 'oklch(0.55 0.04 55)',
+                letterSpacing: '0.14em',
+                color: 'var(--muted-foreground)',
               }}
             >
-              Riesgo de deslizamientos · Medellín
+              {meta.crumb}
+            </div>
+            <div
+              className="truncate"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: '17px',
+                letterSpacing: '-0.015em',
+                lineHeight: 1.2,
+                color: 'var(--foreground)',
+              }}
+            >
+              {meta.title}
             </div>
           </div>
         </div>
-
-        {/* Nav */}
-        <nav className="hidden items-center gap-1 lg:flex">
-          {([
-            { id: 'dashboard' as View, label: 'Dashboard', icon: <LayoutDashboard size={14} /> },
-            { id: 'rain' as View, label: 'Monitor de Lluvia', icon: <CloudRain size={14} /> },
-            { id: 'history' as View, label: 'Historial', icon: <History size={14} /> },
-            { id: 'system' as View, label: 'Sistema', icon: <Radio size={14} /> },
-          ] as const).map((item) => {
-            const active = activeView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onViewChange?.(item.id)}
-                className="press-scale"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 14px',
-                  borderRadius: '10px',
-                  fontSize: '14px',
-                  fontWeight: active ? 600 : 500,
-                  color: active ? 'oklch(0.32 0.04 45)' : 'oklch(0.5 0.03 55)',
-                  background: active ? 'oklch(0.92 0.02 70)' : 'transparent',
-                  cursor: 'pointer',
-                  border: 'none',
-                  fontFamily: 'var(--font-sans)',
-                  transition: 'background 0.15s ease, color 0.15s ease',
-                }}
-                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'oklch(0.94 0.018 70)'; }}
-                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
 
         {/* Estado sistema + avatar */}
         <div className="flex items-center gap-3">
@@ -150,8 +95,8 @@ export function Header({ activeView = 'dashboard', onViewChange }: HeaderProps) 
             className="hidden items-center gap-2 md:flex"
             style={{
               borderRadius: '99px',
-              border: '1px solid oklch(0.89 0.018 70)',
-              background: 'oklch(0.99 0.008 75)',
+              border: '1px solid var(--border)',
+              background: 'var(--card)',
               padding: '7px 13px',
               fontSize: '12.5px',
             }}
@@ -159,32 +104,30 @@ export function Header({ activeView = 'dashboard', onViewChange }: HeaderProps) 
             <span className="relative flex h-2 w-2">
               <span
                 className="absolute inline-flex h-full w-full rounded-full animate-teyva-ping"
-                style={{ background: systemOnline ? 'oklch(0.64 0.13 150)' : 'oklch(0.6 0.18 30)' }}
+                style={{ background: systemOnline ? 'var(--risk-bajo)' : 'var(--risk-critico)' }}
               />
               <span
                 className="relative inline-flex h-2 w-2 rounded-full"
-                style={{ background: systemOnline ? 'oklch(0.64 0.13 150)' : 'oklch(0.6 0.18 30)' }}
+                style={{ background: systemOnline ? 'var(--risk-bajo)' : 'var(--risk-critico)' }}
               />
             </span>
-            <span style={{ fontWeight: 600, color: 'oklch(0.3 0.04 45)' }}>
+            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>
               {systemOnline ? 'Sistema en línea' : 'Sin conexión'}
             </span>
           </div>
 
-          <div
-            className="flex cursor-pointer items-center justify-center"
-            style={{
-              height: '40px',
-              width: '40px',
-              borderRadius: '99px',
-              background: 'oklch(0.91 0.025 65)',
-              fontWeight: 700,
-              fontSize: '14px',
-              color: 'oklch(0.4 0.06 50)',
-            }}
-          >
-            JP
-          </div>
+          <Avatar className="h-9 w-9">
+            <AvatarFallback
+              style={{
+                background: 'oklch(0.9 0.035 256.3)',
+                fontWeight: 700,
+                fontSize: '13px',
+                color: 'oklch(0.4 0.08 260)',
+              }}
+            >
+              JP
+            </AvatarFallback>
+          </Avatar>
         </div>
       </div>
     </header>

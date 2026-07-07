@@ -341,6 +341,99 @@ def _humanize_age(value: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
+# TOOL 6 — Reporte ciudadano (PostgreSQL, tabla citizen_reports)
+# ---------------------------------------------------------------------------
+# El session_id de la conversación viaja por contextvar (mismo patrón que el
+# colector de fuentes): chat_rag lo fija al inicio de cada request.
+_report_session_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "report_session", default=None
+)
+
+
+def set_report_session(session_id: str | None) -> None:
+    _report_session_ctx.set(session_id)
+
+
+async def report_incident(commune: str, descripcion: str, barrio: Optional[str] = None) -> str:
+    """Registra un avistamiento reportado por un ciudadano.
+
+    Entra a `citizen_reports` con status `pending_review` — tabla SEPARADA de
+    los eventos oficiales DAGRD, así que NO alimenta el modelo ni dispara
+    alertas hasta que un operario lo verifique.
+    """
+    from db.models.citizen_report import CitizenReport
+
+    descripcion = (descripcion or "").strip()
+    if len(descripcion) < 10:
+        return (
+            "Para registrar el reporte necesito una descripción breve de lo que "
+            "observas (por ejemplo: grietas en una pared, movimiento de tierra, "
+            "agua turbia bajando por la ladera)."
+        )
+    cid = _resolve_commune_loose(commune)
+    if cid is None:
+        return f"No reconozco la comuna «{commune}». Dime el nombre o número de tu comuna."
+
+    async with AsyncSessionLocal() as db:
+        row = CitizenReport(
+            commune_id=cid,
+            barrio=(barrio or "").strip() or None,
+            descripcion=descripcion[:2000],
+            status="pending_review",
+            session_id=_report_session_ctx.get(),
+        )
+        db.add(row)
+        await db.commit()
+        await db.refresh(row)
+
+    lugar = commune_display_name(cid) + (f", barrio {barrio}" if barrio else "")
+    return (
+        f"Reporte #{row.id} registrado para {lugar}. Quedó EN REVISIÓN: el equipo "
+        f"de gestión del riesgo lo verificará antes de tomar acciones. "
+        f"Si es una emergencia en curso, llama YA al DAGRD 4444444 o a Bomberos "
+        f"119 — este reporte no reemplaza la línea de emergencia."
+    )
+
+
+# ---------------------------------------------------------------------------
+# TOOL 7 — Reporte de situación en lenguaje plano
+# ---------------------------------------------------------------------------
+async def get_situation_report() -> str:
+    """Panorama actual del valle (riesgo, lluvia, eventos, sismos) en lenguaje plano."""
+    from alerts.reports import generate_situation_report
+
+    async with AsyncSessionLocal() as db:
+        return await generate_situation_report(db)
+
+
+# ---------------------------------------------------------------------------
+# TOOL 8 — Rutas de evacuación (MVP, OpenStreetMap + OSRM)
+# ---------------------------------------------------------------------------
+async def get_evacuation_routes(commune: str) -> str:
+    """Zonas seguras candidatas más cercanas a una comuna, con distancia y
+    tiempo caminando. MVP sin validar por Defensoría/DAGRD."""
+    cid = _resolve_commune_loose(commune)
+    if cid is None:
+        return f"No reconozco la comuna «{commune}»."
+
+    from alerts.evacuation import get_evacuation_routes as _get_routes
+
+    async with AsyncSessionLocal() as db:
+        result = await _get_routes(db, cid)
+
+    if result.get("error"):
+        return f"{result['error']}"
+
+    nombre = commune_display_name(cid)
+    lines = [f"Zonas seguras candidatas cerca de {nombre} (sin validar por Defensoría/DAGRD):"]
+    for z in result.get("zones", []):
+        tiempo = f"{z['duration_walking_min']:.0f} min caminando" if z.get("duration_walking_min") else f"~{z['distance_straight_km']} km en línea recta"
+        lines.append(f"- {z['nombre']} ({z['tipo']}): {tiempo}")
+    lines.append("Recuerda: en caso de emergencia real, contacta primero a DAGRD 4444444.")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Esquemas de tools (formato OpenAI / Ollama) + dispatcher
 # ---------------------------------------------------------------------------
 TOOL_SCHEMAS: list[dict] = [
@@ -414,8 +507,63 @@ TOOL_SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "get_scraper_health",
-            "description": "Estado de salud de las 4 fuentes de datos (SIATA, IDEAM, DAGRD, Medellín).",
+            "description": "Estado de salud de las fuentes de datos (SIATA, IDEAM, DAGRD, Medellín, sismos).",
             "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "report_incident",
+            "description": (
+                "Registra un reporte ciudadano de una situación de riesgo observada "
+                "(grietas, movimiento de tierra, agua turbia en la ladera, muros "
+                "inclinados). Úsala cuando el usuario describe algo que está viendo "
+                "y quiere reportarlo. El reporte queda en revisión para el equipo de "
+                "gestión del riesgo — NO es la línea de emergencia."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "commune": {"type": "string", "description": "Nombre o número de la comuna donde se observa"},
+                    "descripcion": {"type": "string", "description": "Qué está observando la persona, en sus palabras"},
+                    "barrio": {"type": "string", "description": "Barrio específico (opcional)"},
+                },
+                "required": ["commune", "descripcion"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_situation_report",
+            "description": (
+                "Genera un reporte de situación completo del valle en lenguaje plano: "
+                "comunas por nivel de riesgo, lluvia de hoy, eventos de la semana y "
+                "sismos recientes. Úsala cuando pidan 'un resumen de la situación', "
+                "'cómo está todo hoy' o un panorama general."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_evacuation_routes",
+            "description": (
+                "Devuelve zonas seguras candidatas (parques, colegios, estadios) "
+                "más cercanas a una comuna, con tiempo caminando. Úsala cuando "
+                "pregunten '¿adónde evacuo?', 'rutas seguras' o similar. MVP sin "
+                "validar por Defensoría/DAGRD — siempre menciona la línea de "
+                "emergencia DAGRD 4444444 para casos reales."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "commune": {"type": "string", "description": "Nombre o número de comuna"},
+                },
+                "required": ["commune"],
+            },
         },
     },
 ]
@@ -427,6 +575,9 @@ _DISPATCH = {
     "get_recent_events": get_recent_events,
     "get_rainfall_timeseries": get_rainfall_timeseries,
     "get_scraper_health": get_scraper_health,
+    "report_incident": report_incident,
+    "get_situation_report": get_situation_report,
+    "get_evacuation_routes": get_evacuation_routes,
 }
 
 

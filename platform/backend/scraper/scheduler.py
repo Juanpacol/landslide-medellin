@@ -10,6 +10,7 @@ from scraper.dagrd import run_dagrd_scraper
 from scraper.ideam import run_ideam_scraper
 from scraper.medellin_datos import run_medellin_datos_scraper
 from scraper.siata import run_siata_scraper
+from scraper.siata_sismos import run_siata_sismos_scraper
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,10 @@ def build_scheduler() -> AsyncIOScheduler:
         id="medellin_datos_arcgis",
         replace_existing=True,
         next_run_time=now + timedelta(seconds=50),
+    )
+    scheduler.add_job(
+        run_siata_sismos_scraper, "interval", minutes=30,
+        id="siata_sismos", replace_existing=True, next_run_time=now + timedelta(seconds=65),
     )
     # Watchdog: alerta por Slack si alguna fuente lleva demasiado sin datos.
     # Arranca a los 5 min (les da tiempo a los scrapers iniciales de poblar logs).

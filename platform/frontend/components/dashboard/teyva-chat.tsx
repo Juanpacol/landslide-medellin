@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCcw, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { fetchChatHistory, sendChatMessage, streamChatMessage } from '@/lib/api';
 import type { CommuneFeature } from '@/lib/api';
 
@@ -42,8 +43,9 @@ const SUGGESTIONS = (selected: SelectedCommune) => {
   return base.slice(0, 3);
 };
 
-const HERO_BG = 'linear-gradient(140deg, oklch(0.32 0.06 42) 0%, oklch(0.38 0.08 38) 55%, oklch(0.34 0.07 30) 100%)';
-const BRAND_BG = 'linear-gradient(140deg, oklch(0.58 0.14 42) 0%, oklch(0.45 0.10 38) 100%)';
+// Nexura blue paleta (updated from terracota)
+const HERO_BG = 'linear-gradient(140deg, oklch(0.32 0.08 258.9) 0%, oklch(0.38 0.10 258.9) 55%, oklch(0.34 0.09 258.9) 100%)';
+const BRAND_BG = 'linear-gradient(140deg, oklch(0.625 0.191 258.9) 0%, oklch(0.68 0.17 258.9) 100%)';
 
 interface TeyvaChatWidgetProps {
   selectedCommune: SelectedCommune;
@@ -170,9 +172,9 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
             flexDirection: 'column',
             borderRadius: '24px',
             overflow: 'hidden',
-            background: 'oklch(0.99 0.008 75)',
-            border: '1px solid oklch(0.89 0.018 70)',
-            boxShadow: '0 24px 60px -20px oklch(0.4 0.06 45 / 0.4)',
+            background: 'oklch(0.99 0.006 256.3)',
+            border: '1px solid oklch(0.89 0.012 256.3)',
+            boxShadow: '0 24px 60px -20px oklch(0.4 0.1 258.9 / 0.4)',
           }}
         >
           {/* Header */}
@@ -240,7 +242,7 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              background: 'oklch(0.97 0.012 75)',
+              background: 'oklch(0.96 0.014 256.3)',
             }}
           >
             {messages.length === 0 && (
@@ -249,10 +251,10 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
                   borderRadius: '16px',
                   padding: '14px',
                   background: 'oklch(1 0 0)',
-                  border: '1px solid oklch(0.91 0.018 70)',
+                  border: '1px solid oklch(0.89 0.012 256.3)',
                   fontSize: '13.5px',
                   lineHeight: 1.5,
-                  color: 'oklch(0.32 0.04 45)',
+                  color: 'oklch(0.26 0.014 264)',
                 }}
               >
                 ¡Hola! Soy Teyva 🌦️ Vigilo el riesgo de deslizamientos en Medellín. Pregúntame por cualquier comuna y te cuento cómo está hoy.
@@ -272,11 +274,11 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
                   alignItems: 'center',
                   gap: '6px',
                   borderRadius: '99px',
-                  border: '1px solid oklch(0.89 0.018 70)',
-                  background: 'oklch(0.99 0.008 75)',
+                  border: '1px solid oklch(0.89 0.012 256.3)',
+                  background: 'oklch(0.99 0.006 256.3)',
                   padding: '6px 13px',
                   fontSize: '12px',
-                  color: 'oklch(0.52 0.035 55)',
+                  color: 'oklch(0.52 0.018 264)',
                   cursor: 'pointer',
                 }}
               >
@@ -286,7 +288,7 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
           </div>
 
           {/* Sugerencias + Input */}
-          <div style={{ borderTop: '1px solid oklch(0.91 0.018 70)', padding: '12px 14px', background: 'oklch(0.99 0.008 75)' }}>
+          <div style={{ borderTop: '1px solid oklch(0.89 0.012 256.3)', padding: '12px 14px', background: 'oklch(0.99 0.006 256.3)' }}>
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px' }}>
               {SUGGESTIONS(selectedCommune).map((s) => (
                 <button
@@ -297,9 +299,9 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
                     whiteSpace: 'nowrap',
                     cursor: 'pointer',
                     borderRadius: '99px',
-                    border: '1px solid oklch(0.88 0.025 65)',
-                    background: 'oklch(0.96 0.018 75)',
-                    color: 'oklch(0.4 0.05 50)',
+                    border: '1px solid oklch(0.88 0.02 258.9)',
+                    background: 'oklch(0.93 0.014 256.3)',
+                    color: 'oklch(0.4 0.06 258.9)',
                     padding: '7px 13px',
                     fontFamily: 'var(--font-sans)',
                     fontSize: '12.5px',
@@ -318,8 +320,8 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
                 alignItems: 'center',
                 gap: '9px',
                 borderRadius: '14px',
-                border: '1px solid oklch(0.89 0.02 68)',
-                background: 'oklch(0.98 0.01 75)',
+                border: '1px solid oklch(0.89 0.014 256.3)',
+                background: 'oklch(0.98 0.01 256.3)',
                 padding: '7px 7px 7px 15px',
               }}
             >
@@ -335,7 +337,7 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
                   background: 'transparent',
                   fontFamily: 'var(--font-sans)',
                   fontSize: '14px',
-                  color: 'oklch(0.3 0.04 45)',
+                  color: 'oklch(0.26 0.014 264)',
                 }}
               />
               <button
@@ -374,7 +376,7 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
           cursor: 'pointer',
           borderRadius: '20px',
           background: BRAND_BG,
-          boxShadow: '0 14px 32px -10px oklch(0.55 0.13 40 / 0.6)',
+          boxShadow: '0 14px 32px -10px oklch(0.55 0.19 258.9 / 0.6)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -391,41 +393,91 @@ export function TeyvaChatWidget({ selectedCommune, externalOpen, onOpenChange }:
   );
 }
 
+// Componentes markdown para el estilo compacto de las burbujas de chat: sin
+// márgenes por defecto de <p>/<ul>, viñetas visibles a tamaño reducido.
+const MARKDOWN_COMPONENTS = {
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p style={{ margin: '0 0 8px 0' }}>{children}</p>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul style={{ margin: '0 0 8px 0', paddingLeft: '18px' }}>{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol style={{ margin: '0 0 8px 0', paddingLeft: '18px' }}>{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li style={{ marginBottom: '3px' }}>{children}</li>
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong style={{ fontWeight: 700 }}>{children}</strong>
+  ),
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <div style={{ fontWeight: 700, fontSize: '14px', margin: '0 0 6px 0' }}>{children}</div>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <div style={{ fontWeight: 700, fontSize: '13.5px', margin: '0 0 6px 0' }}>{children}</div>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <div style={{ fontWeight: 600, fontSize: '13px', margin: '0 0 6px 0' }}>{children}</div>
+  ),
+  code: ({ children }: { children?: React.ReactNode }) => (
+    <code
+      style={{
+        background: 'oklch(0.92 0.014 256.3)',
+        borderRadius: '4px',
+        padding: '1px 5px',
+        fontSize: '12px',
+        fontFamily: 'ui-monospace, monospace',
+      }}
+    >
+      {children}
+    </code>
+  ),
+};
+
 function Bubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
   const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' };
+
   const bubbleStyle: React.CSSProperties = isUser
     ? {
         maxWidth: '80%',
-        borderRadius: '16px 16px 4px 16px',
-        padding: '11px 14px',
-        fontSize: '13.5px',
-        lineHeight: 1.5,
-        background: 'linear-gradient(140deg, oklch(0.58 0.14 42) 0%, oklch(0.45 0.10 38) 100%)',
+        borderRadius: '14px 4px 14px 14px',
+        padding: '10px 13px',
+        fontSize: '13px',
+        lineHeight: 1.6,
+        background: 'oklch(0.625 0.191 258.9)',
         color: 'oklch(0.98 0.01 80)',
+        wordWrap: 'break-word',
+        whiteSpace: 'pre-wrap',
       }
     : {
         maxWidth: '82%',
-        borderRadius: '16px 16px 16px 4px',
-        padding: '11px 14px',
-        fontSize: '13.5px',
-        lineHeight: 1.5,
-        background: 'oklch(1 0 0)',
-        border: '1px solid oklch(0.91 0.018 70)',
-        color: 'oklch(0.32 0.04 45)',
+        borderRadius: '4px 14px 14px 14px',
+        padding: '11px 13px',
+        fontSize: '13px',
+        lineHeight: 1.6,
+        background: 'oklch(0.98 0.006 256.3)',
+        border: '1px solid oklch(0.89 0.012 256.3)',
+        color: 'oklch(0.26 0.014 264)',
+        wordWrap: 'break-word',
       };
 
   return (
     <div style={rowStyle}>
       <div style={bubbleStyle}>
         {message.status === 'sending' ? (
-          <span style={{ display: 'inline-flex', gap: '4px' }}>
+          <span style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
             <Dot delay="0s" />
             <Dot delay="0.15s" />
             <Dot delay="0.3s" />
           </span>
-        ) : (
+        ) : message.status === 'error' ? (
+          <span style={{ color: 'inherit', fontWeight: 500 }}>⚠️ {message.content}</span>
+        ) : isUser ? (
           message.content
+        ) : (
+          <ReactMarkdown components={MARKDOWN_COMPONENTS}>{message.content}</ReactMarkdown>
         )}
       </div>
     </div>

@@ -5,14 +5,14 @@ import { fetchRiskExplanation, type CommuneDetail, type CommuneFeature, type Ris
 
 type CommuneProps = CommuneFeature['properties'];
 
-const LEVELS: Record<string, { label: string; color: string; soft: string }> = {
+export const LEVELS: Record<string, { label: string; color: string; soft: string }> = {
   Bajo:    { label: 'Bajo',    color: 'oklch(0.64 0.11 150)', soft: 'oklch(0.95 0.04 150)' },
   Medio:   { label: 'Medio',   color: 'oklch(0.78 0.13 80)',  soft: 'oklch(0.96 0.05 85)' },
   Alto:    { label: 'Alto',    color: 'oklch(0.66 0.16 50)',  soft: 'oklch(0.95 0.05 55)' },
   Crítico: { label: 'Crítico', color: 'oklch(0.55 0.19 30)',  soft: 'oklch(0.94 0.05 35)' },
 };
 
-const ADVICE: Record<string, string> = {
+export const ADVICE: Record<string, string> = {
   Bajo: 'Condiciones estables. Mantén el monitoreo rutinario; no se requieren acciones inmediatas.',
   Medio: 'Vigila la evolución de la lluvia. Revisa canales de drenaje y mantén informada a la comunidad.',
   Alto: 'Activa protocolos preventivos. Inspecciona laderas inestables y coordina con el comité local de riesgo.',
@@ -25,9 +25,10 @@ interface CommuneInfoProps {
   commune: CommuneProps | null;
   detail: CommuneDetail | null;
   loading?: boolean;
+  onOpenProfile?: (communeId: string) => void;
 }
 
-export function CommuneInfo({ commune, detail, loading = false }: CommuneInfoProps) {
+export function CommuneInfo({ commune, detail, loading = false, onOpenProfile }: CommuneInfoProps) {
   const [explanation, setExplanation] = useState<RiskExplanationResponse | null>(null);
 
   useEffect(() => {
@@ -261,6 +262,33 @@ export function CommuneInfo({ commune, detail, loading = false }: CommuneInfoPro
         <span style={{ fontSize: '16px', lineHeight: 1.3, flexShrink: 0 }}>💡</span>
         <p style={{ fontSize: '13px', lineHeight: 1.5, color: 'oklch(0.4 0.04 50)' }}>{advice}</p>
       </div>
+
+      {/* Ver perfil completo */}
+      {onOpenProfile && (
+        <button
+          onClick={() => onOpenProfile(String(commune.commune_id))}
+          className="press-scale"
+          style={{
+            marginTop: '14px',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '7px',
+            padding: '11px 16px',
+            borderRadius: '12px',
+            border: 'none',
+            cursor: 'pointer',
+            background: 'var(--gradient-brand)',
+            color: 'oklch(0.98 0.01 80)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: '13.5px',
+            fontWeight: 700,
+          }}
+        >
+          Ver perfil completo →
+        </button>
+      )}
 
       {/* Explicación generada por IA */}
       {(explanation?.explanation || detail?.model_explanation) && (

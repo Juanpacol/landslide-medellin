@@ -1,9 +1,13 @@
 [
+  "antecedent_precip_index",
   "centroid_lat",
   "centroid_lon",
   "densidadmax",
   "mean_precip_mm_snapshot",
+  "pct_barrios_alta_amenaza",
   "precip_records",
   "precip_sum_mm_day",
+  "seismic_recent_intensity",
+  "soil_water_index_pct",
   "station_count"
 ]

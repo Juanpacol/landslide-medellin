@@ -43,9 +43,10 @@ ChartJS.register(
 );
 
 const CARD: React.CSSProperties = {
-  borderRadius: '18px',
-  background: 'oklch(0.99 0.006 75)',
-  border: '1px solid oklch(0.91 0.018 70)',
+  borderRadius: '20px',
+  background: 'var(--card)',
+  border: '1px solid var(--border)',
+  boxShadow: 'var(--shadow-xs)',
   padding: '22px 24px',
 };
 
@@ -54,7 +55,7 @@ const LABEL: React.CSSProperties = {
   fontWeight: 700,
   textTransform: 'uppercase' as const,
   letterSpacing: '0.12em',
-  color: 'oklch(0.55 0.035 55)',
+  color: 'var(--muted-foreground)',
   marginBottom: '14px',
 };
 
@@ -542,10 +543,8 @@ export function RainMonitor() {
       {/* ── Header ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
         <div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '26px', letterSpacing: '-0.02em', color: 'oklch(0.28 0.04 45)', margin: 0 }}>
-            Monitor de Lluvia
-          </h2>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'oklch(0.55 0.03 55)' }}>
+          <h2 className="teyva-page-title">Monitor de Lluvia</h2>
+          <p className="teyva-page-subtitle">
             Acumulado diario · SIATA · actualización cada 30 min
           </p>
         </div>

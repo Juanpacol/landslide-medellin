@@ -479,17 +479,8 @@ export function ChatHistory() {
       style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}
     >
       <div>
-        <h1
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '26px',
-            fontWeight: 700,
-            letterSpacing: '-0.02em',
-          }}
-        >
-          Historial de conversaciones
-        </h1>
-        <p style={{ fontSize: '14px', color: 'var(--muted-foreground)', marginTop: '4px', maxWidth: '560px' }}>
+        <h2 className="teyva-page-title">Historial de conversaciones</h2>
+        <p className="teyva-page-subtitle" style={{ maxWidth: '560px' }}>
           Todas las conversaciones con Teyva quedan guardadas. Busca por comuna o tema y retoma
           cualquier consulta anterior.
         </p>

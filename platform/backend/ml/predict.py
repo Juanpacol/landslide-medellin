@@ -160,6 +160,18 @@ async def predict_all_comunas(db: AsyncSession) -> None:
 
     await db.commit()
 
+    # Alertas Slack basadas en las predicciones que se acaban de escribir.
+    # No deben tumbar la corrida de predicción si el webhook falla.
+    try:
+        from alerts.slack import check_and_fire_critical_risk_alerts, check_and_fire_yellow_alerts
+
+        await check_and_fire_critical_risk_alerts(db)
+        await check_and_fire_yellow_alerts(db)
+    except Exception:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).exception("Alertas Slack post-predicción fallaron (no crítico)")
+
 
 async def _run_standalone() -> None:
     async with AsyncSessionLocal() as db:

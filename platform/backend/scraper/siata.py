@@ -111,6 +111,44 @@ async def _run_siata(session: AsyncSession) -> int:
     try:
         by_commune, meta, ref_dt, detail, downloaded = await _collect_siata_payload()
 
+        # Índice de precipitación antecedente por comuna (lluvia ponderada por
+        # recencia sobre rainfall_timeseries) — feature ML clave para el modelo.
+        from ml.precip_index import FEATURE_KEY as API_KEY, antecedent_indexes_for_all_communes
+
+        try:
+            api_by_commune = await antecedent_indexes_for_all_communes(session)
+        except Exception as api_exc:  # noqa: BLE001
+            logger.warning("No se pudo calcular el índice antecedente: %s", api_exc)
+            api_by_commune = {}
+
+        # Intensidad sísmica reciente del valle (misma para todas las comunas).
+        from ml.seismic_features import FEATURE_KEY as SEISMIC_KEY, seismic_recent_intensity
+
+        try:
+            seismic_intensity = await seismic_recent_intensity(session)
+        except Exception as seis_exc:  # noqa: BLE001
+            logger.warning("No se pudo calcular la intensidad sísmica: %s", seis_exc)
+            seismic_intensity = None
+
+        # % de barrios en amenaza "Alta" por comuna — puente estadístico entre
+        # la granularidad de barrio (VM05) y el modelo, que predice por comuna.
+        from ml.barrio_hazard_features import FEATURE_KEY as HAZARD_PCT_KEY, pct_barrios_alta_amenaza
+
+        try:
+            hazard_pct_by_commune = await pct_barrios_alta_amenaza(session)
+        except Exception as hazard_exc:  # noqa: BLE001
+            logger.warning("No se pudo calcular pct_barrios_alta_amenaza: %s", hazard_exc)
+            hazard_pct_by_commune = {}
+
+        # Soil Water Index (saturación estimada del suelo, metodología JMA).
+        from ml.soil_water_index import FEATURE_KEY as SWI_KEY, swi_for_all_communes
+
+        try:
+            swi_by_commune = await swi_for_all_communes(session)
+        except Exception as swi_exc:  # noqa: BLE001
+            logger.warning("No se pudo calcular el Soil Water Index: %s", swi_exc)
+            swi_by_commune = {}
+
         for cid, values in by_commune.items():
             exists = await ml_feature_exists(
                 session, commune_id=cid, reference_date=ref_dt, source_key="siata"
@@ -129,6 +167,10 @@ async def _run_siata(session: AsyncSession) -> int:
                     "station_codes": m["station_codes"][:50],
                     "barrios": sorted(m["barrios"])[:30],
                     "mean_precip_mm_snapshot": round(mean_p, 3),
+                    **({API_KEY: api_by_commune[cid]} if cid in api_by_commune else {}),
+                    **({SEISMIC_KEY: seismic_intensity} if seismic_intensity is not None else {}),
+                    **({HAZARD_PCT_KEY: hazard_pct_by_commune[cid]} if cid in hazard_pct_by_commune else {}),
+                    **({SWI_KEY: swi_by_commune[cid]} if cid in swi_by_commune else {}),
                     "siata_json_url": PLUVIO_JSON,
                 },
                 precip_acum_7d=None,
@@ -159,6 +201,13 @@ async def _run_siata(session: AsyncSession) -> int:
             await check_and_fire_alerts(session)
         except Exception as alert_exc:  # noqa: BLE001
             logger.warning("Alert check failed (non-critical): %s", alert_exc)
+
+        # Snake Line: SWI × lluvia intensa cruzando la línea crítica (JMA).
+        try:
+            from alerts.snake_line import check_and_fire_snake_line_alerts
+            await check_and_fire_snake_line_alerts(session, list(by_commune.keys()))
+        except Exception as snake_exc:  # noqa: BLE001
+            logger.warning("Snake Line alert check failed (non-critical): %s", snake_exc)
     except Exception as exc:  # noqa: BLE001
         detail = (detail + " | " if detail else "") + repr(exc)
         await session.rollback()

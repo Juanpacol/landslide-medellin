@@ -13,8 +13,10 @@ from constants import (
     ALERT_COOLDOWN_RAINFALL_HOURS,
     ALERT_COOLDOWN_CRITICAL_RISK_HOURS,
     ALERT_COOLDOWN_SCRAPER_HOURS,
+    ANTECEDENT_INDEX_THRESHOLD_MM,
     SCRAPER_INTERVALS_MIN,
     SCRAPER_STALE_FACTOR,
+    compute_alert_state,
     normalize_category,
 )
 from alerts.charts import ascii_sparkline, rainfall_chart_for_commune
@@ -202,6 +204,116 @@ async def check_and_fire_alerts(session: AsyncSession) -> list[str]:
         if status == "sent":
             alerted.append(commune_id)
             logger.info("Slack alert sent for commune %s (%.1f mm > %.1f mm)", commune_id, acum_mm, threshold_mm)
+
+    await session.commit()
+    return alerted
+
+
+# ── Estado Amarillo (alistamiento) ────────────────────────────────────────────
+
+async def _yellow_alert_on_cooldown(session: AsyncSession, commune_id: str) -> bool:
+    key = f"yellow_alert_cooldown_{commune_id}"
+    row = await session.get(AppSetting, key)
+    if not row or not row.value:
+        return False
+    try:
+        last_sent = datetime.fromisoformat(row.value)
+        if last_sent.tzinfo is None:
+            last_sent = last_sent.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - last_sent).total_seconds() < ALERT_COOLDOWN_YELLOW_HOURS * 3600
+    except ValueError:
+        return False
+
+
+async def _mark_yellow_alert_sent(session: AsyncSession, commune_id: str) -> None:
+    key = f"yellow_alert_cooldown_{commune_id}"
+    row = await session.get(AppSetting, key)
+    if row:
+        row.value = datetime.now(timezone.utc).isoformat()
+    else:
+        session.add(AppSetting(key=key, value=datetime.now(timezone.utc).isoformat()))
+
+
+def _build_yellow_alert_payload(commune_id: str, name: str, state: dict) -> dict:
+    return {
+        "attachments": [
+            {
+                "color": "#F2B705",
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {"type": "plain_text", "text": "🟡 Alistamiento — TEYVA"},
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {"type": "mrkdwn", "text": f"*Comuna:*\n{name} ({commune_id})"},
+                            {"type": "mrkdwn", "text": f"*Lluvia hoy:*\n{state['rainfall_pct']:.0%} del umbral"},
+                            {"type": "mrkdwn", "text": f"*Índice antecedente:*\n{state['antecedent_pct']:.0%} de referencia"},
+                            {"type": "mrkdwn", "text": f"*Riesgo ML:*\n{state['risk_category']}"},
+                        ],
+                    },
+                    {
+                        "type": "section",
+                        "text": {"type": "mrkdwn", "text": f"💡 *Acción:* {state['action']}"},
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"Hora Colombia: {datetime.now(COL_TZ).strftime('%Y-%m-%d %H:%M')} · Sistema TEYVA",
+                            }
+                        ],
+                    },
+                ],
+            }
+        ]
+    }
+
+
+async def check_and_fire_yellow_alerts(session: AsyncSession) -> list[str]:
+    """Alerta de alistamiento (estado AMARILLO) por comuna, vía
+    `constants.compute_alert_state`. Distinto del riesgo crítico (ROJO), que
+    ya dispara por `check_and_fire_critical_risk_alerts`. Cooldown propio por
+    comuna para no duplicar avisos en cada corrida del scheduler."""
+    from ml.precip_index import antecedent_indexes_for_all_communes
+
+    webhook_url = await _get_webhook_url(session)
+    if not webhook_url:
+        return []
+
+    thresholds = await _get_thresholds(session)
+    acums = await _get_today_acum(session)
+    risks = await _get_latest_risk(session)
+    antecedent_by_commune = await antecedent_indexes_for_all_communes(session)
+
+    alerted: list[str] = []
+    for commune_id in set(acums) | set(antecedent_by_commune) | set(risks):
+        threshold_mm = thresholds.get(commune_id, 35.0)
+        rainfall_pct = round(acums.get(commune_id, 0.0) / threshold_mm, 3) if threshold_mm else 0.0
+        antecedent_pct = round(antecedent_by_commune.get(commune_id, 0.0) / ANTECEDENT_INDEX_THRESHOLD_MM, 3)
+        _, risk_category = risks.get(commune_id, (None, None))
+
+        result = compute_alert_state(rainfall_pct, antecedent_pct, risk_category)
+        if result["state"] != "AMARILLO":
+            continue
+        if await _yellow_alert_on_cooldown(session, commune_id):
+            continue
+
+        name = _NAMES.get(commune_id, f"Comuna {commune_id}")
+        state_payload = {
+            "rainfall_pct": rainfall_pct,
+            "antecedent_pct": antecedent_pct,
+            "risk_category": risk_category or "Sin datos",
+            "action": result["action"],
+        }
+        payload = _build_yellow_alert_payload(commune_id, name, state_payload)
+        status, _ = await _fire_slack(webhook_url, payload)
+        if status == "sent":
+            await _mark_yellow_alert_sent(session, commune_id)
+            alerted.append(commune_id)
+            logger.info("Yellow alert sent for commune %s", commune_id)
 
     await session.commit()
     return alerted
