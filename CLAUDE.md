@@ -8,24 +8,35 @@ Plataforma de monitoreo de riesgo de deslizamientos para Medellín (19 comunas +
 teyva/
 ├── platform/
 │   ├── backend/          # ÚNICO paquete Python (PYTHONPATH apunta aquí)
-│   │   ├── ml/           # XGBoost: train.py, predict.py, features.py, models/ (artefactos)
-│   │   ├── scraper/      # siata (30min), dagrd (1h), ideam (6h), medellin_datos (24h)
+│   │   ├── domain/       # Reglas PURAS (sin I/O): risk_rules.py (umbrales, categorías,
+│   │   │                 #   compute_alert_state) + communes.py (fuente ÚNICA del territorio)
+│   │   ├── application/  # Casos de uso: predict_risk.py, fire_alerts.py, train_model.py
+│   │   ├── infrastructure/
+│   │   │   ├── repositories/  # Queries compartidas (última predicción por comuna, etc.)
+│   │   │   └── external/      # Clientes HTTP/SDK: arcgis, slack, osrm, llm
+│   │   ├── ml/           # Motor ML: train.py, predict.py (inferencia), benchmark.py, models/
+│   │   ├── scraper/      # siata (30min), dagrd (1h), ideam (6h), medellin_datos (24h), sismos
 │   │   │   └── scheduler.py  # APScheduler daemon + watchdog de salud (alerta Slack)
-│   │   ├── db/           # SQLAlchemy async+sync, 10 tablas, session.py
-│   │   ├── api/          # FastAPI: routes/ (risk, chat, scraper, rain, alerts) + auth.py
+│   │   ├── db/           # SQLAlchemy async+sync, session.py, 12+ tablas
+│   │   ├── api/          # FastAPI: routes/ + auth.py (roles) + rate_limit.py + audit.py
 │   │   ├── agent/        # Chat: Claude (primario) + Ollama (fallback), RAG, MCP
 │   │   ├── rag/          # ChromaDB + sentence-transformers (2,127 chunks)
-│   │   ├── alerts/       # Slack: lluvia, riesgo crítico, scrapers caídos
-│   │   ├── constants.py  # Fuente única: umbrales de riesgo, intervalos de scrapers
-│   │   └── alembic/      # 4 migraciones
+│   │   ├── alerts/       # Construcción de alertas Slack + Snake Line + evacuación
+│   │   ├── constants.py  # SOLO config operativa: cooldowns, intervalos de scrapers
+│   │   └── alembic/      # migraciones (7+)
 │   └── frontend/         # Next.js 16 + React 19 + Tailwind 4 + Radix/shadcn
 │       ├── components/dashboard/  # mapa, KPIs, chat, historial, monitor lluvia, salud
 │       └── lib/api.ts    # cliente fetch centralizado
-├── .github/workflows/    # 5 crons: 4 scrapers + predict-risk (escriben a Supabase)
+├── .github/workflows/    # 6 crons: 5 scrapers + predict-risk (corren alembic + escriben a Supabase)
 └── docker-compose.yml    # stack local: db (fallback), ollama, backend, frontend, scraper, ml
 ```
 
-**Regla de oro:** todo el Python vive bajo `platform/backend/` como UN paquete — los módulos se importan como top-level (`from db.models...`, `from scraper.common...`). No separar en carpetas raíz distintas: rompe imports y workflows.
+**Regla de oro:** todo el Python vive bajo `platform/backend/` como UN paquete — los módulos se importan como top-level (`from domain.communes...`, `from db.models...`). No separar en carpetas raíz distintas: rompe imports y workflows.
+
+**Capas (dirección de dependencias `api/scraper → application → domain/infrastructure`):**
+- `domain/` no importa NADA con I/O. `domain/communes.py` es la única definición del territorio: id canónico ("1".."21", el de los DATOS) vs código oficial ("01".."16", "50".."90", solo para ArcGIS/cartografía). Cualquier lista de comunas nueva = bug.
+- Los **entrypoints que invoca GitHub Actions NO se mueven** (`python -m scraper.siata`, `python -m ml.predict`, `python -m ml.train`): son wrappers finos que delegan a `application/`.
+- La composición de alertas (qué checks corren tras ingesta/predicción/periódico) vive SOLO en `application/fire_alerts.py`.
 
 ## Base de datos — UNA sola fuente de verdad
 
@@ -56,7 +67,9 @@ cd platform/frontend && pnpm dev
 
 - **Fuentes:** SIATA (lluvia), IDEAM (meteorología), DAGRD (emergencias), GeoMedellín (features geográficas). Los scrapers deduplican por `source_row_id` — `records_valid=0` con status `ok` significa "sin eventos NUEVOS", no error.
 - **Modelo:** XGBoost. AUC-ROC 0.944, recall 0.999 (conservador). SMOTE para desbalance (26 positivos / 8,429 muestras).
-- **Umbrales riesgo:** SOLO en `constants.py` (`risk_level_from_score`): medio 0.35 / alto 0.65 / crítico 0.90. Categorías se guardan en minúscula sin tilde (`critico`); presentación vía `display_label()`.
+- **Gobernanza del pipeline ML** (`ml/train.py`): los 4 artefactos (`best_model.pkl`, `scaler.pkl`, `feature_names.json`, `metrics.json`) se escriben JUNTOS y solo si el entrenamiento completa; una corrida abortada escribe `last_train_attempt.json` (gitignored) y NO toca producción. `metrics.json` lleva `trained_at` + `git_commit_sha`. Métricas extra: `train_auc_temporal` (validación pasado→futuro) y `benchmark_auc` (snapshot fijo en `ml/models/benchmark.json`, congelar con `python -m ml.benchmark --freeze`).
+- **Eventos sintéticos:** `landslide_events.is_synthetic=true` (144, generados por `scraper/ingest_synthetic_events.py` con Snake Line) sirven para calibrar Snake Line y están EXCLUIDOS del training del clasificador — entrenar y validar con la misma heurística es contaminación circular. El filtro vive en `infrastructure/repositories/landslide_events.py`.
+- **Umbrales riesgo:** SOLO en `domain/risk_rules.py` (`risk_level_from_score`): medio 0.35 / alto 0.65 / crítico 0.90. Categorías se guardan en minúscula sin tilde (`critico`); presentación vía `display_label()`.
 
 ## Chat + RAG
 
@@ -64,7 +77,11 @@ cd platform/frontend && pnpm dev
 
 ## Seguridad
 
-- Endpoints mutantes (`/predict-all`, `/predict-commune`, `PUT /rain/thresholds`, `POST /rain/settings/webhook*`) exigen `Authorization: Bearer $API_TOKEN` (`api/auth.py`). Sin `API_TOKEN` definido = modo dev (permite todo con warning).
+- Endpoints mutantes (`/predict-all`, `/predict-commune`, `PUT /rain/thresholds`, `GET|POST /rain/settings/webhook*`, `POST /alerts/report`) exigen `Authorization: Bearer $API_TOKEN` (`api/auth.py`, con rol `viewer` opcional vía `API_TOKEN_VIEWER`).
+- **`ENV=production` sin `API_TOKEN` = el backend NO ARRANCA** (`assert_production_auth`). Sin token en dev = permite todo con warning.
+- Rate limiting in-memory por IP (`api/rate_limit.py`): chat 10 req/min, predict 5 req/min. Si se escala a varios workers, migrar a Redis.
+- Auditoría append-only en tabla `audit_log` (`api/audit.py::log_audit_event`): umbrales, webhooks, predicciones manuales, reportes. Se guarda hash SHA-256 del payload, nunca el payload crudo.
+- Los `load_dotenv` usan `override=False`: el entorno real SIEMPRE gana sobre `.env` (un `API_TOKEN=` vacío en `.env` llegó a pisar el token real).
 - CORS restringido vía `ALLOWED_ORIGINS`.
 - **Jamás** commitear secretos: `.env` está en gitignore; `.env.example` solo placeholders. (Ya hubo una password real filtrada en el historial — rotada. No repetir.)
 
@@ -85,4 +102,4 @@ cd platform/frontend && pnpm dev
 
 Owner: Juan Pablo Botero (jbotero@aztia.co) · Stakeholder: Gestión del Riesgo Medellín
 
-**Última actualización:** Julio 2026
+**Última actualización:** Julio 2026 (refactor por capas domain/application/infrastructure)

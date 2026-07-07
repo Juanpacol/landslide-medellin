@@ -12,3 +12,5 @@ platform/backend/ml/models/last_train_attempt.json
 platform/backend/ml/models/*_synthetic.pkl
 platform/backend/ml/models/*_synthetic.json
 platform/backend/validacion_eventos.csv
+# Log de observabilidad de predicciones (runtime, crece con cada corrida)
+platform/backend/observability/predictions.jsonl
