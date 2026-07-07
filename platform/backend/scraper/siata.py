@@ -207,19 +207,11 @@ async def _run_siata(session: AsyncSession) -> int:
         await session.commit()
         status = "ok"
 
-        # Check rainfall thresholds and fire Slack alerts if any commune exceeded
-        try:
-            from alerts.slack import check_and_fire_alerts
-            await check_and_fire_alerts(session)
-        except Exception as alert_exc:  # noqa: BLE001
-            logger.warning("Alert check failed (non-critical): %s", alert_exc)
+        # Checks de alertas post-ingesta (umbral diario + Snake Line) — la
+        # composición vive en application/fire_alerts.py; nunca tumba la corrida.
+        from application.fire_alerts import alerts_after_rain_ingest
 
-        # Snake Line: SWI × lluvia intensa cruzando la línea crítica (JMA).
-        try:
-            from alerts.snake_line import check_and_fire_snake_line_alerts
-            await check_and_fire_snake_line_alerts(session, list(by_commune.keys()))
-        except Exception as snake_exc:  # noqa: BLE001
-            logger.warning("Snake Line alert check failed (non-critical): %s", snake_exc)
+        await alerts_after_rain_ingest(session, list(by_commune.keys()))
     except Exception as exc:  # noqa: BLE001
         detail = (detail + " | " if detail else "") + repr(exc)
         await session.rollback()

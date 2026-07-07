@@ -22,12 +22,12 @@ async def run_scraper_watchdog() -> None:
     reportar — p. ej. GitHub Actions deshabilitado). Sin SLACK_WEBHOOK_URL
     configurado es un no-op silencioso.
     """
-    from alerts.slack import check_and_fire_scraper_alerts
+    from application.fire_alerts import alerts_scraper_watchdog
     from db.session import AsyncSessionLocal
 
     try:
         async with AsyncSessionLocal() as session:
-            alerted = await check_and_fire_scraper_alerts(session)
+            alerted = await alerts_scraper_watchdog(session)
             if alerted:
                 logger.warning("Watchdog: alertas Slack enviadas para %s", alerted)
     except Exception:

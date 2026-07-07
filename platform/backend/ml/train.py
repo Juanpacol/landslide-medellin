@@ -507,14 +507,10 @@ def train() -> dict[str, Any]:
 
 def main() -> None:
     _ = sync_engine  # noqa: F841
-    out = train()
-    print(json.dumps(out, indent=2, default=str))
-    try:
-        from ml.evaluation import generate_report
+    from application.train_model import run_training
 
-        generate_report()
-    except Exception:  # noqa: BLE001
-        pass
+    out = run_training()
+    print(json.dumps(out, indent=2, default=str))
 
 
 if __name__ == "__main__":
