@@ -121,14 +121,15 @@ async def _run_siata(session: AsyncSession) -> int:
             logger.warning("No se pudo calcular el índice antecedente: %s", api_exc)
             api_by_commune = {}
 
-        # Intensidad sísmica reciente del valle (misma para todas las comunas).
-        from ml.seismic_features import FEATURE_KEY as SEISMIC_KEY, seismic_recent_intensity
+        # Intensidad sísmica reciente POR COMUNA (atenuación por distancia real
+        # comuna↔epicentro; clave "_default" = valle para comunas sin centroide).
+        from ml.seismic_features import FEATURE_KEY as SEISMIC_KEY, seismic_intensity_by_commune
 
         try:
-            seismic_intensity = await seismic_recent_intensity(session)
+            seismic_by_commune = await seismic_intensity_by_commune(session)
         except Exception as seis_exc:  # noqa: BLE001
             logger.warning("No se pudo calcular la intensidad sísmica: %s", seis_exc)
-            seismic_intensity = None
+            seismic_by_commune = {}
 
         # % de barrios en amenaza "Alta" por comuna — puente estadístico entre
         # la granularidad de barrio (VM05) y el modelo, que predice por comuna.
@@ -158,6 +159,16 @@ async def _run_siata(session: AsyncSession) -> int:
                 continue
             mean_p = sum(values) / len(values)
             m = meta[cid]
+            seismic_val = seismic_by_commune.get(cid, seismic_by_commune.get("_default"))
+            swi_val = swi_by_commune.get(cid)
+            # Interacción sismo × saturación: un sismo sobre suelo saturado es
+            # el escenario de mayor riesgo real; como columnas separadas el
+            # modelo (árboles poco profundos) difícilmente aprende ese cruce.
+            seismic_x_swi = (
+                round(seismic_val * (swi_val / 100.0), 4)
+                if seismic_val is not None and swi_val is not None
+                else None
+            )
             row = MLFeature(
                 commune_id=cid,
                 reference_date=ref_dt,
@@ -168,9 +179,10 @@ async def _run_siata(session: AsyncSession) -> int:
                     "barrios": sorted(m["barrios"])[:30],
                     "mean_precip_mm_snapshot": round(mean_p, 3),
                     **({API_KEY: api_by_commune[cid]} if cid in api_by_commune else {}),
-                    **({SEISMIC_KEY: seismic_intensity} if seismic_intensity is not None else {}),
+                    **({SEISMIC_KEY: seismic_val} if seismic_val is not None else {}),
                     **({HAZARD_PCT_KEY: hazard_pct_by_commune[cid]} if cid in hazard_pct_by_commune else {}),
-                    **({SWI_KEY: swi_by_commune[cid]} if cid in swi_by_commune else {}),
+                    **({SWI_KEY: swi_val} if swi_val is not None else {}),
+                    **({"seismic_x_swi": seismic_x_swi} if seismic_x_swi is not None else {}),
                     "siata_json_url": PLUVIO_JSON,
                 },
                 precip_acum_7d=None,

@@ -1,6 +1,12 @@
 """
-Ingesta de eventos SINTÉTICOS coherentes para entrenar el modelo mientras
-acumula historia real.
+Ingesta de eventos SINTÉTICOS para calibrar Snake Line — NO para entrenar
+el clasificador ML.
+
+Se insertan con `is_synthetic=True` y `ml/train.py::_load_events_index()` los
+excluye del training set: fueron generados aplicando la propia heurística de
+Snake Line sobre lluvia histórica, así que entrenar/validar el modelo con
+ellos sería contaminación circular (el modelo aprendería la regla de
+generación, no el comportamiento real del terreno).
 
 Estrategia: para cada comuna con cobertura de lluvia histórica (6, 15, 16, 18, 21),
 selecciona días donde SWI + lluvia_60min hubieran cruzado la línea crítica de Snake Line.
@@ -73,6 +79,7 @@ async def main() -> None:
                     latitud=None,
                     longitud=None,
                     has_coords=False,
+                    is_synthetic=True,
                 )
             )
             inserted += 1

@@ -32,6 +32,39 @@ from ml.features import FeatureBuilder  # noqa: E402
 MODELS_DIR = Path(__file__).resolve().parent / "models"
 METRICS_PATH = MODELS_DIR / "metrics.json"
 BEST_MODEL_PATH = MODELS_DIR / "best_model.pkl"
+# Resultado de la ÚLTIMA corrida (exitosa o no). metrics.json en cambio solo
+# se escribe cuando el entrenamiento completa: siempre describe al
+# best_model.pkl vigente, nunca a una corrida abortada.
+LAST_ATTEMPT_PATH = MODELS_DIR / "last_train_attempt.json"
+
+
+def _write_attempt(payload: dict[str, Any]) -> None:
+    LAST_ATTEMPT_PATH.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+
+
+def _provenance() -> dict[str, Any]:
+    """Sello de procedencia para metrics.json: permite detectar drift entre
+    artefactos (¿este metrics.json corresponde a este best_model.pkl?)."""
+    import subprocess
+
+    sha: str | None = None
+    try:
+        sha = (
+            subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=BACKEND_ROOT,
+            ).stdout.strip()
+            or None
+        )
+    except Exception:  # noqa: BLE001 — sin .git (p.ej. imagen Docker) no es error
+        sha = None
+    return {
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "git_commit_sha": sha,
+    }
 
 
 def _ref_to_date(ref: datetime) -> date:
@@ -62,8 +95,13 @@ def _normalize_commune_id(value: Any) -> str | None:
 
 
 def _load_events_index(session: Session) -> dict[str, list[date]]:
+    """Índice (commune_id → fechas) de eventos REALES. Los sintéticos
+    (is_synthetic=true, generados con Snake Line) se excluyen: entrenar con
+    ellos y validar con la misma heurística sería contaminación circular."""
     by_commune: dict[str, list[date]] = {}
-    rows = session.scalars(select(LandslideEvent)).all()
+    rows = session.scalars(
+        select(LandslideEvent).where(LandslideEvent.is_synthetic.is_(False))
+    ).all()
     for ev in rows:
         cid = _normalize_commune_id(ev.commune_id)
         if cid is None:
@@ -182,6 +220,7 @@ def _build_supervised_matrix(
         "antecedent_precip_index",
         "pct_barrios_alta_amenaza",
         "soil_water_index_pct",
+        "seismic_x_swi",
     }
     keys = sorted(set(keys) | force_keys)
 
@@ -220,11 +259,64 @@ def _auc_scorer(model: Any, X: np.ndarray, y: np.ndarray, cv: Any) -> float:
     return float(np.mean(scores))
 
 
+_MIN_TEMPORAL_POSITIVES = 3  # mínimo de positivos a cada lado del corte
+
+
+def _temporal_validation(
+    model_template: Any,
+    Xs: np.ndarray,
+    y: np.ndarray,
+    meta: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """AUC entrenando con el pasado y validando con el futuro.
+
+    El CV aleatorio (shuffle) puede sobreestimar: mezcla días vecinos del
+    mismo episodio de lluvia entre train y test. Esta métrica corta por fecha
+    (percentil 80 de las fechas de los positivos) y responde la pregunta real
+    del producto: ¿el modelo anticipa eventos que aún no ha visto?
+    Si no hay suficientes positivos a ambos lados, reporta null con motivo.
+    """
+    from sklearn.base import clone
+
+    days = np.array([m["reference_day"] for m in meta])
+    pos_days = sorted(days[y == 1])
+    if len(pos_days) < 2 * _MIN_TEMPORAL_POSITIVES:
+        return {
+            "train_auc_temporal": None,
+            "temporal_reason": f"solo {len(pos_days)} positivos; se requieren ≥{2 * _MIN_TEMPORAL_POSITIVES}",
+        }
+
+    cutoff = pos_days[int(len(pos_days) * 0.8)]
+    train_mask = days < cutoff
+    test_mask = ~train_mask
+    y_tr, y_te = y[train_mask], y[test_mask]
+    if len(np.unique(y_tr)) < 2 or len(np.unique(y_te)) < 2 or int(y_te.sum()) < _MIN_TEMPORAL_POSITIVES:
+        return {
+            "train_auc_temporal": None,
+            "temporal_reason": f"corte {cutoff} no deja ambas clases (o <{_MIN_TEMPORAL_POSITIVES} positivos) en test",
+        }
+
+    try:
+        model = clone(model_template)
+        X_tr, y_tr_res = SMOTE(random_state=42).fit_resample(Xs[train_mask], y_tr)
+        model.fit(X_tr, y_tr_res)
+        proba = model.predict_proba(Xs[test_mask])[:, 1]
+        return {
+            "train_auc_temporal": float(roc_auc_score(y_te, proba)),
+            "temporal_cutoff": cutoff,
+            "temporal_n_test": int(test_mask.sum()),
+            "temporal_n_test_positive": int(y_te.sum()),
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"train_auc_temporal": None, "temporal_reason": f"error: {exc!r}"}
+
+
 def train() -> dict[str, Any]:
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    provenance = _provenance()
 
     with SyncSessionLocal() as session:
-        X, y, feature_names, _meta, target_strategy = _build_supervised_matrix(session)
+        X, y, feature_names, meta, target_strategy = _build_supervised_matrix(session)
 
     n_samples = int(X.shape[0])
     n_features = int(X.shape[1]) if n_samples else 0
@@ -240,8 +332,9 @@ def train() -> dict[str, Any]:
             "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "Sin filas válidas con reference_date para entrenar.",
+            **provenance,
         }
-        METRICS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        _write_attempt(payload)
         return payload
 
     scaler = StandardScaler()
@@ -262,13 +355,10 @@ def train() -> dict[str, Any]:
             "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "La variable objetivo tiene una sola clase; no se entrena clasificador.",
+            **provenance,
         }
-        METRICS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        _write_attempt(payload)
         return payload
-
-    builder = FeatureBuilder(MODELS_DIR)
-    builder.save_scaler(scaler)
-    builder.save_feature_names(feature_names)
 
     sm = SMOTE(random_state=42)
     X_res, y_res = sm.fit_resample(Xs, y)
@@ -345,11 +435,15 @@ def train() -> dict[str, Any]:
             "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "Ningún modelo pudo evaluarse con AUC-ROC.",
+            **provenance,
         }
-        METRICS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        _write_attempt(payload)
         return payload
 
     best_model.fit(X_res, y_res)
+
+    # Validación temporal: pasado→futuro sobre los datos SIN resamplear.
+    temporal = _temporal_validation(best_model, Xs, y, meta)
 
     try:
         train_proba = best_model.predict_proba(X_res)[:, 1]
@@ -362,12 +456,28 @@ def train() -> dict[str, Any]:
         train_precision = float("nan")
         train_recall = float("nan")
 
+    # Persistir los 4 artefactos JUNTOS y solo tras entrenar con éxito.
+    # Si scaler/feature_names se guardaran antes del fit (como pasaba), un
+    # fallo a mitad de camino deja artefactos de corridas distintas mezclados
+    # → shape mismatch en predict (incidente del 2026-07-07).
+    builder = FeatureBuilder(MODELS_DIR)
+    builder.save_scaler(scaler)
+    builder.save_feature_names(feature_names)
     artifact = {
         "model": best_model,
         "feature_names": feature_names,
         "scaler_fitted": True,
     }
     joblib.dump(artifact, BEST_MODEL_PATH)
+
+    # Benchmark fijo (ml/models/benchmark.json): AUC comparable entre corridas.
+    try:
+        from ml.benchmark import evaluate_benchmark
+
+        with SyncSessionLocal() as session:
+            benchmark = evaluate_benchmark(best_model, scaler, feature_names, session) or {}
+    except Exception as exc:  # noqa: BLE001
+        benchmark = {"benchmark_auc": None, "reason": f"error: {exc!r}"}
 
     model_version = "teyva-ml-1.0"
     payload = {
@@ -387,8 +497,12 @@ def train() -> dict[str, Any]:
         "class_weight": class_weight_map,
         "feature_names": feature_names,
         "model_version": model_version,
+        **temporal,
+        **benchmark,
+        **provenance,
     }
     METRICS_PATH.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    _write_attempt(payload)
     return payload
 
 

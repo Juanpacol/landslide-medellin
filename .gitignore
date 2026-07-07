@@ -1,7 +1,14 @@
 .env
+.venv/
+platform/backend/.venv/
 data/raw/
 __pycache__/
 *.pyc
 .DS_Store
 # Cache local de polígonos de comunas (datos de referencia, regenerable desde ArcGIS)
 _commune_polygons_cache.json
+# Artefactos ML de corrida (no de release): describen la última corrida local
+platform/backend/ml/models/last_train_attempt.json
+platform/backend/ml/models/*_synthetic.pkl
+platform/backend/ml/models/*_synthetic.json
+platform/backend/validacion_eventos.csv

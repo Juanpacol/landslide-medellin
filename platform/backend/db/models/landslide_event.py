@@ -18,6 +18,11 @@ class LandslideEvent(Base):
     latitud: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitud: Mapped[float | None] = mapped_column(Float, nullable=True)
     has_coords: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Eventos generados por ingest_synthetic_events.py: útiles para calibrar
+    # Snake Line, EXCLUIDOS del training set del clasificador ML (ml/train.py).
+    is_synthetic: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
     ingested_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
