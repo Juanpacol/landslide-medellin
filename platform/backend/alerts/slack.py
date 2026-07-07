@@ -38,13 +38,12 @@ logger = logging.getLogger(__name__)
 
 COL_TZ = ZoneInfo("America/Bogota")
 
-_NAMES: dict[str, str] = {
-    "1": "Popular", "2": "Santa Cruz", "3": "Manrique", "4": "Aranjuez",
-    "5": "Castilla", "6": "Doce de Octubre", "7": "Robledo", "8": "Villa Hermosa",
-    "9": "Buenos Aires", "10": "La Candelaria", "11": "Laureles-Estadio",
-    "12": "La América", "13": "San Javier", "14": "El Poblado", "15": "Guayabal",
-    "16": "Belén", "50": "Palmitas", "60": "San Cristóbal", "70": "Altavista",
-    "80": "San Antonio de Prado", "90": "Santa Elena",
+# Nombres desde la fuente única (domain/communes.py). Acepta id canónico
+# ("18") Y código oficial ("60") porque hay datos históricos con ambos.
+from domain.communes import COMMUNES as _COMMUNES
+
+_NAMES: dict[str, str] = {c.id: c.nombre for c in _COMMUNES} | {
+    c.official_code: c.nombre for c in _COMMUNES
 }
 
 

@@ -24,29 +24,14 @@ from observability.predictions import get_prediction_logs
 
 router = APIRouter()
 
-_COMUNAS_BASE = [
-    ("1", "Popular", True),
-    ("2", "Santa Cruz", True),
-    ("3", "Manrique", True),
-    ("4", "Aranjuez", False),
-    ("5", "Castilla", False),
-    ("6", "Doce de Octubre", True),
-    ("7", "Robledo", True),
-    ("8", "Villa Hermosa", True),
-    ("9", "Buenos Aires", True),
-    ("10", "La Candelaria", False),
-    ("11", "Laureles-Estadio", False),
-    ("12", "La América", False),
-    ("13", "San Javier", True),
-    ("14", "El Poblado", False),
-    ("15", "Guayabal", False),
-    ("16", "Belén", True),
-    ("50", "Palmitas", True),
-    ("60", "San Cristóbal", True),
-    ("70", "Altavista", True),
-    ("80", "San Antonio de Prado", True),
-    ("90", "Santa Elena", True),
-]
+# Territorio desde la fuente única (domain/communes.py), en id CANÓNICO —
+# el mismo que usan risk_predictions/ml_features. El código oficial (ArcGIS)
+# solo se usa al pedir polígonos (_load_real_commune_polygons).
+from domain.communes import BY_ID as _COMMUNES_BY_ID
+from domain.communes import COMMUNES as _DOMAIN_COMMUNES
+from domain.communes import canonical_id as _canonical_commune_id
+
+_COMUNAS_BASE = [(c.id, c.nombre, c.is_ladera) for c in _DOMAIN_COMMUNES]
 
 _COMUNA_QUERY_URL = (
     "https://www.medellin.gov.co/servidormapas/rest/services/"
@@ -114,6 +99,9 @@ async def _load_real_commune_polygons() -> list[dict[str, Any]]:
         try:
             cached = json.loads(_POLYGON_CACHE_FILE.read_text(encoding="utf-8"))
             if isinstance(cached, list) and cached:
+                for item in cached:
+                    if isinstance(item, dict):
+                        item["commune_id"] = _canonical_commune_id(item.get("commune_id"))
                 _POLYGON_CACHE = cached
                 return _POLYGON_CACHE
         except Exception:
@@ -121,14 +109,20 @@ async def _load_real_commune_polygons() -> list[dict[str, Any]]:
                 "Cache de polígonos en disco corrupto; se regenerará desde ArcGIS."
             )
 
-    # 3) Fetch desde ArcGIS y persiste a disco.
+    # 3) Fetch desde ArcGIS (por código OFICIAL) y persiste a disco.
     async with httpx.AsyncClient(timeout=20.0) as client:
-        tasks = [_fetch_single_commune_polygon(client, cid) for cid, _, _ in _COMUNAS_BASE]
+        tasks = [
+            _fetch_single_commune_polygon(client, _COMMUNES_BY_ID[cid].official_code)
+            for cid, _, _ in _COMUNAS_BASE
+        ]
         items = await asyncio.gather(*tasks, return_exceptions=True)
 
     out: list[dict[str, Any]] = []
     for item in items:
         if isinstance(item, dict):
+            # ArcGIS responde con el código oficial → traducir al id canónico
+            # para que el frontend y las predicciones hablen el mismo idioma.
+            item["commune_id"] = _canonical_commune_id(item.get("commune_id"))
             out.append(item)
     if out:
         _POLYGON_CACHE = out

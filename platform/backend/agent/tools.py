@@ -17,65 +17,14 @@ def _normalize_token(s: str) -> str:
     return "".join(c for c in nkfd if unicodedata.category(c) != "Mn")
 
 
-# commune_id → nombres oficiales (alineado con restore_db / Medellín)
-COMMUNE_LABELS: dict[str, str] = {
-    "1": "Popular",
-    "2": "Santa Cruz",
-    "3": "Manrique",
-    "4": "Aranjuez",
-    "5": "Castilla",
-    "6": "Doce de Octubre",
-    "7": "Robledo",
-    "8": "Villa Hermosa",
-    "9": "Buenos Aires",
-    "10": "La Candelaria",
-    "11": "Laureles-Estadio",
-    "12": "La América",
-    "13": "San Javier",
-    "14": "El Poblado",
-    "15": "Guayabal",
-    "16": "Belén",
-    "50": "Palmitas",
-    "60": "San Cristóbal",
-    "70": "Altavista",
-    "80": "San Antonio de Prado",
-    "90": "Santa Elena",
-}
+# Fuente única de verdad del territorio: domain/communes.py.
+# Se re-exportan resolve_commune_id / commune_display_name porque media docena
+# de módulos (chat, rag_tools, alerts) los importan de aquí.
+from domain.communes import COMMUNES as _COMMUNES
+from domain.communes import display_name as commune_display_name  # noqa: F401
+from domain.communes import resolve_commune_id  # noqa: F401
 
-_ALIAS_TO_ID: dict[str, str] = {}
-for _cid, _name in COMMUNE_LABELS.items():
-    _ALIAS_TO_ID[_normalize_token(_name)] = _cid
-    _ALIAS_TO_ID[_normalize_token(_cid)] = _cid
-
-# Variantes habituales
-_ALIASES_EXTRA = {
-    "doce de octubre": "6",
-    "la america": "12",
-    "laureles estadio": "11",
-    "laureles-estadio": "11",
-    "san cristobal": "60",
-    "san cristóbal": "60",
-    "san antonio de prado": "80",
-    "poblado": "14",
-    "candelaria": "10",
-    "villa hermosa": "8",
-}
-for _k, _v in _ALIASES_EXTRA.items():
-    _ALIAS_TO_ID.setdefault(_normalize_token(_k), _v)
-
-
-def resolve_commune_id(nombre_o_id: str) -> str | None:
-    raw = nombre_o_id.strip()
-    if not raw:
-        return None
-    if re.fullmatch(r"\d+", raw):
-        return raw
-    key = _normalize_token(raw)
-    return _ALIAS_TO_ID.get(key)
-
-
-def commune_display_name(commune_id: str) -> str:
-    return COMMUNE_LABELS.get(commune_id, commune_id)
+COMMUNE_LABELS: dict[str, str] = {c.id: c.nombre for c in _COMMUNES}
 
 
 def _latest_per_commune_subquery():

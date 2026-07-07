@@ -37,6 +37,26 @@ app.include_router(rain.router, prefix="/api/rain", tags=["rain"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 
 
+@app.get("/api/geo/communes")
+def communes_catalog() -> dict[str, list[dict[str, object]]]:
+    """Catálogo del territorio desde la fuente única (domain/communes.py).
+    El frontend consume esto en vez de duplicar la lista hardcodeada."""
+    from domain.communes import COMMUNES
+
+    return {
+        "communes": [
+            {
+                "id": c.id,
+                "official_code": c.official_code,
+                "nombre": c.nombre,
+                "tipo": c.tipo,
+                "is_ladera": c.is_ladera,
+            }
+            for c in COMMUNES
+        ]
+    }
+
+
 @app.get("/")
 def root() -> dict[str, str]:
     return {"status": "ok"}

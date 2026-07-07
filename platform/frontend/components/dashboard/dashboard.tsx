@@ -27,7 +27,7 @@ import { SoilWaterHeatmap } from './soil-water-heatmap';
 import { SnakeLineChart } from './snake-line-chart';
 import { ModelFeaturesPanel } from './model-features-panel';
 import { TeyvaChatWidget } from './teyva-chat';
-import { fetchCommuneDetail, fetchRiskStats, type CommuneDetail, type CommuneFeature, type RiskStats } from '@/lib/api';
+import { fetchCommuneDetail, fetchCommunesCatalog, fetchRiskStats, type CommuneCatalogEntry, type CommuneDetail, type CommuneFeature, type RiskStats } from '@/lib/api';
 import {
   Sidebar,
   SidebarContent,
@@ -46,14 +46,17 @@ import {
 
 type CommuneProps = CommuneFeature['properties'];
 
-const COMUNA_OPTIONS: { id: string; nombre: string }[] = [
+// Fallback local si /api/geo/communes no responde. IDs CANÓNICOS (los mismos
+// de risk_predictions/ml_features): corregimientos = 17-21, no los códigos
+// oficiales 50-90 — con esos los endpoints devolvían siempre vacío.
+const COMUNA_OPTIONS_FALLBACK: { id: string; nombre: string }[] = [
   { id: '1', nombre: 'Popular' }, { id: '2', nombre: 'Santa Cruz' }, { id: '3', nombre: 'Manrique' },
   { id: '4', nombre: 'Aranjuez' }, { id: '5', nombre: 'Castilla' }, { id: '6', nombre: 'Doce de Octubre' },
   { id: '7', nombre: 'Robledo' }, { id: '8', nombre: 'Villa Hermosa' }, { id: '9', nombre: 'Buenos Aires' },
   { id: '10', nombre: 'La Candelaria' }, { id: '11', nombre: 'Laureles-Estadio' }, { id: '12', nombre: 'La América' },
   { id: '13', nombre: 'San Javier' }, { id: '14', nombre: 'El Poblado' }, { id: '15', nombre: 'Guayabal' },
-  { id: '16', nombre: 'Belén' }, { id: '50', nombre: 'Palmitas' }, { id: '60', nombre: 'San Cristóbal' },
-  { id: '70', nombre: 'Altavista' }, { id: '80', nombre: 'San Antonio de Prado' }, { id: '90', nombre: 'Santa Elena' },
+  { id: '16', nombre: 'Belén' }, { id: '17', nombre: 'Palmitas' }, { id: '18', nombre: 'San Cristóbal' },
+  { id: '19', nombre: 'Altavista' }, { id: '20', nombre: 'San Antonio de Prado' }, { id: '21', nombre: 'Santa Elena' },
 ];
 
 interface NavItem {
@@ -212,11 +215,16 @@ export function Dashboard() {
   // Capa activa del mapa: riesgo ML por comuna o amenaza oficial por barrio
   const [rightPanelTab, setRightPanelTab] = useState<'barrios' | 'mesh' | 'features' | null>(null);
   const [decisionCommuneId, setDecisionCommuneId] = useState<string>('1');
+  const [comunaOptions, setComunaOptions] = useState<{ id: string; nombre: string }[]>(COMUNA_OPTIONS_FALLBACK);
 
   const chartCommuneId = selectedCommune ? String(selectedCommune.commune_id) : null;
 
   useEffect(() => {
     fetchRiskStats().then(setStats).catch(() => setStats(null));
+    fetchCommunesCatalog()
+      .then((communes: CommuneCatalogEntry[]) =>
+        setComunaOptions(communes.map((c) => ({ id: c.id, nombre: c.nombre }))))
+      .catch(() => { /* fallback local ya cargado */ });
   }, []);
 
   useEffect(() => {
@@ -618,7 +626,7 @@ export function Dashboard() {
                       cursor: 'pointer',
                     }}
                   >
-                    {COMUNA_OPTIONS.map((c) => (
+                    {comunaOptions.map((c) => (
                       <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
                   </select>

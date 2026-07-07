@@ -641,3 +641,16 @@ export interface EvacuationRoutesResponse {
 export async function fetchEvacuationRoutes(communeId: string): Promise<EvacuationRoutesResponse> {
   return apiRequest(`/alerts/evacuation-routes/${communeId}`);
 }
+
+export interface CommuneCatalogEntry {
+  id: string;
+  official_code: string;
+  nombre: string;
+  tipo: 'comuna' | 'corregimiento';
+  is_ladera: boolean;
+}
+
+export async function fetchCommunesCatalog(): Promise<CommuneCatalogEntry[]> {
+  const data = await apiRequest<{ communes: CommuneCatalogEntry[] }>('/geo/communes');
+  return data.communes;
+}

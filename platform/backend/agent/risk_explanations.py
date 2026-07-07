@@ -50,13 +50,10 @@ def _get_anthropic_client():
         _anthropic_client = anthropic.Anthropic()
     return _anthropic_client
 
-_NOMBRES: dict[str, str] = {
-    "1": "Popular", "2": "Santa Cruz", "3": "Manrique", "4": "Aranjuez",
-    "5": "Castilla", "6": "Doce de Octubre", "7": "Robledo", "8": "Villa Hermosa",
-    "9": "Buenos Aires", "10": "La Candelaria", "11": "Laureles-Estadio",
-    "12": "La América", "13": "San Javier", "14": "El Poblado", "15": "Guayabal",
-    "16": "Belén", "50": "Palmitas", "60": "San Cristóbal", "70": "Altavista",
-    "80": "San Antonio de Prado", "90": "Santa Elena",
+from domain.communes import COMMUNES as _COMMUNES
+
+_NOMBRES: dict[str, str] = {c.id: c.nombre for c in _COMMUNES} | {
+    c.official_code: c.nombre for c in _COMMUNES
 }
 
 _IS_LADERA: dict[str, bool] = {

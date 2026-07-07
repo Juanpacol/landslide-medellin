@@ -55,29 +55,13 @@ DENSIDAD_URL = (
 
 HEADERS = {"User-Agent": "TEYVA-Scraper/1.0"}
 
-# Comunas y corregimientos de Medellín con sus códigos ML (del proyecto)
+# Territorio desde la fuente única (domain/communes.py). El ml_id es el id
+# canónico bajo el que viven los datos (corregimientos = 17-21, no 50-90).
+from domain.communes import COMMUNES as _DOMAIN_COMMUNES
+
 COMUNAS = [
-    {"codigo": "01", "nombre": "Popular",           "ml_id": "1",  "tipo": "comuna"},
-    {"codigo": "02", "nombre": "Santa Cruz",        "ml_id": "2",  "tipo": "comuna"},
-    {"codigo": "03", "nombre": "Manrique",          "ml_id": "3",  "tipo": "comuna"},
-    {"codigo": "04", "nombre": "Aranjuez",          "ml_id": "4",  "tipo": "comuna"},
-    {"codigo": "05", "nombre": "Castilla",          "ml_id": "5",  "tipo": "comuna"},
-    {"codigo": "06", "nombre": "Doce de Octubre",   "ml_id": "6",  "tipo": "comuna"},
-    {"codigo": "07", "nombre": "Robledo",           "ml_id": "7",  "tipo": "comuna"},
-    {"codigo": "08", "nombre": "Villa Hermosa",     "ml_id": "8",  "tipo": "comuna"},
-    {"codigo": "09", "nombre": "Buenos Aires",      "ml_id": "9",  "tipo": "comuna"},
-    {"codigo": "10", "nombre": "La Candelaria",     "ml_id": "10", "tipo": "comuna"},
-    {"codigo": "11", "nombre": "Laureles-Estadio",  "ml_id": "11", "tipo": "comuna"},
-    {"codigo": "12", "nombre": "La América",        "ml_id": "12", "tipo": "comuna"},
-    {"codigo": "13", "nombre": "San Javier",        "ml_id": "13", "tipo": "comuna"},
-    {"codigo": "14", "nombre": "El Poblado",        "ml_id": "14", "tipo": "comuna"},
-    {"codigo": "15", "nombre": "Guayabal",          "ml_id": "15", "tipo": "comuna"},
-    {"codigo": "16", "nombre": "Belén",             "ml_id": "16", "tipo": "comuna"},
-    {"codigo": "50", "nombre": "Palmitas",          "ml_id": "50", "tipo": "corregimiento"},
-    {"codigo": "60", "nombre": "San Cristóbal",     "ml_id": "60", "tipo": "corregimiento"},
-    {"codigo": "70", "nombre": "Altavista",         "ml_id": "70", "tipo": "corregimiento"},
-    {"codigo": "80", "nombre": "San Antonio de Prado", "ml_id": "80", "tipo": "corregimiento"},
-    {"codigo": "90", "nombre": "Santa Elena",       "ml_id": "90", "tipo": "corregimiento"},
+    {"codigo": c.official_code, "nombre": c.nombre, "ml_id": c.id, "tipo": c.tipo}
+    for c in _DOMAIN_COMMUNES
 ]
 
 # Descripciones de amenaza para enriquecer el texto

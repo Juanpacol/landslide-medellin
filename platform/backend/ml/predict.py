@@ -91,7 +91,10 @@ async def predict_all_comunas(db: AsyncSession) -> None:
     metrics = _load_metrics()
     model_version = str(metrics.get("model_version") or "teyva-ml-1.0")
 
-    for cid in range(1, 22):
+    from domain.communes import COMMUNES
+
+    for commune in COMMUNES:
+        cid = commune.id
         out = await predict_risk(cid, db)
         risk_score = float(out.get("risk_score") or 0.0)
         risk_level = str(out.get("risk_level") or "bajo")
