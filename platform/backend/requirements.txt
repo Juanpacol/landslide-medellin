@@ -25,3 +25,6 @@ fastmcp
 anthropic
 pytest
 pytest-asyncio
+detect-secrets
+bandit[toml]
+ruff

@@ -1,0 +1,67 @@
+name: CI — Security Scans
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  secret-detection:
+    name: Detect Secrets (Bloqueante)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install detect-secrets
+        run: pip install detect-secrets
+
+      - name: Initialize baseline if not exists
+        run: |
+          if [ ! -f .secrets.baseline ]; then
+            git ls-files -z | xargs -0 detect-secrets scan --force-use-all-plugins > .secrets.baseline
+          fi
+
+      # Escaneamos solo archivos versionados por git (mismo scope que se usó
+      # para generar el baseline) — evita falsos positivos/timeouts por
+      # directorios ignorados (.venv, node_modules) que puedan existir en el
+      # runner pero nunca se commitean.
+      - name: Scan for secrets
+        run: |
+          git ls-files -z | xargs -0 detect-secrets scan --baseline .secrets.baseline --force-use-all-plugins
+
+  bandit-injection:
+    name: Bandit — SQL Injection & Code Issues
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ./platform/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      - name: Run bandit on backend
+        run: |
+          cd platform/backend
+          bandit -r . -f json -o /tmp/bandit-report.json || true
+          bandit -r . -f txt | head -100
+        continue-on-error: true

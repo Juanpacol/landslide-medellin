@@ -35,3 +35,10 @@ jobs:
       - name: Run risk prediction
         working-directory: platform/backend
         run: python -m ml.predict
+
+      - name: Run ML drift detection
+        working-directory: platform/backend
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m monitoring.ml_drift

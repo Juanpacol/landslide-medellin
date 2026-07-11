@@ -1,4 +1,5 @@
 from db.base import Base
+from db.models.agent_run_log import AgentRunLog
 from db.models.alert_log import AlertLog
 from db.models.app_setting import AppSetting
 from db.models.audit_log import AuditLog
@@ -18,6 +19,7 @@ from db.models.seismic_event import SeismicEvent
 
 __all__ = [
     "Base",
+    "AgentRunLog",
     "AlertLog",
     "AppSetting",
     "AuditLog",
