@@ -27,19 +27,21 @@ jobs:
       - name: Install detect-secrets
         run: pip install detect-secrets
 
+      # Excluye lockfiles (.lock, -lock.yaml, -lock.json) y .tsbuildinfo: son
+      # hashes/checksums por diseño, no secretos — detect-secrets los marca
+      # en masa como "alta entropía" (pnpm-lock.yaml sale con miles de falsos
+      # positivos, uno por paquete). Mismo scope usado para generar el baseline.
       - name: Initialize baseline if not exists
         run: |
           if [ ! -f .secrets.baseline ]; then
-            git ls-files -z | xargs -0 detect-secrets scan --force-use-all-plugins > .secrets.baseline
+            git ls-files -z | grep -zv -E '\.lock$|-lock\.yaml$|-lock\.json$|\.tsbuildinfo$' \
+              | xargs -0 detect-secrets scan --force-use-all-plugins > .secrets.baseline
           fi
 
-      # Escaneamos solo archivos versionados por git (mismo scope que se usó
-      # para generar el baseline) — evita falsos positivos/timeouts por
-      # directorios ignorados (.venv, node_modules) que puedan existir en el
-      # runner pero nunca se commitean.
       - name: Scan for secrets
         run: |
-          git ls-files -z | xargs -0 detect-secrets scan --baseline .secrets.baseline --force-use-all-plugins
+          git ls-files -z | grep -zv -E '\.lock$|-lock\.yaml$|-lock\.json$|\.tsbuildinfo$' \
+            | xargs -0 detect-secrets scan --baseline .secrets.baseline --force-use-all-plugins
 
   bandit-injection:
     name: Bandit — SQL Injection & Code Issues

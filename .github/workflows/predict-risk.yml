@@ -36,8 +36,11 @@ jobs:
         working-directory: platform/backend
         run: python -m ml.predict
 
+      # continue-on-error: un bug del agente no debe marcar la corrida de
+      # predicción como fallida (regla ya aplicada al resto de agentes).
       - name: Run ML drift detection
         working-directory: platform/backend
+        continue-on-error: true
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

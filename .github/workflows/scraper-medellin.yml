@@ -11,6 +11,7 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       PYTHONPATH: ./platform/backend
     steps:
       - name: Checkout
@@ -35,3 +36,8 @@ jobs:
       - name: Run Medellin Datos scraper
         working-directory: platform/backend
         run: python -m scraper.medellin_datos
+
+      - name: Validate ingested data
+        working-directory: platform/backend
+        continue-on-error: true
+        run: python -m monitoring.scraper_validator

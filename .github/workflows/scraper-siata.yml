@@ -11,6 +11,7 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       PYTHONPATH: ./platform/backend
     steps:
       - name: Checkout
@@ -35,3 +36,11 @@ jobs:
       - name: Run SIATA scraper
         working-directory: platform/backend
         run: python -m scraper.siata
+
+      # Valida el batch recién ingerido (rangos, timestamps, cobertura).
+      # continue-on-error: un bug del validador nunca marca el cron del
+      # scraper como fallido (regla: la validación no tumba la ingesta).
+      - name: Validate ingested data
+        working-directory: platform/backend
+        continue-on-error: true
+        run: python -m monitoring.scraper_validator
