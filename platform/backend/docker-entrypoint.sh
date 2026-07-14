@@ -22,5 +22,8 @@ PY
 echo "→ Aplicando migraciones (alembic upgrade head)..."
 alembic upgrade head
 
+echo "→ Reconstruyendo artefactos binarios (ChromaDB + modelo ML si no existen)..."
+sh "$(dirname "$0")/setup_assets.sh"
+
 echo "→ Iniciando API en :8000"
 exec uvicorn api.main:app --host 0.0.0.0 --port 8000

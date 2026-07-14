@@ -35,8 +35,8 @@
 
 | Recurso | Enlace |
 |---|---|
-| Presentación (PPTX) | [`RECURSOS/Monitoreo-inteligente-de-riesgo-de-deslizamientos-para-Medellin.pptx`](RECURSOS/Monitoreo-inteligente-de-riesgo-de-deslizamientos-para-Medellin.pptx) |
-| Presentación (PDF) | [`RECURSOS/Monitoreo-inteligente-de-riesgo-de-deslizamientos-para-Medellin.pdf`](RECURSOS/Monitoreo-inteligente-de-riesgo-de-deslizamientos-para-Medellin.pdf) |
+| Presentación (PPTX) | `RECURSOS/` — excluido de git por tamaño, disponible localmente |
+| Presentación (PDF) | `RECURSOS/` — excluido de git por tamaño, disponible localmente |
 | Portada | [`RECURSOS/Portada.png`](RECURSOS/Portada.png) |
 | Informe técnico | [`docs/marco_metodologico.md`](docs/marco_metodologico.md) |
 | Diccionario de datos | [`docs/data_dictionary.md`](docs/data_dictionary.md) |
@@ -88,12 +88,13 @@ Capas de la solución:
 ### Opción A — Docker (recomendado)
 
 ```bash
-git clone <repo>
+git clone https://github.com/Juanpacol/teyva
 cd teyva
+cp .env.example .env    # completar credenciales (DATABASE_URL, ANTHROPIC_API_KEY)
 docker compose up
 ```
 
-Abre [http://localhost:3000](http://localhost:3000). Primera ejecución descarga el modelo LLM (~2 GB).
+Abre [http://localhost:3000](http://localhost:3000). La primera ejecución descarga el modelo LLM (~2 GB) y reconstruye automáticamente el índice ChromaDB y el modelo ML si no existen.
 
 ### Opción B — Local
 
@@ -107,6 +108,10 @@ cd platform/backend
 export PYTHONPATH=.
 cp ../../.env.example .env   # completar credenciales
 alembic upgrade head
+
+# Reconstruir artefactos binarios (ChromaDB + modelo ML)
+sh setup_assets.sh
+
 uvicorn api.main:app --reload --port 8000
 
 # Frontend (otra terminal)
@@ -117,6 +122,27 @@ pnpm install && pnpm dev
 ### Variables de entorno requeridas
 
 Ver [`.env.example`](.env.example) — las mínimas son `DATABASE_URL`, `ANTHROPIC_API_KEY` (o usar Ollama local) y `SLACK_WEBHOOK_URL` (opcional).
+
+---
+
+## Artefactos Binarios (ChromaDB y Modelo ML)
+
+Los archivos binarios no están en el repositorio git porque superan los límites de tamaño de GitHub (~1.4 GB entre PDFs fuente, índice vectorial y modelos entrenados). Son completamente regenerables desde los datos ya procesados que sí están versionados.
+
+| Artefacto | Ruta | Qué rompe si no existe | Cómo regenerar |
+|---|---|---|---|
+| Índice ChromaDB | `platform/backend/rag/data/chroma_db/` | El agente conversacional no puede buscar contexto en documentos (RAG desactivado) | `python -m rag.chroma_store --ingest` |
+| Modelo ML | `platform/backend/ml/models/best_model.pkl` | El endpoint `/api/risk/predict` retorna `score=0` en lugar de la predicción real | `python -m ml.train` |
+| Scaler ML | `platform/backend/ml/models/scaler.pkl` | Mismo efecto que arriba — se genera junto con el modelo | `python -m ml.train` |
+
+El script `setup_assets.sh` hace todo esto en un paso y es **idempotente** — si los artefactos ya existen no los sobreescribe:
+
+```bash
+cd platform/backend
+sh setup_assets.sh
+```
+
+En Docker, `docker-entrypoint.sh` llama a este script automáticamente en cada inicio, antes de levantar la API. El modelo ML requiere que los scrapers hayan corrido al menos una vez para tener datos en la tabla `ml_features`.
 
 ---
 
