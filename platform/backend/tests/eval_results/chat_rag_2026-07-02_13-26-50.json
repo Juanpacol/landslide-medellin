@@ -1,0 +1,94 @@
+{
+  "prompt_module": "agent/chat_rag",
+  "total_tests": 13,
+  "passed": 0,
+  "failed": 13,
+  "accuracy": "0.0%",
+  "threshold": "90%",
+  "threshold_passed": false,
+  "average_score": null,
+  "graded_count": 0,
+  "quality_threshold": null,
+  "quality_threshold_passed": null,
+  "executed_at": "2026-07-02T13:26:50.452200",
+  "results": [
+    {
+      "test_id": "in_scope_normal_1",
+      "passed": false,
+      "error": "Validation failed",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "in_scope_normal_2",
+      "passed": false,
+      "error": "Task <Task pending name='Task-13' coro=<chat_rag() running at /Users/juanpablo/teyva/platform/backend/agent/chat_rag.py:133> cb=[_run_until_complete_cb() at /opt/homebrew/Cellar/python@3.11/3.11.15_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py:181]> got Future <Future pending cb=[BaseProtocol._on_waiter_completed()]> attached to a different loop",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "in_scope_events",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-eaa3d116-4b7b-411c-b91a-2838971e812c', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "variant_uppercase",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-b9e93fc0-1da5-44b4-bc13-dec7a9eef3e4', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "variant_lowercase_typo",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-2732a60b-493a-48d3-8a9c-8809bc98cb0b', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "variant_accent",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-5696bffc-be02-4994-9dfa-b8e040073a21', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "out_of_scope_geography",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-ed9a36f3-d87d-454b-bdcb-6633557a39be', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "out_of_scope_recipe",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-f09fcbbb-3bd9-4821-8a57-82e37be9daca', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "out_of_scope_history",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-44aec6ae-38af-40ef-bfed-78282b3fdab8', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "out_of_scope_movie",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-53395185-3553-4978-9c76-a393bc90405b', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "edge_case_complex_query",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-43e98107-0ca7-457e-a686-62c73854b3d0', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "edge_case_multiple_communes",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-3dcedd51-1148-44b7-a29f-e703a9f5797f', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "edge_case_temporal",
+      "passed": false,
+      "error": "(sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot perform operation: another operation is in progress\n[SQL: SELECT agent_conversations.id, agent_conversations.session_id, agent_conversations.role, agent_conversations.content, agent_conversations.created_at \nFROM agent_conversations \nWHERE agent_conversations.session_id = $1::VARCHAR ORDER BY agent_conversations.created_at DESC \n LIMIT $2::INTEGER]\n[parameters: ('eval-chat-rag-de0c3f00-a104-42bd-9f7d-94af846ec914', 6)]\n(Background on this error at: https://sqlalche.me/e/20/rvf5)",
+      "duration_ms": 0.0
+    }
+  ]
+}

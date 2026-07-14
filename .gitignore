@@ -1,0 +1,67 @@
+# ── Entornos y secretos ──────────────────────────────────────
+.env
+.venv/
+platform/backend/.venv/
+
+# ── Datos (voluminosos o sensibles) ─────────────────────────
+data/raw/
+data/realtime/
+
+# ── Artefactos ML (se regeneran con ml.train) ────────────────
+platform/backend/ml/models/last_train_attempt.json
+platform/backend/ml/models/*_synthetic.pkl
+platform/backend/ml/models/*_synthetic.json
+platform/backend/validacion_eventos.csv
+
+# ── ChromaDB (se regenera con rag.chroma_store --ingest) ─────
+platform/backend/rag/chroma_db/
+platform/backend/rag/data/chroma_db/
+
+# ── PDFs y archivos binarios grandes (usar LFS o almacenamiento externo) ──
+platform/backend/rag/data/siata_geotecnia/raw_pdfs/
+platform/backend/rag/data/siata_hidromet/raw_pdfs/
+platform/backend/rag/data/dagrd_eventos/
+RECURSOS/*.pdf
+RECURSOS/*.pptx
+
+# ── Modelos ML binarios (artefactos de entrenamiento) ────────
+platform/backend/ml/models/*.pkl
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Jupyter ──────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Node / Frontend ──────────────────────────────────────────
+node_modules/
+platform/frontend/.next/
+platform/frontend/out/
+
+# ── OS ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ──────────────────────────────────────────────────────
+.vscode/settings.json
+
+# ── Observabilidad runtime ───────────────────────────────────
+platform/backend/observability/predictions.jsonl
+
+# ── Caché local de polígonos ─────────────────────────────────
+_commune_polygons_cache.json
+# Cache local de polígonos de comunas (datos de referencia, regenerable desde ArcGIS)
+_commune_polygons_cache.json
+# Artefactos ML de corrida (no de release): describen la última corrida local
+platform/backend/ml/models/last_train_attempt.json
+platform/backend/ml/models/*_synthetic.pkl
+platform/backend/ml/models/*_synthetic.json
+platform/backend/validacion_eventos.csv
+# Log de observabilidad de predicciones (runtime, crece con cada corrida)
+platform/backend/observability/predictions.jsonl

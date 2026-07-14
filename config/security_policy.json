@@ -1,0 +1,95 @@
+{
+  "_comment": "TEYVA — Políticas de seguridad, anonimización y gobernanza de datos",
+  "version": "1.0.0",
+  "last_updated": "2026-07-13",
+
+  "authentication": {
+    "required_in_production": true,
+    "token_header": "Authorization",
+    "token_prefix": "Bearer",
+    "protected_endpoints": [
+      "POST /api/risk/predict-all",
+      "POST /api/risk/predict-commune",
+      "PUT /api/rain/thresholds",
+      "GET /api/rain/settings",
+      "POST /api/rain/settings/webhook",
+      "GET /api/audit/log"
+    ],
+    "public_endpoints": [
+      "GET /api/risk/comunas",
+      "GET /api/risk/comuna/{id}/detalle",
+      "GET /api/risk/historia/{id}",
+      "POST /api/chat",
+      "GET /api/health",
+      "GET /api/scraper/status"
+    ]
+  },
+
+  "rate_limiting": {
+    "chat": {
+      "requests_per_minute": 10,
+      "scope": "per_ip"
+    },
+    "predict": {
+      "requests_per_minute": 5,
+      "scope": "per_ip"
+    },
+    "note": "Escalar a Redis si se despliegan múltiples workers"
+  },
+
+  "data_governance": {
+    "pii_fields": {
+      "policy": "never_store",
+      "note": "Los reportes ciudadanos no capturan nombre, DNI ni dirección exacta",
+      "citizen_reports": {
+        "session_id": "UUID aleatorio sin vinculación a identidad",
+        "barrio": "Campo libre — no se geolocaliza ni se vincula a persona"
+      }
+    },
+    "audit_log": {
+      "policy": "append_only",
+      "stored_fields": ["event_type", "timestamp", "commune_id", "payload_hash_sha256"],
+      "never_stored": ["payload_raw", "api_tokens", "user_pii"]
+    },
+    "model_artifacts": {
+      "trained_data_retention": "El modelo solo almacena pesos — no retiene datos de entrenamiento",
+      "versioning": "Cada artefacto incluye trained_at y git_commit_sha para trazabilidad"
+    }
+  },
+
+  "anonymization": {
+    "citizen_reports": {
+      "session_id": "UUID v4 generado por el cliente, no vinculado a IP ni usuario",
+      "location": "Se almacena commune_id y barrio (opcional) — sin coordenadas exactas del ciudadano"
+    },
+    "chat_history": {
+      "retention_days": 90,
+      "policy": "Los mensajes se asocian a session_id anónimo"
+    }
+  },
+
+  "secrets_policy": {
+    "never_commit": [".env", "*.pem", "*.key", "credentials.json"],
+    "placeholders_only_in": ".env.example",
+    "rotation_required_if_leaked": true,
+    "note": "Historial tiene una contraseña real filtrada y rotada — no repetir"
+  },
+
+  "cors": {
+    "policy": "whitelist",
+    "default_allowed": ["http://localhost:3000"],
+    "production": "Configurar via ALLOWED_ORIGINS en .env"
+  },
+
+  "tls": {
+    "required_in_production": true,
+    "database": "DB_SSL=true obligatorio con Supabase",
+    "api": "Terminar TLS en reverse proxy (nginx/Cloudflare) antes del backend"
+  },
+
+  "bias_and_fairness": {
+    "prohibited_features": ["commune_id", "estrato", "barrio_id"],
+    "synthetic_data_policy": "Los eventos is_synthetic=true están excluidos del entrenamiento ML",
+    "audit_frequency": "En cada reentrenamiento — ver tests/bias_tests/"
+  }
+}

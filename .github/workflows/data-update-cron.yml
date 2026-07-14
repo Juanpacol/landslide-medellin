@@ -1,0 +1,85 @@
+name: Data Update Cron — Ingesta orquestada de fuentes abiertas
+
+# Orquestador de alto nivel que garantiza que todas las fuentes
+# estén frescas. Complementa los scrapers individuales.
+on:
+  schedule:
+    # Verificación de salud de fuentes cada 2 horas
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Fuente a actualizar (all | siata | dagrd | ideam | medellin)"
+        required: false
+        default: "all"
+
+jobs:
+  health-check:
+    name: Verificar salud de fuentes de datos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install httpx python-dotenv
+
+      - name: Check API health
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+        run: |
+          python - <<'EOF'
+          import httpx, os, sys
+          url = os.environ.get("DASHBOARD_URL", "http://localhost:8000")
+          try:
+              r = httpx.get(f"{url}/api/health", timeout=10)
+              if r.status_code == 200:
+                  print(f"API OK: {r.json()}")
+              else:
+                  print(f"API degradada: {r.status_code}")
+                  sys.exit(1)
+          except Exception as e:
+              print(f"API no disponible: {e}")
+              sys.exit(1)
+          EOF
+        continue-on-error: true
+
+  check-scraper-staleness:
+    name: Detectar fuentes obsoletas
+    runs-on: ubuntu-latest
+    needs: health-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check scraper staleness
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+          DB_SSL: "true"
+          PYTHONPATH: platform/backend
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          python - <<'EOF'
+          import asyncio, sys
+          sys.path.insert(0, "platform/backend")
+          from agent.rag_tools import get_scraper_health
+          result = asyncio.run(get_scraper_health())
+          print(result)
+          if "⚠️" in result:
+              print("ADVERTENCIA: Hay fuentes en estado de alerta")
+          EOF
+        continue-on-error: true

@@ -1,0 +1,94 @@
+# ============================================================
+# TEYVA — Configuración base del entorno
+# ============================================================
+# Este archivo define los parámetros generales.
+# Las variables sensibles (contraseñas, tokens) van en .env,
+# nunca en este archivo.
+
+app:
+  name: TEYVA
+  version: "1.2.0"
+  environment: development   # development | production
+  debug: true
+  log_level: INFO            # DEBUG | INFO | WARNING | ERROR
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1                 # Aumentar en producción (ver rate_limit.py — migrar a Redis)
+  reload: true               # Solo en development
+
+database:
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30
+  ssl: true                  # false para Docker local
+  # URL definida en .env como DATABASE_URL
+
+frontend:
+  host: "0.0.0.0"
+  port: 3000
+  api_base_url: "http://localhost:8000"
+
+# ── ML Pipeline ──────────────────────────────────────────────
+ml:
+  prediction_horizon_days: 7
+  thresholds:
+    bajo:    0.00
+    medio:   0.35
+    alto:    0.65
+    critico: 0.90
+  smote:
+    random_state: 42
+    k_neighbors: 5
+  cross_validation:
+    folds: 5
+    scoring: roc_auc
+
+# ── RAG / Agente ──────────────────────────────────────────────
+rag:
+  enabled: true
+  max_tool_rounds: 3
+  chunk_size: 512
+  chunk_overlap: 50
+  top_k_results: 5
+  embed_model: "paraphrase-multilingual-MiniLM-L12-v2"
+
+llm:
+  provider: anthropic        # anthropic | ollama
+  primary_model: "claude-haiku-4-5"
+  fallback_model: "llama3.2"
+  temperature: 0.3
+  max_tokens: 1024
+
+# ── Rate Limiting ─────────────────────────────────────────────
+rate_limiting:
+  chat:
+    requests_per_minute: 10
+  predict:
+    requests_per_minute: 5
+
+# ── Alertas Slack ─────────────────────────────────────────────
+alerts:
+  slack:
+    cooldown_minutes: 60      # Tiempo mínimo entre alertas del mismo tipo
+    watchdog_interval_minutes: 30
+    stale_multiplier: 3       # Alerta si fuente lleva >3x intervalo sin datos
+  rainfall_threshold_mm: 80.0 # Umbral para alerta de lluvia acumulada 7d
+
+# ── Scrapers ─────────────────────────────────────────────────
+scrapers:
+  siata:
+    interval_minutes: 30
+  dagrd:
+    interval_minutes: 60
+  ideam:
+    interval_minutes: 360
+  medellin:
+    interval_minutes: 1440
+
+# ── CORS ─────────────────────────────────────────────────────
+cors:
+  allowed_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"

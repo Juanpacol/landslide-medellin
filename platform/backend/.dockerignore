@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+_commune_polygons_cache.json
+*.log
+data/raw/
+.git/
+.DS_Store

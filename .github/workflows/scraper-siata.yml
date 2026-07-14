@@ -1,0 +1,46 @@
+name: Scraper SIATA
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-siata:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      PYTHONPATH: ./platform/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: platform/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run database migrations
+        working-directory: platform/backend
+        run: |
+          alembic upgrade head
+
+      - name: Run SIATA scraper
+        working-directory: platform/backend
+        run: python -m scraper.siata
+
+      # Valida el batch recién ingerido (rangos, timestamps, cobertura).
+      # continue-on-error: un bug del validador nunca marca el cron del
+      # scraper como fallido (regla: la validación no tumba la ingesta).
+      - name: Validate ingested data
+        working-directory: platform/backend
+        continue-on-error: true
+        run: python -m monitoring.scraper_validator

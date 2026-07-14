@@ -1,0 +1,9 @@
+[
+  "centroid_lat",
+  "centroid_lon",
+  "densidadmax",
+  "mean_precip_mm_snapshot",
+  "precip_records",
+  "precip_sum_mm_day",
+  "station_count"
+]

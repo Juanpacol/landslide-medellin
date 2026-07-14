@@ -1,0 +1,93 @@
+name: CI — Tests, Lint, Type Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  backend-tests:
+    name: Backend Tests & Lint
+    runs-on: ubuntu-latest
+    # db/session.py exige DATABASE_URL/DATABASE_URL_SYNC al importar (falla
+    # con RuntimeError si faltan) — sin esto pytest no colecciona ningún test,
+    # ni siquiera los que no tocan BD. No existe DB de staging separada
+    # (CLAUDE.md: "UNA sola fuente de verdad"), así que igual que los crons
+    # de scrapers ya en producción, esto corre contra el mismo Supabase vía
+    # el connection pooler.
+    env:
+      PYTHONPATH: ./platform/backend
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+      DB_SSL: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd platform/backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # No bloqueante: el repo tiene deuda de lint/formato preexistente
+      # (139 violaciones, 72 archivos sin formatear). Se reporta en el log
+      # para visibilidad; pasa a bloqueante tras una limpieza dedicada.
+      - name: Lint with ruff (informativo)
+        continue-on-error: true
+        run: |
+          cd platform/backend
+          ruff check .
+
+      - name: Format check with ruff (informativo)
+        continue-on-error: true
+        run: |
+          cd platform/backend
+          ruff format . --check
+
+      - name: Run pytest (unit + integration, skip if Ollama absent)
+        run: |
+          cd platform/backend
+          pytest tests/ -v --tb=short
+
+  frontend-tests:
+    name: Frontend Tests & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: |
+          cd platform/frontend
+          pnpm install
+
+      - name: Type check
+        run: |
+          cd platform/frontend
+          pnpm typecheck
+
+      - name: Lint
+        run: |
+          cd platform/frontend
+          pnpm lint
+
+      - name: Build
+        run: |
+          cd platform/frontend
+          pnpm build

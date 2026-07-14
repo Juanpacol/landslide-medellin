@@ -1,0 +1,140 @@
+{
+  "prompt_module": "agent/chat_rag",
+  "description": "Evaluation test cases for chat_rag RAG-based chatbot",
+  "test_cases": [
+    {
+      "id": "in_scope_normal_1",
+      "input": "¿Qué riesgo de deslizamiento hay en Villatina?",
+      "expected": {
+        "must_contain": ["Villatina"],
+        "must_not_contain": ["no tengo datos", "fuera de", "no tengo información", "no reconozco"],
+        "type": "success"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "in_scope_normal_2",
+      "input": "¿Cuánta lluvia ha caído esta semana en Medellín?",
+      "expected": {
+        "must_contain": ["lluvia"],
+        "must_not_contain": ["no tengo datos", "cometí un error"],
+        "type": "success"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "in_scope_events",
+      "input": "¿Hay eventos recientes en La América?",
+      "expected": {
+        "must_contain": ["La América"],
+        "must_not_contain": ["no puedo responder"],
+        "type": "success"
+      },
+      "importance": "medium"
+    },
+    {
+      "id": "variant_uppercase",
+      "input": "VILLATINA",
+      "expected": {
+        "must_contain": ["Villatina"],
+        "must_not_contain": ["no tengo datos", "no tengo información"],
+        "type": "success"
+      },
+      "importance": "medium"
+    },
+    {
+      "id": "variant_lowercase_typo",
+      "input": "villatina????",
+      "expected": {
+        "must_contain": ["Villatina"],
+        "type": "success"
+      },
+      "importance": "medium"
+    },
+    {
+      "id": "variant_accent",
+      "input": "¿Riesgo en villatina sin acento?",
+      "expected": {
+        "must_contain": ["Villatina"],
+        "type": "success"
+      },
+      "importance": "low"
+    },
+    {
+      "id": "out_of_scope_geography",
+      "input": "¿Cuál es la capital de Japón?",
+      "expected": {
+        "must_contain_any": ["no tengo datos", "fuera de", "conocimiento se limita", "no puedo ayudar", "no tengo información"],
+        "must_not_contain": ["Tokio"],
+        "type": "refusal"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "out_of_scope_recipe",
+      "input": "¿Cómo se hace un panettone?",
+      "expected": {
+        "must_contain_any": ["no tengo datos", "fuera de", "conocimiento se limita", "no puedo ayudar", "no tengo información"],
+        "must_not_contain": ["harina", "levadura"],
+        "type": "refusal"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "out_of_scope_history",
+      "input": "Cuéntame qué pasó en la Segunda Guerra Mundial",
+      "expected": {
+        "must_contain_any": ["no tengo datos", "fuera de", "conocimiento se limita", "no puedo ayudar", "no tengo información"],
+        "must_not_contain": ["1939", "Hitler"],
+        "type": "refusal"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "out_of_scope_movie",
+      "input": "Recomiéndame una película para ver hoy",
+      "expected": {
+        "must_contain_any": ["no tengo datos", "fuera de", "conocimiento se limita", "no puedo ayudar", "no tengo información"],
+        "type": "refusal"
+      },
+      "importance": "medium"
+    },
+    {
+      "id": "edge_case_complex_query",
+      "input": "¿Hay riesgo alto y lluvia acumulada en San Javier esta semana?",
+      "expected": {
+        "must_contain": ["San Javier"],
+        "must_not_contain": ["disculpa", "error"],
+        "type": "success"
+      },
+      "importance": "medium"
+    },
+    {
+      "id": "edge_case_multiple_communes",
+      "input": "¿Qué comunas tienen riesgo crítico?",
+      "expected": {
+        "must_contain_any": ["crítico", "riesgo"],
+        "must_not_contain": ["no puedo"],
+        "type": "success"
+      },
+      "importance": "high"
+    },
+    {
+      "id": "edge_case_temporal",
+      "input": "¿Cómo ha sido el riesgo en Villatina esta semana?",
+      "expected": {
+        "must_contain": ["Villatina"],
+        "must_not_contain": ["disculpa"],
+        "type": "success"
+      },
+      "importance": "medium"
+    }
+  ],
+  "metadata": {
+    "created_at": "2026-07-02",
+    "author": "Claude",
+    "last_updated": "2026-07-02",
+    "version": "1.1",
+    "notes": "v1.1: fixed OR-vs-AND semantics for refusal checks (must_contain_any), tightened Villatina false-positive detection, fixed accent mismatch on 'crítico'."
+  }
+}

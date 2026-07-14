@@ -1,0 +1,452 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'leaflet/dist/leaflet.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* ─── Teyva: Paleta tierra cálida ─── */
+  --color-brown-50: oklch(0.97 0.008 35);
+  --color-brown-100: oklch(0.93 0.016 35);
+  --color-brown-200: oklch(0.88 0.022 35);
+  --color-brown-300: oklch(0.82 0.032 38);
+  --color-brown-400: oklch(0.74 0.046 42);
+  --color-brown-500: oklch(0.62 0.078 45);
+  --color-brown-600: oklch(0.48 0.078 48);
+  --color-brown-700: oklch(0.38 0.068 48);
+  --color-brown-900: oklch(0.26 0.04 38);
+
+  --color-terracotta-50: oklch(0.96 0.01 50);
+  --color-terracotta-100: oklch(0.92 0.018 50);
+  --color-terracotta-200: oklch(0.88 0.028 48);
+  --color-terracotta-300: oklch(0.82 0.042 48);
+  --color-terracotta-400: oklch(0.76 0.08 50);
+  --color-terracotta-500: oklch(0.68 0.12 48);
+  --color-terracotta-600: oklch(0.58 0.135 48);
+  --color-terracotta-700: oklch(0.52 0.14 40);
+
+  --color-ocre-50: oklch(0.96 0.012 60);
+  --color-ocre-100: oklch(0.92 0.02 60);
+  --color-ocre-200: oklch(0.88 0.035 62);
+  --color-ocre-300: oklch(0.82 0.055 62);
+  --color-ocre-400: oklch(0.75 0.08 60);
+  --color-ocre-500: oklch(0.68 0.1 58);
+  --color-ocre-600: oklch(0.58 0.1 58);
+
+  --color-risk-critico: oklch(0.62 0.22 25);
+  --color-risk-alto: oklch(0.68 0.15 45);
+  --color-risk-medio: oklch(0.72 0.12 70);
+  --color-risk-bajo: oklch(0.65 0.13 140);
+
+  /* ─── Fuentes via Next.js font API ─── */
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.9rem;
+  /* Paleta Nexura Care: primario #3683F8 → oklch(0.625 0.191 258.9);
+     superficies familia #EBF3FE (hue 256.3); textos casi neutros (#060606). */
+  --background: oklch(0.96 0.014 256.3);
+  --foreground: oklch(0.24 0.012 264);
+  --card: oklch(0.99 0.006 256.3);
+  --card-foreground: oklch(0.26 0.014 264);
+  --popover: oklch(0.99 0.006 256.3);
+  --popover-foreground: oklch(0.26 0.014 264);
+  --primary: oklch(0.625 0.191 258.9);
+  --primary-foreground: oklch(0.98 0.006 256.3);
+  --secondary: oklch(0.93 0.014 256.3);
+  --secondary-foreground: oklch(0.28 0.02 264);
+  --muted: oklch(0.94 0.012 256.3);
+  --muted-foreground: oklch(0.52 0.018 264);
+  --accent: oklch(0.82 0.14 78);
+  --accent-foreground: oklch(0.26 0.014 264);
+  --destructive: oklch(0.55 0.19 30);
+  --destructive-foreground: oklch(0.98 0.006 256.3);
+  --border: oklch(0.89 0.012 256.3);
+  --input: oklch(0.9 0.014 256.3);
+  --ring: oklch(0.625 0.191 258.9);
+  --chart-1: oklch(0.625 0.191 258.9);
+  --chart-2: oklch(0.78 0.13 80);
+  --chart-3: oklch(0.66 0.16 50);
+  --chart-4: oklch(0.64 0.11 150);
+  --chart-5: oklch(0.55 0.19 30);
+  --sidebar: oklch(0.97 0.008 256.3);
+  --sidebar-foreground: oklch(0.26 0.014 264);
+  --sidebar-primary: oklch(0.625 0.191 258.9);
+  --sidebar-primary-foreground: oklch(0.98 0.006 256.3);
+  --sidebar-accent: oklch(0.92 0.014 256.3);
+  --sidebar-accent-foreground: oklch(0.28 0.02 264);
+  --sidebar-border: oklch(0.89 0.012 256.3);
+  --sidebar-ring: oklch(0.625 0.191 258.9);
+  /* Colores de marca y utilidad */
+  --brand: oklch(0.625 0.191 258.9);
+  --gold: oklch(0.82 0.14 78);
+  --leaf: oklch(0.64 0.11 150);
+  --sun: oklch(0.82 0.14 78);
+  /* Escala de riesgo */
+  --risk-bajo: oklch(0.64 0.11 150);
+  --risk-bajo-soft: oklch(0.95 0.04 150);
+  --risk-medio: oklch(0.78 0.13 80);
+  --risk-medio-soft: oklch(0.96 0.05 85);
+  --risk-alto: oklch(0.66 0.16 50);
+  --risk-alto-soft: oklch(0.95 0.05 55);
+  --risk-critico: oklch(0.55 0.19 30);
+  --risk-critico-soft: oklch(0.94 0.05 35);
+  /* Secundarios: insight (cyan) y agua (azul) */
+  --info: oklch(0.62 0.09 220);
+  --info-soft: oklch(0.94 0.03 220);
+  --water: oklch(0.58 0.11 240);
+  --water-soft: oklch(0.93 0.035 235);
+  /* Glassmorphism */
+  --glass-bg: oklch(0.99 0.006 256.3 / 0.72);
+  --glass-border: oklch(0.89 0.012 256.3 / 0.6);
+  /* Gradientes */
+  --gradient-hero: linear-gradient(140deg, oklch(0.32 0.08 258.9) 0%, oklch(0.38 0.11 255) 55%, oklch(0.34 0.09 265) 100%);
+  --gradient-brand: linear-gradient(140deg, oklch(0.625 0.191 258.9) 0%, oklch(0.48 0.14 258) 100%);
+  --gradient-leaf: linear-gradient(135deg, oklch(0.64 0.11 150) 0%, oklch(0.5 0.09 145) 100%);
+  --gradient-info: linear-gradient(135deg, oklch(0.62 0.09 220) 0%, oklch(0.5 0.08 235) 100%);
+  --gradient-gold: linear-gradient(135deg, oklch(0.82 0.14 78) 0%, oklch(0.72 0.13 62) 100%);
+  /* Sombras */
+  --shadow-soft: 0 1px 2px oklch(0.5 0.05 50 / 0.04), 0 10px 26px -16px oklch(0.5 0.06 45 / 0.3);
+  --shadow-elevated: 0 24px 60px -20px oklch(0.4 0.06 45 / 0.4);
+  --shadow-lift: 0 4px 10px -2px oklch(0.5 0.06 45 / 0.12), 0 18px 36px -18px oklch(0.5 0.06 45 / 0.35);
+  /* Escala de elevación consolidada (reemplaza los strings SHADOW inline) */
+  --shadow-xs: 0 1px 2px oklch(0.5 0.05 50 / 0.04);
+  --shadow-sm: var(--shadow-xs), 0 10px 26px -16px oklch(0.5 0.06 45 / 0.3);
+  --shadow-md: var(--shadow-xs), 0 14px 36px -22px oklch(0.5 0.06 45 / 0.3);
+  /* Badges semánticos (derivados de la escala de riesgo) */
+  --badge-success-bg: var(--risk-bajo-soft);
+  --badge-success-fg: oklch(0.45 0.11 150);
+  --badge-warning-bg: var(--risk-medio-soft);
+  --badge-warning-fg: oklch(0.52 0.12 70);
+  --badge-danger-bg: var(--risk-critico-soft);
+  --badge-danger-fg: oklch(0.5 0.19 30);
+  --badge-info-bg: var(--info-soft);
+  --badge-info-fg: oklch(0.48 0.09 220);
+  --badge-neutral-bg: var(--muted);
+  --badge-neutral-fg: var(--muted-foreground);
+}
+
+.dark {
+  --background: oklch(0.16 0.02 256.3);
+  --foreground: oklch(0.94 0.008 256.3);
+  --card: oklch(0.21 0.018 256.3);
+  --card-foreground: oklch(0.92 0.01 256.3);
+  --popover: oklch(0.23 0.016 256.3);
+  --popover-foreground: oklch(0.92 0.01 256.3);
+  --primary: oklch(0.68 0.17 258.9);
+  --primary-foreground: oklch(0.98 0.006 256.3);
+  --secondary: oklch(0.27 0.022 256.3);
+  --secondary-foreground: oklch(0.92 0.01 256.3);
+  --muted: oklch(0.25 0.02 256.3);
+  --muted-foreground: oklch(0.68 0.016 256.3);
+  --accent: oklch(0.82 0.14 78);
+  --accent-foreground: oklch(0.21 0.018 256.3);
+  --destructive: oklch(0.65 0.19 30);
+  --destructive-foreground: oklch(0.98 0.006 256.3);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.68 0.17 258.9);
+  --chart-1: oklch(0.68 0.17 258.9);
+  --chart-2: oklch(0.78 0.13 80);
+  --chart-3: oklch(0.66 0.16 50);
+  --chart-4: oklch(0.64 0.11 150);
+  --chart-5: oklch(0.65 0.19 30);
+  --sidebar: oklch(0.21 0.018 256.3);
+  --sidebar-foreground: oklch(0.92 0.01 256.3);
+  --sidebar-primary: oklch(0.68 0.17 258.9);
+  --sidebar-primary-foreground: oklch(0.98 0.006 256.3);
+  --sidebar-accent: oklch(0.27 0.022 256.3);
+  --sidebar-accent-foreground: oklch(0.92 0.01 256.3);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.68 0.17 258.9);
+  --brand: oklch(0.68 0.17 258.9);
+  --gold: oklch(0.82 0.14 78);
+  --leaf: oklch(0.64 0.11 150);
+  --sun: oklch(0.82 0.14 78);
+  --gradient-hero: linear-gradient(140deg, oklch(0.24 0.07 258.9) 0%, oklch(0.28 0.09 255) 55%, oklch(0.25 0.08 265) 100%);
+  --gradient-brand: linear-gradient(140deg, oklch(0.68 0.17 258.9) 0%, oklch(0.52 0.13 258) 100%);
+  --gradient-leaf: linear-gradient(135deg, oklch(0.55 0.1 150) 0%, oklch(0.42 0.08 145) 100%);
+  --info: oklch(0.68 0.09 220);
+  --info-soft: oklch(0.3 0.04 220);
+  --water: oklch(0.66 0.11 240);
+  --water-soft: oklch(0.28 0.045 235);
+  --glass-bg: oklch(0.21 0.018 256.3 / 0.72);
+  --glass-border: oklch(1 0 0 / 0.1);
+  --badge-success-bg: oklch(0.3 0.05 150);
+  --badge-success-fg: oklch(0.78 0.11 150);
+  --badge-warning-bg: oklch(0.32 0.06 75);
+  --badge-warning-fg: oklch(0.8 0.12 80);
+  --badge-danger-bg: oklch(0.3 0.07 30);
+  --badge-danger-fg: oklch(0.75 0.15 32);
+  --badge-info-bg: oklch(0.3 0.04 220);
+  --badge-info-fg: oklch(0.75 0.08 220);
+  --badge-neutral-bg: var(--muted);
+  --badge-neutral-fg: var(--muted-foreground);
+}
+
+@keyframes teyvaPing {
+  0% { transform: scale(1); opacity: 0.55; }
+  75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+@keyframes teyvaRise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes teyvaPop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes teyvaFadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes teyvaFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes teyvaSlideRight {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes teyvaShimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+@keyframes teyvaBarGrow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+.animate-teyva-ping { animation: teyvaPing 2s cubic-bezier(0,0,0.2,1) infinite; }
+.animate-teyva-rise { animation: teyvaRise 0.3s ease; }
+.animate-teyva-pop { animation: teyvaPop 0.28s cubic-bezier(0.34,1.4,0.5,1); }
+
+/* ─── Sistema de animación de entrada (Layer 1) ─── */
+.anim-fade-up {
+  animation: teyvaFadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.anim-fade-in { animation: teyvaFadeIn 0.4s ease both; }
+.anim-slide-right { animation: teyvaSlideRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Stagger para grupos de cards */
+.anim-stagger > * { animation: teyvaFadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.anim-stagger > *:nth-child(2) { animation-delay: 0.12s; }
+.anim-stagger > *:nth-child(3) { animation-delay: 0.2s; }
+.anim-stagger > *:nth-child(4) { animation-delay: 0.28s; }
+.anim-stagger > *:nth-child(5) { animation-delay: 0.36s; }
+.anim-stagger > *:nth-child(6) { animation-delay: 0.44s; }
+
+/* ─── Micro-interacciones (Layer 2) ─── */
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
+.press-scale:active { transform: scale(0.97); }
+
+/* ─── Skeleton loading ─── */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--secondary) 50%, var(--muted) 75%);
+  background-size: 800px 100%;
+  animation: teyvaShimmer 1.4s linear infinite;
+  border-radius: 10px;
+}
+
+/* ─── Card base Teyva ─── */
+.teyva-card {
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+}
+
+/* ─── Icon chip: cuadrado redondeado con fondo tintado, centra un ícono ─── */
+.teyva-icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  width: 36px;
+  border-radius: 11px;
+  flex-shrink: 0;
+}
+
+/* ─── Badges semánticos (pastilla de estado, patrón Nexura) ─── */
+.teyva-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.teyva-badge-success { background: var(--badge-success-bg); color: var(--badge-success-fg); }
+.teyva-badge-warning { background: var(--badge-warning-bg); color: var(--badge-warning-fg); }
+.teyva-badge-danger  { background: var(--badge-danger-bg);  color: var(--badge-danger-fg); }
+.teyva-badge-info    { background: var(--badge-info-bg);    color: var(--badge-info-fg); }
+.teyva-badge-neutral { background: var(--badge-neutral-bg); color: var(--badge-neutral-fg); }
+/* Punto de estado dentro del badge */
+.teyva-badge .dot {
+  height: 6px;
+  width: 6px;
+  border-radius: 99px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* ─── Días con evento en calendarios (react-day-picker) ─── */
+.teyva-day-event {
+  position: relative;
+}
+.teyva-day-event::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 5px;
+  width: 5px;
+  border-radius: 99px;
+  background: var(--risk-alto);
+}
+.teyva-day-alert::before {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: calc(50% - 6px);
+  transform: translateX(-50%);
+  height: 5px;
+  width: 5px;
+  border-radius: 99px;
+  background: var(--risk-critico);
+}
+.teyva-day-sismo {
+  position: relative;
+}
+.teyva-day-sismo .teyva-sismo-dot,
+.teyva-day-sismo::marker {
+  display: none;
+}
+.teyva-day-sismo {
+  box-shadow: inset 0 -2px 0 0 var(--info);
+  border-radius: 6px;
+}
+
+/* ─── Encabezado de página (título + subtítulo, patrón compartido de vistas) ─── */
+.teyva-page-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  margin: 0;
+  line-height: 1.1;
+}
+.teyva-page-subtitle {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: var(--muted-foreground);
+}
+
+/* ─── Scrollbar sutil para paneles internos ─── */
+.teyva-scroll::-webkit-scrollbar { width: 6px; }
+.teyva-scroll::-webkit-scrollbar-track { background: transparent; }
+.teyva-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 99px;
+}
+.teyva-scroll::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+/* ─── Accesibilidad: respetar reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade-in, .anim-slide-right,
+  .anim-stagger > *, .animate-teyva-rise, .animate-teyva-pop {
+    animation: none !important;
+  }
+  .hover-lift, .hover-lift:hover { transition: none; transform: none; }
+}
+
+.leaflet-container {
+  background: var(--color-muted);
+  font-family: var(--font-sans);
+  border-radius: var(--radius-lg);
+}
+.leaflet-tile-pane {
+  filter: saturate(0.85) contrast(0.95);
+}
+.dark .leaflet-tile-pane {
+  filter: saturate(0.6) brightness(0.7) contrast(1.1) hue-rotate(-10deg);
+}

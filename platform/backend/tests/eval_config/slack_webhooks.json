@@ -1,0 +1,83 @@
+{
+  "prompt_module": "alerts/slack",
+  "description": "Evaluation test cases for Slack webhook payload generation",
+  "test_cases": [
+    {
+      "id": "critical_risk_structure",
+      "payload_type": "critical_risk",
+      "commune_id": "1",
+      "risk_score": 0.95,
+      "risk_category": "Crítico",
+      "expected": {
+        "has_blocks": true,
+        "block_types": ["header", "section", "divider"],
+        "must_contain_text": ["Crítico", "inmediata"],
+        "must_not_contain": ["null", "undefined"],
+        "is_valid_json": true
+      },
+      "importance": "high"
+    },
+    {
+      "id": "critical_risk_with_factors",
+      "payload_type": "critical_risk",
+      "commune_id": "2",
+      "risk_score": 0.98,
+      "risk_category": "Crítico",
+      "explanation_structured": {
+        "title": "Riesgo extremo en zona ladera",
+        "factors": ["Lluvia acumulada 200mm", "15 eventos recientes"],
+        "urgency": "critico",
+        "recommended_action": "Evacuar población en riesgo"
+      },
+      "expected": {
+        "has_blocks": true,
+        "block_format": "mrkdwn",
+        "must_contain_text": ["Lluvia acumulada", "eventos"],
+        "is_valid_json": true
+      },
+      "importance": "high"
+    },
+    {
+      "id": "high_risk_alert",
+      "payload_type": "high_risk",
+      "commune_id": "3",
+      "risk_score": 0.75,
+      "risk_category": "Alto",
+      "expected": {
+        "has_blocks": true,
+        "must_contain_text": ["Alto"],
+        "is_valid_json": true
+      },
+      "importance": "high"
+    },
+    {
+      "id": "rainfall_threshold_alert",
+      "payload_type": "rainfall_threshold",
+      "commune_id": "4",
+      "precip_acum": 120.0,
+      "threshold": 100.0,
+      "expected": {
+        "has_blocks": true,
+        "must_contain_text": ["lluvia"],
+        "is_valid_json": true
+      },
+      "importance": "medium"
+    },
+    {
+      "id": "no_blocks_empty",
+      "payload_type": "test",
+      "data": {},
+      "expected": {
+        "is_valid_json": true,
+        "block_count_gte": 1
+      },
+      "importance": "low"
+    }
+  ],
+  "metadata": {
+    "created_at": "2026-07-02",
+    "author": "Claude",
+    "last_updated": "2026-07-02",
+    "version": "1.0"
+  }
+}

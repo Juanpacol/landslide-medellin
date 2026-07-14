@@ -1,0 +1,43 @@
+# CODEOWNERS — TEYVA
+# Asignación de responsables por módulo.
+# Los revisores listados son requeridos para aprobar PRs que toquen esos paths.
+# Formato: <path> <@usuario-github> [<@usuario-github>...]
+
+# ── Propietario global ────────────────────────────────────────
+* @jbotero-aztia
+
+# ── ML y modelos predictivos ──────────────────────────────────
+platform/backend/ml/                  @jbotero-aztia
+platform/backend/domain/              @jbotero-aztia
+platform/backend/application/         @jbotero-aztia
+models/                               @jbotero-aztia
+src/train.py                          @jbotero-aztia
+src/inference.py                      @jbotero-aztia
+notebooks/04_modelo_predictivo.ipynb  @jbotero-aztia
+tests/bias_tests/                     @jbotero-aztia
+
+# ── Agente conversacional y RAG ───────────────────────────────
+platform/backend/agent/               @jbotero-aztia
+platform/backend/rag/                 @jbotero-aztia
+src/agents/                           @jbotero-aztia
+
+# ── Infraestructura de datos ──────────────────────────────────
+platform/backend/scraper/             @jbotero-aztia
+platform/backend/db/                  @jbotero-aztia
+platform/backend/alembic/             @jbotero-aztia
+src/data_pipeline/                    @jbotero-aztia
+
+# ── API y seguridad ───────────────────────────────────────────
+platform/backend/api/                 @jbotero-aztia
+config/security_policy.json           @jbotero-aztia
+
+# ── CI/CD ─────────────────────────────────────────────────────
+.github/workflows/                    @jbotero-aztia
+deployments/                          @jbotero-aztia
+
+# ── Frontend ─────────────────────────────────────────────────
+platform/frontend/                    @jbotero-aztia
+
+# ── Documentación ────────────────────────────────────────────
+docs/                                 @jbotero-aztia
+README.md                             @jbotero-aztia
