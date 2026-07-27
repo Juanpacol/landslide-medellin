@@ -36,6 +36,7 @@ import httpx
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent.guardrails import PromptInjectionDetected, scan_output, validate_input
 from agent.memory import get_history, save_turn
 from agent.prompts import SYSTEM_PROMPT
 from agent.rag_tools import TOOL_SCHEMAS, call_tool, get_sources, reset_sources, set_report_session
@@ -441,6 +442,17 @@ async def chat_rag(message: str, session_id: str, db: AsyncSession) -> str:
     history = await get_history(session_id, db, limit=6)
     await save_turn(session_id, "user", message, db)
 
+    # Se atrapa AQUÍ, no se deja burbujear al manejador global 422: el chat
+    # debe mantener su contrato estable (200 con ChatResponse), un 422
+    # rompería la UX. Se guarda el turno del asistente con el rechazo, así
+    # queda trazado en el historial que hubo un intento.
+    try:
+        message = validate_input(message)
+    except PromptInjectionDetected as exc:
+        reply = str(exc)
+        await save_turn(session_id, "assistant", reply, db)
+        return reply
+
     reset_sources()  # colector de fuentes para este request
     set_report_session(session_id)  # para la tool report_incident
 
@@ -467,6 +479,7 @@ async def chat_rag(message: str, session_id: str, db: AsyncSession) -> str:
 
     reply = _append_sources_footer(reply)
     reply = _append_emergency_line_if_needed(reply)
+    reply = scan_output(reply)
     await save_turn(session_id, "assistant", reply, db)
     return reply
 
@@ -570,6 +583,17 @@ async def chat_rag_stream(message: str, session_id: str, db: AsyncSession) -> As
     history = await get_history(session_id, db, limit=6)
     await save_turn(session_id, "user", message, db)
 
+    # Igual que en chat_rag(): se atrapa aquí, no burbujea al 422 global —
+    # un 422 a mitad de un stream SSE es inválido. Se emite el rechazo como
+    # un chunk normal y se corta el stream ahí.
+    try:
+        message = validate_input(message)
+    except PromptInjectionDetected as exc:
+        reply = str(exc)
+        yield reply
+        await save_turn(session_id, "assistant", reply, db)
+        return
+
     reset_sources()  # colector de fuentes para este request
     set_report_session(session_id)  # para la tool report_incident
 
@@ -597,10 +621,13 @@ async def chat_rag_stream(message: str, session_id: str, db: AsyncSession) -> As
             yield piece
         return
 
+    # scan_output solo puede aplicarse al remanente NO emitido todavía: el
+    # cuerpo ya transmitido por SSE no se puede redactar retroactivamente
+    # (limitación arquitectónica real, no un bug — documentado en el plan).
     before = full_reply
     full_reply = _append_sources_footer(full_reply)
     full_reply = _append_emergency_line_if_needed(full_reply)
-    extra = full_reply[len(before):]
+    extra = scan_output(full_reply[len(before):])
     if extra:
         yield extra
     await save_turn(session_id, "assistant", full_reply, db)
