@@ -155,4 +155,7 @@ async def run() -> None:
 if __name__ == "__main__":
     import asyncio
 
+    from observability.logging_config import configure_logging
+
+    configure_logging("monitoring-scraper-validator")
     asyncio.run(run())

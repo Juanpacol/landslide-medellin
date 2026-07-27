@@ -25,10 +25,6 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 RAG_DIR = Path(__file__).parent
@@ -37,6 +33,14 @@ CHROMA_DIR = DATA_DIR / "chroma_db"
 COLLECTION_NAME = "teyva_knowledge"
 
 EMBED_MODEL = os.getenv("RAG_EMBED_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
+
+from infrastructure.cache import _MISSING, TTLCache  # noqa: E402
+
+# TTL 5 min, sin invalidación activa: el corpus solo cambia con --ingest
+# manual (evento raro, operativo). Resultados pueden quedar hasta 5 min
+# desactualizados tras un re-ingest en caliente con la API corriendo —
+# limitación aceptada, documentada para quien opere el sistema.
+_search_cache = TTLCache(ttl_seconds=300)
 
 # Las 4 fuentes y la ruta de su JSON de chunks.
 SOURCES = {
@@ -229,6 +233,11 @@ def search(
     Returns:
         Lista de {text, metadata, distance} ordenada por relevancia.
     """
+    cache_key = (query, source, n, zone)
+    cached = _search_cache.get(cache_key)
+    if cached is not _MISSING:
+        return cached
+
     collection = get_collection(create=False)
 
     conds = []
@@ -255,6 +264,7 @@ def search(
     dists = (res.get("distances") or [[]])[0]
     for doc, meta, dist in zip(docs, metas, dists):
         out.append({"text": doc, "metadata": meta or {}, "distance": dist})
+    _search_cache.set(cache_key, out)
     return out
 
 
@@ -362,4 +372,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from observability.logging_config import configure_logging
+
+    configure_logging("rag-chroma-store")
     main()

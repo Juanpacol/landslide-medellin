@@ -514,4 +514,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from observability.logging_config import configure_logging
+
+    configure_logging("ml-train")
     main()

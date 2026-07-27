@@ -32,10 +32,6 @@ import pdfplumber
 import requests
 from bs4 import BeautifulSoup
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 # --- Paths ---
@@ -507,6 +503,9 @@ def run(zones: Optional[list[str]] = None, test: bool = False) -> None:
 if __name__ == "__main__":
     import argparse
 
+    from observability.logging_config import configure_logging
+
+    configure_logging("rag-siata-geotecnia-chunker")
     parser = argparse.ArgumentParser(description="SIATA Geotecnia PDF Chunker")
     parser.add_argument("--zones", nargs="+", help="Zonas específicas (ej: Villatina Pajarito)")
     parser.add_argument("--test", action="store_true", help="Solo procesa Olaya Herrera (más pequeño)")

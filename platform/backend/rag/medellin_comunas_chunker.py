@@ -28,10 +28,6 @@ from typing import Optional
 
 import requests
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 RAG_DIR = Path(__file__).parent
@@ -348,4 +344,7 @@ def run() -> None:
 
 
 if __name__ == "__main__":
+    from observability.logging_config import configure_logging
+
+    configure_logging("rag-medellin-comunas-chunker")
     run()

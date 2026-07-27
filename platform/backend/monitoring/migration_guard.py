@@ -219,7 +219,9 @@ def main() -> int:
                         help="imprime el diagnóstico completo en JSON")
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    from observability.logging_config import configure_logging
+
+    configure_logging("migration-guard")
     return asyncio.run(run(
         offline=args.offline, preflight=args.preflight,
         github_output=args.github_output, as_json=args.as_json,

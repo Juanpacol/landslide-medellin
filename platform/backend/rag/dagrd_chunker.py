@@ -27,10 +27,6 @@ from typing import Optional
 import requests
 from bs4 import BeautifulSoup
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 RAG_DIR = Path(__file__).parent
@@ -306,6 +302,10 @@ def run(max_pages: Optional[int] = None) -> None:
 
 if __name__ == "__main__":
     import argparse
+
+    from observability.logging_config import configure_logging
+
+    configure_logging("rag-dagrd-chunker")
     parser = argparse.ArgumentParser(description="DAGRD Eventos Chunker")
     parser.add_argument("--max-pages", type=int, help="Límite de páginas por término (para testing)")
     args = parser.parse_args()

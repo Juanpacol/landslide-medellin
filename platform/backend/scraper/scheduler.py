@@ -77,7 +77,9 @@ def build_scheduler() -> AsyncIOScheduler:
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    from observability.logging_config import configure_logging
+
+    configure_logging("scraper-scheduler")
     scheduler = build_scheduler()
     scheduler.start()
     logger.info("TEYVA scraper scheduler started (Ctrl+C to stop).")

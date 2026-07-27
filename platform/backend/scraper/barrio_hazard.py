@@ -149,7 +149,9 @@ async def run_barrio_hazard() -> int:
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    from observability.logging_config import configure_logging
+
+    configure_logging("scraper-barrio-hazard")
     n = await run_barrio_hazard()
     print("barrios_procesados", n)
 

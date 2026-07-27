@@ -98,4 +98,7 @@ async def _run_standalone() -> None:
 
 
 if __name__ == "__main__":
+    from observability.logging_config import configure_logging
+
+    configure_logging("ml-predict")
     asyncio.run(_run_standalone())

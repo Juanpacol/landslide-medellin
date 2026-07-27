@@ -32,10 +32,6 @@ import pdfplumber
 import requests
 from bs4 import BeautifulSoup
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 # --- Paths ---
@@ -476,6 +472,9 @@ def run(weeks: int = 4, max_downloads: Optional[int] = None) -> None:
 if __name__ == "__main__":
     import argparse
 
+    from observability.logging_config import configure_logging
+
+    configure_logging("rag-siata-pdf-chunker")
     parser = argparse.ArgumentParser(description="SIATA HIDROMET PDF Chunker")
     parser.add_argument("--weeks", type=int, default=4, help="Semanas atrás (default: 4)")
     parser.add_argument("--max-downloads", type=int, help="Límite de PDFs (para testing)")

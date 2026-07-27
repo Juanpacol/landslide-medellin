@@ -209,8 +209,9 @@ async def main() -> None:
         cd platform/backend && PYTHONPATH=. python -m alerts.evacuation
     """
     from db.session import AsyncSessionLocal
+    from observability.logging_config import configure_logging
 
-    logging.basicConfig(level=logging.INFO)
+    configure_logging("alerts-evacuation")
     async with AsyncSessionLocal() as session:
         n = await refresh_safe_zones(session)
     print("zonas_seguras_cargadas", n)

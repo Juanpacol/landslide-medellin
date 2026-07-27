@@ -191,7 +191,9 @@ async def run_mesh_grid() -> int:
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    from observability.logging_config import configure_logging
+
+    configure_logging("scraper-mesh-grid")
     n = await run_mesh_grid()
     print("cuadriculas_procesadas", n)
 
