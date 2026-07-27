@@ -5,12 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.auth import assert_production_auth
 from api.routes import alerts, chat, rain, risk, scraper
+from errors.error_handler import install_exception_handlers
+from observability.logging_config import configure_logging
+
+configure_logging("teyva-api")
 
 # Falla el ARRANQUE (no solo warnings) si ENV=production sin API_TOKEN:
 # un despliegue mal configurado no puede quedar con endpoints mutantes abiertos.
 assert_production_auth()
 
 app = FastAPI(title="TEYVA API", version="0.1.0")
+install_exception_handlers(app)
 
 # CORS restringido por entorno. Definir ALLOWED_ORIGINS como lista separada por
 # comas (ej. "https://teyva.co,https://www.teyva.co"). Sin la variable, default
