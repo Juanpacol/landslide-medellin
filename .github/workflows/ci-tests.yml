@@ -39,17 +39,15 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # No bloqueante: el repo tiene deuda de lint/formato preexistente
-      # (139 violaciones, 72 archivos sin formatear). Se reporta en el log
-      # para visibilidad; pasa a bloqueante tras una limpieza dedicada.
-      - name: Lint with ruff (informativo)
-        continue-on-error: true
+      # Bloqueante desde la limpieza de la deuda histórica (130 violaciones →
+      # 0). Se mantiene así para que no se vuelva a acumular: el frontend ya
+      # era bloqueante y estaba en verde, el backend era la asimetría.
+      - name: Lint with ruff
         run: |
           cd platform/backend
           ruff check .
 
-      - name: Format check with ruff (informativo)
-        continue-on-error: true
+      - name: Format check with ruff
         run: |
           cd platform/backend
           ruff format . --check

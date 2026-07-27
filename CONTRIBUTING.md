@@ -48,7 +48,9 @@ ruff check .
 ruff format .
 ```
 
-Configuración en `ruff.toml`: Python 3.11, line-length 100, reglas `E`/`F`/`B` activas (`E501` ignorado — lo cubre `ruff format`). Hoy el lint corre **informativo** en CI por deuda preexistente; se espera que vuelva a bloquear tras una limpieza dedicada — no la agraves con código nuevo.
+Configuración en `ruff.toml`: Python 3.11, line-length 100, reglas `E`/`F`/`B` activas (`E501` ignorado — lo cubre `ruff format`; `alembic/versions` excluido porque las migraciones aplicadas no se tocan). `Depends()`/`Query()` en argumentos por defecto están permitidos vía `extend-immutable-calls` — es la API de FastAPI, no un descuido.
+
+**El lint es bloqueante en CI.** Corre `ruff check .` y `ruff format .` antes de pushear.
 
 - Type hints obligatorios.
 - `async` para toda operación de I/O.
@@ -69,7 +71,7 @@ Configuración en `ruff.toml`: Python 3.11, line-length 100, reglas `E`/`F`/`B` 
 - Descripción que explique **qué cambia y por qué** — no un PR vacío con solo el diff.
 - Alcance: una cosa por PR. Si tu cambio toca 5 áreas no relacionadas, probablemente son 5 PRs.
 - Gates reales de CI que vas a encontrar:
-  - `ci-tests.yml`: pytest del backend es **bloqueante**; lint/format del backend es informativo (ver arriba); el job `migration-guard` es bloqueante y barato (~20s, sin BD) — impide que un PR introduzca 2+ heads de Alembic.
+  - `ci-tests.yml`: pytest, lint y format del backend son **todos bloqueantes**; el job `migration-guard` también, y es barato (~20s, sin BD) — impide que un PR introduzca 2+ heads de Alembic.
   - `ci-security.yml`: escaneo de secretos y dependencias.
   - Los workflows de despliegue/scrapers no corren en PRs; solo en `main`.
 
