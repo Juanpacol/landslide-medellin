@@ -1,4 +1,3 @@
-import os
 import sys
 from logging.config import fileConfig
 from pathlib import Path
@@ -24,10 +23,11 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    url = os.environ.get("DATABASE_URL_SYNC")
-    if not url:
-        raise RuntimeError("DATABASE_URL_SYNC no está definida")
-    return url
+    # DATABASE_URL_MIGRATE (credencial con DDL, solo en GitHub Actions) o
+    # DATABASE_URL_SYNC si el destino es local. Ver infrastructure/migrations/ddl_url.py.
+    from infrastructure.migrations.ddl_url import resolve_migration_url
+
+    return resolve_migration_url()
 
 
 def run_migrations_offline() -> None:

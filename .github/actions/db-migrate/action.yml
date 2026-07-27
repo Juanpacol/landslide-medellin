@@ -4,6 +4,16 @@ description: >
   `alembic upgrade head` solo si es seguro. Si la BD está adelante del repo el
   upgrade fallaría y detendría la ingesta; se omite y el cron sigue.
 
+inputs:
+  migrate-url:
+    description: >
+      Credencial con permisos DDL (secrets.DATABASE_URL_MIGRATE). Vacío = se
+      omite el upgrade y la ingesta continúa. Entra por `inputs` y no por el
+      `env:` del job a propósito: así `python -m scraper.siata` nunca ve la
+      credencial DDL en su entorno.
+    required: false
+    default: ""
+
 runs:
   using: composite
   steps:
@@ -19,16 +29,29 @@ runs:
       run: python -m monitoring.migration_guard --preflight --github-output
 
     - name: alembic upgrade head
-      if: steps.guard.outputs.safe_to_upgrade == 'true'
+      if: steps.guard.outputs.safe_to_upgrade == 'true' && inputs.migrate-url != ''
       shell: bash
       working-directory: platform/backend
+      env:
+        PYTHONPATH: ${{ github.workspace }}/platform/backend
+        DATABASE_URL_MIGRATE: ${{ inputs.migrate-url }}
       run: alembic upgrade head
 
     # Solo se llega aquí con la BD adelante del repo o con heads múltiples.
     # La BD ya tiene un superconjunto del esquema, así que la ingesta puede
     # continuar; el guard ya mandó la alerta crítica a Slack.
-    - name: Aviso — upgrade omitido
+    - name: Aviso — upgrade omitido por drift
       if: steps.guard.outputs.safe_to_upgrade != 'true'
       shell: bash
       run: |
         echo "::warning::alembic upgrade omitido (${{ steps.guard.outputs.kind }}) — alerta enviada a Slack. Ver docs/RUNBOOK_MIGRATIONS.md"
+
+    # Se prefiere seguir ingiriendo antes que fallar el cron (regla del repo:
+    # nada de migración/monitoreo tumba la ingesta). El costo es que un secret
+    # mal configurado deja de migrar hasta que el migration_guard reporte
+    # "pending" a Slack.
+    - name: Aviso — sin credencial DDL
+      if: inputs.migrate-url == ''
+      shell: bash
+      run: |
+        echo "::warning::DATABASE_URL_MIGRATE ausente — upgrade omitido. La ingesta sigue; el migration_guard alertará si quedan migraciones pendientes."

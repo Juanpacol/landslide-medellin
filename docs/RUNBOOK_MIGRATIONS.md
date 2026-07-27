@@ -118,8 +118,83 @@ desarrollo a mano. No hay entorno de staging donde equivocarse sin consecuencias
 | Aviso de cron rojo | `.github/actions/notify-failure/` | Slack cuando cualquier workflow falla |
 | Arranque del contenedor | `platform/backend/docker-entrypoint.sh` | Arranca igual en vez de crash loop |
 
+---
+
+## Separación de privilegios DDL
+
+Tres credenciales, dos roles. Esta es la prevención real del incidente del
+2026-07-26: aplicar una migración desde un portátil ahora es imposible por
+construcción, no por disciplina.
+
+| Variable | Rol | ¿DDL? | Dónde vive |
+|---|---|---|---|
+| `DATABASE_URL` / `DATABASE_URL_SYNC` | `teyva_app` | ❌ | `.env` local, secrets del repo, todos los workflows |
+| `DATABASE_URL_MIGRATE` | `postgres` | ✅ | **solo** secret de GitHub Actions |
+
+La política vive en `platform/backend/infrastructure/migrations/ddl_url.py`, que
+consumen `alembic/env.py`, `docker-entrypoint.sh` y los tests. Regla: se usa
+`DATABASE_URL_MIGRATE` si existe; si no, se cae a `DATABASE_URL_SYNC` **solo
+cuando el destino es local** (`localhost`, `db`, `127.0.0.1`), para que
+`docker compose up` offline siga migrando solo.
+
+### Cómo aplicar una migración ahora
+
+`alembic upgrade head` contra Supabase falla a propósito. El loop nuevo — que
+además es mejor, porque prueba la migración contra una BD desechable en vez de
+contra la única BD de producción:
+
+```bash
+# 1. Esquema local desechable
+docker compose up -d db
+cd platform/backend && export PYTHONPATH=.
+export DATABASE_URL_SYNC=postgresql://teyva:teyva@localhost:5432/teyva
+export DATABASE_URL=postgresql+asyncpg://teyva:teyva@localhost:5432/teyva
+export DB_SSL=false
+
+# 2. Generar y probar en ambos sentidos
+alembic upgrade head
+alembic revision --autogenerate -m "descripción"
+alembic upgrade head
+alembic downgrade -1 && alembic upgrade head
+
+# 3. Única vía a producción
+git push origin main
+gh workflow run scraper-siata.yml   # "aplicar ahora" en vez de esperar 30 min
+```
+
+Gotcha: `load_dotenv(override=False)` hace que el entorno real gane sobre
+`.env`. Si exportaste las variables locales, siguen ganando en esa terminal —
+`unset DATABASE_URL DATABASE_URL_SYNC` al volver a Supabase.
+
+### Break-glass
+
+Solo desde `main` ya pusheado, y avisando en Slack. La fricción de ir al gestor
+de contraseñas *es* el control:
+
+```bash
+DATABASE_URL_MIGRATE='postgresql://postgres.<REF>:<PWD>@aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require' \
+  alembic upgrade head
+```
+
+### Diagnóstico
+
+| Síntoma | Causa | Arreglo |
+|---|---|---|
+| `DDLNotAllowed` en local | Esperado: el rol de la app no tiene DDL | Usar el loop de arriba |
+| `permission denied for schema public` en un cron | El secret `DATABASE_URL_MIGRATE` está mal o expiró | Revisar el secret |
+| El guard dice `pending` y nunca avanza | `::warning::DATABASE_URL_MIGRATE ausente` en el log del cron | Configurar el secret |
+
+---
+
 ### Lo que esto NO previene
 
-Nada en el repo impide aplicar una migración desde un portátil a la BD
-compartida. La prevención real sería un rol de Supabase separado para DDL,
-revocándoselo al rol de desarrollo. Queda como mejora pendiente.
+- **El SQL Editor de Supabase.** Cualquiera con acceso al dashboard puede hacer
+  DDL a mano sin pasar por Alembic — un vector *peor* que `alembic upgrade
+  head`, porque ni siquiera queda registrado en `alembic_version`. Solo lo
+  cubre el `migration_guard` detectándolo a posteriori.
+- **Alguien con push a `main`** puede escribir un workflow que use
+  `DATABASE_URL_MIGRATE` para lo que quiera. Es un pretil contra accidentes,
+  no una defensa contra un insider.
+- **Migraciones mal escritas.** Esto evita el DDL *desde el lugar equivocado*,
+  no el DDL *equivocado*. Eso lo cubre probar upgrade + downgrade contra la BD
+  local desechable, que es el beneficio secundario más valioso del cambio.

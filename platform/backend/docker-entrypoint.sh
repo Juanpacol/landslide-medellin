@@ -24,19 +24,28 @@ PY
 # revision" y el contenedor entra en crash loop — que no arregla el drift y sí
 # tumba el dashboard. En ese caso se arranca igual: la BD ya tiene el esquema.
 # El `if` es lo que evita que `set -e` aborte cuando el guard sale != 0.
-echo "→ Verificando estado de migraciones..."
-if python -m monitoring.migration_guard --preflight --json > /tmp/migration_guard.json 2>&1; then
-    if grep -q '"safe_to_upgrade": true' /tmp/migration_guard.json; then
-        echo "→ Aplicando migraciones (alembic upgrade head)..."
-        alembic upgrade head
+# Separación de privilegios DDL: contra Supabase el rol de la app no puede
+# migrar, así que ni se intenta (si no, cada arranque fallaría). Contra la
+# Postgres local del compose sí, y todo sigue igual que antes.
+if python -c "import sys; from infrastructure.migrations.ddl_url import can_run_ddl; sys.exit(0 if can_run_ddl() else 1)" 2>/dev/null; then
+    echo "→ Verificando estado de migraciones..."
+    if python -m monitoring.migration_guard --preflight --json > /tmp/migration_guard.json 2>&1; then
+        if grep -q '"safe_to_upgrade": true' /tmp/migration_guard.json; then
+            echo "→ Aplicando migraciones (alembic upgrade head)..."
+            alembic upgrade head
+        else
+            echo "⚠ BD adelante del repo — se omite 'alembic upgrade head'"
+            cat /tmp/migration_guard.json
+        fi
     else
-        echo "⚠ BD adelante del repo — se omite 'alembic upgrade head'"
-        cat /tmp/migration_guard.json
+        echo "⚠ El guard no pudo evaluar el estado; se intenta el upgrade como antes"
+        cat /tmp/migration_guard.json || true
+        alembic upgrade head
     fi
 else
-    echo "⚠ El guard no pudo evaluar el estado; se intenta el upgrade como antes"
-    cat /tmp/migration_guard.json || true
-    alembic upgrade head
+    echo "→ Sin credencial DDL y la BD es remota: se omiten las migraciones."
+    echo "  Es lo ESPERADO — el rol de la app no tiene DDL y las aplica GitHub"
+    echo "  Actions al pushear a main. Ver docs/RUNBOOK_MIGRATIONS.md"
 fi
 
 # $PORT: Render/Railway/Heroku lo inyectan dinámicamente. docker-compose no lo

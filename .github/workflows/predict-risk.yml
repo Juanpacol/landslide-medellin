@@ -15,6 +15,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      DB_SSL: "true"
       PYTHONPATH: ./platform/backend
     steps:
       - name: Checkout
@@ -36,6 +37,8 @@ jobs:
       # tumbar la ingesta, y alerta a Slack. Ver docs/RUNBOOK_MIGRATIONS.md.
       - name: Run database migrations
         uses: ./.github/actions/db-migrate
+        with:
+          migrate-url: ${{ secrets.DATABASE_URL_MIGRATE }}
 
       - name: Run risk prediction
         working-directory: platform/backend

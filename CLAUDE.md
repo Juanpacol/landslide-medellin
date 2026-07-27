@@ -47,6 +47,7 @@ teyva/
 - El `db` de docker-compose es solo **fallback offline** (si el `.env` raíz no define `DATABASE_URL`).
 - Esquema: gestionado por Alembic. **Nunca editar migraciones ya aplicadas** — eso causó drift real entre Supabase y local. Cambio de esquema = migración nueva.
 - **Aplicar migraciones SOLO desde `main` ya pusheado.** Aplicar a Supabase y commitear después deja `alembic_version` apuntando a una revisión que el repo no conoce, y los 6 crons fallan con `Can't locate revision` (pasó el 2026-07-26). Guard: `python -m monitoring.migration_guard --json`; runbook en `docs/RUNBOOK_MIGRATIONS.md`. Los crons ya no mueren por esto — `.github/actions/db-migrate` omite el upgrade y sigue ingiriendo — pero el drift bloquea toda migración nueva hasta resolverlo.
+- **Separación de privilegios DDL.** El rol de la app (`teyva_app`, el de `DATABASE_URL`/`DATABASE_URL_SYNC`) **no puede hacer DDL**: `alembic upgrade head` desde el portátil contra Supabase falla por diseño. Las migraciones las aplica GitHub Actions con `DATABASE_URL_MIGRATE`, que vive solo como secret. Para crear/probar una migración se usa la Postgres local del compose. Política en `infrastructure/migrations/ddl_url.py`; SQL de setup en `docs/sql/ddl_privilege_split.sql`.
 
 ## Cómo correr
 

@@ -59,6 +59,27 @@ Configuración en `ruff.toml`: Python 3.11, line-length 100, reglas `E`/`F`/`B` 
 
 **No hacer:** ignorar el linter porque "ya está en rojo". Cada archivo que toques debería quedar más limpio, no igual.
 
+## Migraciones
+
+`alembic upgrade head` contra Supabase **falla a propósito**: el rol de la aplicación no tiene permisos DDL (ver [`docs/RUNBOOK_MIGRATIONS.md`](docs/RUNBOOK_MIGRATIONS.md)). El loop correcto usa una BD local desechable, lo cual además es mejor que probar contra la única BD de producción:
+
+```bash
+docker compose up -d db
+cd platform/backend && export PYTHONPATH=.
+export DATABASE_URL_SYNC=postgresql://teyva:teyva@localhost:5432/teyva
+export DATABASE_URL=postgresql+asyncpg://teyva:teyva@localhost:5432/teyva
+export DB_SSL=false
+
+alembic upgrade head
+alembic revision --autogenerate -m "descripción"
+alembic downgrade -1 && alembic upgrade head   # probar ambos sentidos
+
+git push origin main                 # única vía a producción
+gh workflow run scraper-siata.yml    # "aplicar ahora" en vez de esperar el cron
+```
+
+**Nunca editar una migración ya aplicada** — eso causó drift real entre Supabase y local. Cambio de esquema = migración nueva.
+
 ## Docs
 
 - Actualizar `CLAUDE.md` si tu cambio altera la arquitectura, las capas, o una regla operativa (ej. cómo se aplican migraciones).
