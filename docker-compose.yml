@@ -70,7 +70,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
       DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
       DB_SSL: ${DB_SSL:-false}
-      ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       API_TOKEN: ${API_TOKEN:-}
       ENABLE_RAG: ${ENABLE_RAG:-true}
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
@@ -116,6 +116,11 @@ services:
       OLLAMA_URL: http://ollama:11434
     entrypoint: ["python", "-m", "scraper.scheduler"]
     restart: unless-stopped
+    # Comparte imagen con backend, que trae un HEALTHCHECK contra /health.
+    # Este servicio es un daemon de APScheduler, no levanta HTTP: sin esto
+    # quedaría "unhealthy" para siempre y `docker compose ps` mentiría.
+    healthcheck:
+      disable: true
     logging:
       options:
         max-size: "10m"
@@ -146,6 +151,9 @@ services:
       done
       "
     restart: unless-stopped
+    # Igual que scraper: loop de predicción, no servidor HTTP.
+    healthcheck:
+      disable: true
     logging:
       options:
         max-size: "10m"

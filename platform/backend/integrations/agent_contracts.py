@@ -29,7 +29,11 @@ except ImportError:
 
 
 def _rag_enabled() -> bool:
-    return os.getenv("ENABLE_RAG", "false").strip().lower() in ("1", "true", "yes", "on")
+    # Default "true" para alinearlo con .env.example y docker-compose.yml, que
+    # ya lo ponían en true. Con el default anterior ("false"), un despliegue
+    # que olvidara la variable arrancaba con el chat SIN RAG y sin ningún
+    # error visible — degradación silenciosa.
+    return os.getenv("ENABLE_RAG", "true").strip().lower() in ("1", "true", "yes", "on")
 
 
 try:

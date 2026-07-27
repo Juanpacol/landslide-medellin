@@ -39,5 +39,19 @@ else
     alembic upgrade head
 fi
 
-echo "→ Iniciando API en :8000"
-exec uvicorn api.main:app --host 0.0.0.0 --port 8000
+# $PORT: Render/Railway/Heroku lo inyectan dinámicamente. docker-compose no lo
+# define, así que cae a 8000 y nada cambia en local.
+PORT="${PORT:-8000}"
+
+# --proxy-headers: detrás del proxy de un PaaS, sin esto uvicorn reconstruye
+# las URLs como http:// y rompe los redirects.
+#
+# Sin --workers a propósito: cada worker carga su propia copia de torch + el
+# modelo de embeddings (~1.2 GB RSS c/u). Dos workers = OOM en cualquier
+# instancia de menos de 3 GB.
+echo "→ Iniciando API en :${PORT}"
+exec uvicorn api.main:app \
+    --host 0.0.0.0 \
+    --port "${PORT}" \
+    --proxy-headers \
+    --forwarded-allow-ips="*"
