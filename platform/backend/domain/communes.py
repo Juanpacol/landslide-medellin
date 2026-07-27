@@ -133,3 +133,30 @@ def resolve_commune_id(nombre_o_id: str) -> str | None:
     if re.fullmatch(r"\d+", raw):
         return canonical_id(raw)
     return _ALIAS_TO_ID.get(_normalize_token(raw))
+
+
+def find_communes_in_text(text: str) -> list[str]:
+    """commune_id únicos mencionados en el texto (orden aproximado de aparición).
+
+    Vive aquí y no en agent/tools.py porque necesita `_ALIAS_TO_ID`, que es
+    parte de la fuente única del territorio. Estuvo rota justo por eso: el
+    refactor "PR1 — domain layer" movió el mapa de alias a este módulo y dejó
+    la función en agent/tools.py referenciando un nombre que ya no existía
+    allí, así que lanzaba NameError en cada llamada.
+    """
+    tnorm = _normalize_token(text)
+    hits: list[tuple[int, str]] = []
+    for alias, cid in sorted(_ALIAS_TO_ID.items(), key=lambda kv: len(kv[0]), reverse=True):
+        if len(alias) < 1:
+            continue
+        pattern = r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])"
+        m = re.search(pattern, tnorm)
+        if m:
+            hits.append((m.start(), cid))
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for _, cid in sorted(hits, key=lambda x: x[0]):
+        if cid not in seen:
+            seen.add(cid)
+            ordered.append(cid)
+    return ordered

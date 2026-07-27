@@ -22,6 +22,7 @@ def _normalize_token(s: str) -> str:
 # de módulos (chat, rag_tools, alerts) los importan de aquí.
 from domain.communes import COMMUNES as _COMMUNES
 from domain.communes import display_name as commune_display_name  # noqa: F401
+from domain.communes import find_communes_in_text  # noqa: F401
 from domain.communes import resolve_commune_id  # noqa: F401
 
 COMMUNE_LABELS: dict[str, str] = {c.id: c.nombre for c in _COMMUNES}
@@ -190,21 +191,3 @@ async def get_alert_status(db: AsyncSession) -> list[dict[str, Any]]:
     return alerts
 
 
-def find_communes_in_text(text: str) -> list[str]:
-    """Devuelve commune_id únicos mencionados en el texto (orden aproximado de aparición)."""
-    tnorm = _normalize_token(text)
-    hits: list[tuple[int, str]] = []
-    for alias, cid in sorted(_ALIAS_TO_ID.items(), key=lambda kv: len(kv[0]), reverse=True):
-        if len(alias) < 1:
-            continue
-        pattern = r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])"
-        m = re.search(pattern, tnorm)
-        if m:
-            hits.append((m.start(), cid))
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for _, cid in sorted(hits, key=lambda x: x[0]):
-        if cid not in seen:
-            seen.add(cid)
-            ordered.append(cid)
-    return ordered

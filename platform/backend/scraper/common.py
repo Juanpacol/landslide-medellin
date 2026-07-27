@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
 from sqlalchemy import func, select
@@ -20,6 +20,8 @@ DEFAULT_HEADERS = {
     "Accept": "text/html,application/json;q=0.9,*/*;q=0.8",
     "Accept-Language": "es-CO,es;q=0.9,en;q=0.8",
 }
+
+T = TypeVar("T")
 
 
 def utcnow() -> datetime:
