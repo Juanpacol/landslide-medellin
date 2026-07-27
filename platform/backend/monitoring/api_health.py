@@ -94,9 +94,12 @@ async def check_slack() -> tuple[bool, str]:
 
     try:
         async with httpx_client(timeout=5.0) as client:
-            # Do a HEAD request to check if webhook is reachable
+            # HEAD para no publicar un mensaje real en el canal en cada chequeo.
             r = await client.head(webhook_url)
-            ok = r.status_code in (200, 405)  # 405 is OK for HEAD on POST endpoint
+            # Slack responde 400 a un HEAD (espera POST con payload JSON), y eso
+            # significa que el webhook EXISTE y responde — verificado a mano.
+            # Un webhook revocado da 404/410, que es la caída de verdad.
+            ok = r.status_code not in (404, 410)
             return ok, f"Slack: {r.status_code}"
     except Exception as e:
         return False, f"Slack: {str(e)}"
