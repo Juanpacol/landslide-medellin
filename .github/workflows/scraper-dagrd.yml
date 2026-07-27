@@ -8,6 +8,9 @@ on:
 jobs:
   run-dagrd:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
@@ -28,10 +31,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # Guard de drift + `alembic upgrade head`. Si la BD quedó adelante del
+      # repo (migración aplicada sin commitear), omite el upgrade en vez de
+      # tumbar la ingesta, y alerta a Slack. Ver docs/RUNBOOK_MIGRATIONS.md.
       - name: Run database migrations
-        working-directory: platform/backend
-        run: |
-          alembic upgrade head
+        uses: ./.github/actions/db-migrate
 
       - name: Run DAGRD scraper
         working-directory: platform/backend
@@ -44,3 +48,12 @@ jobs:
         working-directory: platform/backend
         continue-on-error: true
         run: python -m monitoring.scraper_validator
+
+      # Un cron rojo no avisa a nadie por sí solo. Esto sí. Solo bash+curl:
+      # funciona aunque el paso que falló haya sido `pip install`.
+      # cancelled() incluido: un timeout de job no cuenta como failure().
+      - name: Notificar fallo a Slack
+        if: failure() || cancelled()
+        uses: ./.github/actions/notify-failure
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}

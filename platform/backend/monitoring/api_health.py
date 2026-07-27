@@ -25,8 +25,10 @@ import httpx
 from db.session import AsyncSessionLocal
 from infrastructure.external.arcgis_client import COMUNA_QUERY_URL
 from infrastructure.external.osrm_client import OSRM_BASE_URL
-from monitoring.notify import fire_agent_alert
+from monitoring.notify import fire_agent_alert, log_agent_run
 from scraper.common import httpx_client
+
+AGENT_NAME = "external-api-health-monitor"
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,26 @@ async def check_slack() -> tuple[bool, str]:
         return False, f"Slack: {str(e)}"
 
 
+async def _recovered_since_last_run(session) -> bool:
+    """True si la corrida anterior NO estaba en ok (o sea: esto es una recuperación).
+
+    Sin esto, tras una caída el servicio volvería en silencio y quien vio la
+    alerta roja nunca sabría que ya se resolvió.
+    """
+    from sqlalchemy import select
+
+    from db.models.agent_run_log import AgentRunLog
+
+    result = await session.execute(
+        select(AgentRunLog.status)
+        .where(AgentRunLog.agent_name == AGENT_NAME)
+        .order_by(AgentRunLog.created_at.desc())
+        .limit(1)
+    )
+    last_status = result.scalar_one_or_none()
+    return last_status is not None and last_status != "ok"
+
+
 async def run() -> None:
     """Run all API health checks."""
     checks = {
@@ -123,13 +145,26 @@ async def run() -> None:
                     "Claude -> Ollama fallback activo; verificar ENABLE_RAG, LLM_PROVIDER"
                 )
 
-            await fire_agent_alert(
-                session,
-                agent_name="external-api-health-monitor",
-                status=status,
-                summary=summary,
-                detail=detail if failed else None,
-            )
+            # Corre cada 30 min: mandar a Slack también cuando todo está OK
+            # eran ~48 mensajes verdes al día, y con ese ruido las alertas
+            # reales se pierden. En verde solo se registra en agent_run_logs;
+            # se avisa al caer Y al recuperarse (para ver el "ya volvió").
+            if failed or await _recovered_since_last_run(session):
+                await fire_agent_alert(
+                    session,
+                    agent_name=AGENT_NAME,
+                    status=status,
+                    summary=summary,
+                    detail=detail if failed else None,
+                )
+            else:
+                await log_agent_run(
+                    session,
+                    agent_name=AGENT_NAME,
+                    status=status,
+                    summary=summary,
+                    detail=detail,
+                )
     except Exception as e:
         logger.exception("API health check failed: %s", e)
 

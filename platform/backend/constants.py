@@ -17,6 +17,7 @@ ALERT_COOLDOWN_RAINFALL_HOURS = 6  # Lluvia excede umbral
 ALERT_COOLDOWN_CRITICAL_RISK_HOURS = 1  # Riesgo crítico detectado
 ALERT_COOLDOWN_SCRAPER_HOURS = 6  # Scraper caído
 ALERT_COOLDOWN_YELLOW_HOURS = 4  # Estado Amarillo (alistamiento)
+ALERT_COOLDOWN_MIGRATION_GUARD_HOURS = 6  # Drift alembic BD↔repo (recordatorio si persiste)
 
 # --- Scrapers: intervalos esperados por fuente (minutos) ---
 # Fuente única de verdad: usada por /api/scraper/health (clasificación de estado)

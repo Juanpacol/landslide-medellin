@@ -1,0 +1,90 @@
+name: "Notificar fallo a Slack"
+description: >
+  Avisa a Slack cuando un cron falla. Solo bash + curl + jq + gh (todo
+  preinstalado en el runner): funciona aunque el paso que falló haya sido
+  `pip install` y no haya un Python utilizable.
+
+inputs:
+  webhook:
+    description: "Slack incoming webhook URL"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Detectar el paso que falló y deduplicar
+      id: ctx
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        RUN_ID: ${{ github.run_id }}
+      run: |
+        set -uo pipefail
+
+        # Nombre del paso que falló. Si la API no responde, se degrada a
+        # "desconocido" — nunca se pierde la notificación por esto.
+        jobs_json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" 2>/dev/null || echo '{}')"
+        step="$(jq -r '[.jobs[]?|.steps[]?|select(.conclusion=="failure")][0].name // "desconocido"' <<<"$jobs_json")"
+
+        # Antirruido: SIATA corre cada 30 min; un fallo persistente serían 48
+        # mensajes al día. Solo se notifica la TRANSICIÓN ok→fallo.
+        wf_file="$(jq -r '.jobs[0].workflow_name // empty' <<<"$jobs_json")"
+        prev="$(gh api "repos/$REPO/actions/runs?per_page=20&status=completed" \
+                  --jq "[.workflow_runs[]|select(.name==\"$wf_file\" and .id!=$RUN_ID)][0].conclusion" \
+                  2>/dev/null || echo unknown)"
+
+        notify=true
+        [ "$prev" = "failure" ] && notify=false
+
+        {
+          echo "step=$step"
+          echo "prev=$prev"
+          echo "notify=$notify"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "Paso fallido: $step | conclusión anterior: $prev | notificar: $notify"
+
+    - name: Enviar a Slack
+      if: steps.ctx.outputs.notify == 'true'
+      shell: bash
+      env:
+        WEBHOOK: ${{ inputs.webhook }}
+        WF: ${{ github.workflow }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        SHA: ${{ github.sha }}
+        STEP: ${{ steps.ctx.outputs.step }}
+      run: |
+        set -uo pipefail
+
+        if [ -z "${WEBHOOK:-}" ]; then
+          echo "::warning::SLACK_WEBHOOK_URL vacío — no se notifica"
+          exit 0
+        fi
+
+        # Pista accionable para el fallo más caro de este repo.
+        hint=""
+        case "$STEP" in
+          *"database migrations"*|*alembic*)
+            hint="Probable drift de Alembic (BD adelante del repo). Ver docs/RUNBOOK_MIGRATIONS.md" ;;
+          *"Install dependencies"*)
+            hint="Fallo instalando dependencias: revisar requirements.txt o caída de PyPI" ;;
+        esac
+
+        # Los valores entran por --arg, nunca interpolados en el script: un
+        # nombre de paso con comillas no puede romper el JSON ni inyectar shell.
+        jq -n \
+          --arg wf "$WF" --arg url "$RUN_URL" --arg step "$STEP" \
+          --arg sha "${SHA:0:7}" --arg hint "$hint" '
+          {attachments: [{
+            fallback: ("[" + $wf + "] workflow FALLÓ"),
+            color: "#cc0000",
+            title: ("❌ Workflow falló: " + $wf),
+            text: ("*Paso:* " + $step + "\n*Commit:* `" + $sha + "`\n<" + $url + "|Ver el run>"
+                   + (if $hint == "" then "" else "\n:bulb: " + $hint end)),
+            mrkdwn_in: ["text"]
+          }]}' > /tmp/slack_payload.json
+
+        curl -sS -X POST -H 'Content-type: application/json' \
+          --data @/tmp/slack_payload.json "$WEBHOOK" || \
+          echo "::warning::No se pudo enviar la notificación a Slack"

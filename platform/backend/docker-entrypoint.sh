@@ -19,8 +19,25 @@ else:
     raise SystemExit("✗ PostgreSQL no respondió a tiempo")
 PY
 
-echo "→ Aplicando migraciones (alembic upgrade head)..."
-alembic upgrade head
+# Guard de drift: si la BD quedó adelante del repo (imagen vieja, o migración
+# aplicada sin commitear), `alembic upgrade head` falla con "Can't locate
+# revision" y el contenedor entra en crash loop — que no arregla el drift y sí
+# tumba el dashboard. En ese caso se arranca igual: la BD ya tiene el esquema.
+# El `if` es lo que evita que `set -e` aborte cuando el guard sale != 0.
+echo "→ Verificando estado de migraciones..."
+if python -m monitoring.migration_guard --preflight --json > /tmp/migration_guard.json 2>&1; then
+    if grep -q '"safe_to_upgrade": true' /tmp/migration_guard.json; then
+        echo "→ Aplicando migraciones (alembic upgrade head)..."
+        alembic upgrade head
+    else
+        echo "⚠ BD adelante del repo — se omite 'alembic upgrade head'"
+        cat /tmp/migration_guard.json
+    fi
+else
+    echo "⚠ El guard no pudo evaluar el estado; se intenta el upgrade como antes"
+    cat /tmp/migration_guard.json || true
+    alembic upgrade head
+fi
 
 echo "→ Iniciando API en :8000"
 exec uvicorn api.main:app --host 0.0.0.0 --port 8000

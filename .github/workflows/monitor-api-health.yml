@@ -8,6 +8,9 @@ on:
 jobs:
   check-api-health:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
@@ -34,3 +37,19 @@ jobs:
         run: |
           cd platform/backend
           python -m monitoring.api_health
+
+      # Vigilancia de drift INDEPENDIENTE de los crons de ingesta: si todos
+      # ellos quedan deshabilitados (GitHub los apaga tras 60 días sin
+      # commits), este workflow sigue detectando el drift.
+      # continue-on-error: el guard nunca debe marcar en rojo el monitoreo.
+      - name: Guard de drift de migraciones
+        continue-on-error: true
+        run: |
+          cd platform/backend
+          python -m monitoring.migration_guard
+
+      - name: Notificar fallo a Slack
+        if: failure() || cancelled()
+        uses: ./.github/actions/notify-failure
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}

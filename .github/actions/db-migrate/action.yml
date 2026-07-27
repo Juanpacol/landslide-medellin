@@ -1,0 +1,34 @@
+name: "DB migrate (con guard de drift)"
+description: >
+  Diagnostica el drift entre las migraciones del repo y las de la BD, y aplica
+  `alembic upgrade head` solo si es seguro. Si la BD está adelante del repo el
+  upgrade fallaría y detendría la ingesta; se omite y el cron sigue.
+
+runs:
+  using: composite
+  steps:
+    - name: Guard de drift de migraciones
+      id: guard
+      shell: bash
+      working-directory: platform/backend
+      env:
+        PYTHONPATH: ${{ github.workspace }}/platform/backend
+      # --preflight sale 0 SIEMPRE. Los pasos de una composite action no
+      # soportan continue-on-error, así que el guard nunca puede fallar: la
+      # decisión se toma con el output safe_to_upgrade.
+      run: python -m monitoring.migration_guard --preflight --github-output
+
+    - name: alembic upgrade head
+      if: steps.guard.outputs.safe_to_upgrade == 'true'
+      shell: bash
+      working-directory: platform/backend
+      run: alembic upgrade head
+
+    # Solo se llega aquí con la BD adelante del repo o con heads múltiples.
+    # La BD ya tiene un superconjunto del esquema, así que la ingesta puede
+    # continuar; el guard ya mandó la alerta crítica a Slack.
+    - name: Aviso — upgrade omitido
+      if: steps.guard.outputs.safe_to_upgrade != 'true'
+      shell: bash
+      run: |
+        echo "::warning::alembic upgrade omitido (${{ steps.guard.outputs.kind }}) — alerta enviada a Slack. Ver docs/RUNBOOK_MIGRATIONS.md"

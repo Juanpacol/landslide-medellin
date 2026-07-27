@@ -46,6 +46,7 @@ teyva/
 - `DB_SSL=true` obligatorio. asyncpg usa contexto TLS sin verificación de cert (Supabase firma con CA propia) — equivalente a `sslmode=require`; ya resuelto en `db/session.py`.
 - El `db` de docker-compose es solo **fallback offline** (si el `.env` raíz no define `DATABASE_URL`).
 - Esquema: gestionado por Alembic. **Nunca editar migraciones ya aplicadas** — eso causó drift real entre Supabase y local. Cambio de esquema = migración nueva.
+- **Aplicar migraciones SOLO desde `main` ya pusheado.** Aplicar a Supabase y commitear después deja `alembic_version` apuntando a una revisión que el repo no conoce, y los 6 crons fallan con `Can't locate revision` (pasó el 2026-07-26). Guard: `python -m monitoring.migration_guard --json`; runbook en `docs/RUNBOOK_MIGRATIONS.md`. Los crons ya no mueren por esto — `.github/actions/db-migrate` omite el upgrade y sigue ingiriendo — pero el drift bloquea toda migración nueva hasta resolverlo.
 
 ## Cómo correr
 
@@ -88,6 +89,10 @@ cd platform/frontend && pnpm dev
 ## Alertas y monitoreo
 
 `alerts/slack.py` — 3 tipos con cooldown en `app_settings`: lluvia sobre umbral, riesgo crítico, y **scrapers caídos** (fallos consecutivos O staleness — silencio > 3× intervalo, cubre el caso "GitHub Actions se deshabilitó solo"). El watchdog corre en el scheduler cada 30 min. Webhook: env `SLACK_WEBHOOK_URL` o UI (BD).
+
+Agentes en `monitoring/` (resultado → `agent_run_logs`, Slack vía `notify.py`): `api_health`, `ml_drift`, `scraper_validator` y `migration_guard` (drift Alembic BD↔repo). **Regla anti-ruido:** en estado `ok` se usa `log_agent_run`, NUNCA `fire_agent_alert` — este último postea a Slack siempre, y con agentes que corren cada 15–30 min eso ahoga las alertas reales. Se avisa al caer y al recuperarse.
+
+Todo workflow fallido avisa a Slack vía `.github/actions/notify-failure` (bash+curl puro: funciona aunque haya fallado `pip install`; solo notifica la transición ok→fallo).
 
 **Gotcha conocido:** GitHub deshabilita los crons tras 60 días sin commits (`disabled_inactivity`). Si las fuentes se ven caídas, revisar `gh workflow list` primero.
 

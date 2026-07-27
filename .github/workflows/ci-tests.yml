@@ -59,6 +59,38 @@ jobs:
           cd platform/backend
           pytest tests/ -v --tb=short
 
+  # Chequeo estático de la cadena de migraciones. Bloqueante y barato (~20s):
+  # no abre conexión a la BD ni necesita secretos.
+  #
+  # NO se diagnostica contra la BD en PRs a propósito: un PR que agrega una
+  # migración legítima aparece como "pending" hasta que se mergea y el cron la
+  # aplica — bloquear por eso sería un falso positivo en cada PR de esquema.
+  # El diagnóstico contra la BD vive en los crons (ver .github/actions/db-migrate).
+  migration-guard:
+    name: Alembic — un solo head, cadena íntegra
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ./platform/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install alembic
+        run: pip install alembic
+
+      - name: Chequeo estático de migraciones
+        run: |
+          cd platform/backend
+          python -m monitoring.migration_guard --offline
+
   frontend-tests:
     name: Frontend Tests & Build
     runs-on: ubuntu-latest
@@ -70,12 +102,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # Node 22 para igualar la imagen del Dockerfile del frontend.
+          node-version: "22"
+
+      # setup-node NO trae pnpm: sin esto todos los pasos de abajo fallan con
+      # "pnpm: command not found". Se habilita vía corepack, igual que en el
+      # Dockerfile, para respetar el campo packageManager de package.json.
+      - name: Habilitar pnpm
+        run: corepack enable
 
       - name: Install dependencies
         run: |
           cd platform/frontend
-          pnpm install
+          pnpm install --frozen-lockfile
 
       - name: Type check
         run: |
