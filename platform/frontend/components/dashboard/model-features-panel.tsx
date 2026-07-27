@@ -77,7 +77,7 @@ export function ModelFeaturesPanel({ communeId, riskScore, riskCategory }: Model
           • <strong>Ubicación</strong> (centroide lat/lon)<br />
           • <strong>Intensidad sísmica</strong> (últimos 30 días, red SIATA)<br />
           • <strong>Índice antecedente</strong> (precipitación acumulada 30 días)<br />
-          • <strong>Amenaza por barrio</strong> (% de barrios en "Alta" per commune)<br />
+          • <strong>Amenaza por barrio</strong> (% de barrios en &quot;Alta&quot; por comuna)<br />
           • <strong>SWI</strong> (saturación del suelo, modelo de tanque JMA)<br />
           • <strong>Conteo de estaciones</strong> (SIATA)
         </div>

@@ -545,8 +545,8 @@ export function Dashboard() {
                       {rightPanelTab === 'features' && selectedCommune && (
                         <ModelFeaturesPanel
                           communeId={String(selectedCommune.commune_id)}
-                          riskScore={selectedCommune.risk_score}
-                          riskCategory={selectedCommune.risk_category || 'Sin datos'}
+                          riskScore={selectedCommune.indice_riesgo}
+                          riskCategory={selectedCommune.categoria_riesgo || 'Sin datos'}
                         />
                       )}
                     </div>

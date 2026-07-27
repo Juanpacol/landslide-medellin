@@ -104,7 +104,6 @@ export function SnakeLineChart({ communeId }: SnakeLineChartProps) {
             />
             <Scatter data={historyPoints} dataKey="y" name="Historial 48h">
               {historyPoints.map((p, i) => (
-                // eslint-disable-next-line react/no-array-index-key
                 <circle key={i} r={3} fill={p.fill} />
               ))}
             </Scatter>
