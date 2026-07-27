@@ -37,7 +37,7 @@ jobs:
         run: |
           cd platform/backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       # Bloqueante desde la limpieza de la deuda histórica (130 violaciones →
       # 0). Se mantiene así para que no se vuelva a acumular: el frontend ya
