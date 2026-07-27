@@ -34,32 +34,55 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _check_and_record(scope: str, key: str, *, times: int, seconds: int) -> None:
+    """Núcleo del rate limit, parametrizado por clave genérica (IP o session_id).
+
+    Extraído de lo que antes era el cuerpo de `_dependency` para poder
+    reusarlo tanto desde la dependencia FastAPI (clave = IP) como desde
+    `rate_limit_by_session` (clave = session_id, llamada a mano).
+    """
+    now = time.monotonic()
+    full_key = (scope, key)
+    window = _hits[full_key]
+
+    while window and now - window[0] > seconds:
+        window.popleft()
+
+    if len(window) >= times:
+        retry_after = max(1, int(seconds - (now - window[0])))
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Demasiadas solicitudes; reintenta en {retry_after}s.",
+            headers={"Retry-After": str(retry_after)},
+        )
+    window.append(now)
+
+    # Poda defensiva: si el mapa crece demasiado (IPs/sesiones efímeras),
+    # soltar las claves vacías primero y, en el extremo, resetear.
+    if len(_hits) > _MAX_KEYS:
+        for k in [k for k, v in _hits.items() if not v]:
+            _hits.pop(k, None)
+        if len(_hits) > _MAX_KEYS:
+            _hits.clear()
+
+
 def rate_limit(scope: str, *, times: int, seconds: int):
     """Dependencia FastAPI: máx `times` requests por `seconds` por IP."""
 
     async def _dependency(request: Request) -> None:
-        now = time.monotonic()
-        key = (scope, _client_ip(request))
-        window = _hits[key]
-
-        while window and now - window[0] > seconds:
-            window.popleft()
-
-        if len(window) >= times:
-            retry_after = max(1, int(seconds - (now - window[0])))
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Demasiadas solicitudes; reintenta en {retry_after}s.",
-                headers={"Retry-After": str(retry_after)},
-            )
-        window.append(now)
-
-        # Poda defensiva: si el mapa crece demasiado (IPs efímeras), soltar
-        # las claves vacías primero y, en el extremo, resetear.
-        if len(_hits) > _MAX_KEYS:
-            for k in [k for k, v in _hits.items() if not v]:
-                _hits.pop(k, None)
-            if len(_hits) > _MAX_KEYS:
-                _hits.clear()
+        _check_and_record(scope, _client_ip(request), times=times, seconds=seconds)
 
     return _dependency
+
+
+def rate_limit_by_session(scope: str, session_id: str, *, times: int, seconds: int) -> None:
+    """Límite por `session_id`, llamado a mano dentro del handler.
+
+    No puede ser un `Depends` como `rate_limit()`: session_id solo está
+    disponible tras parsear el body (mismo motivo por el que
+    `log_audit_event` en api/audit.py también se llama a mano). Comparte el
+    dict `_hits` con el límite por IP — la clave (scope, session_id) es
+    indistinguible de (scope, ip) para el resto de la lógica, así que
+    conviven sin colisión mientras los `scope` usados sean distintos.
+    """
+    _check_and_record(scope, session_id, times=times, seconds=seconds)

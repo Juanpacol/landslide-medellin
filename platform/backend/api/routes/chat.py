@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.rate_limit import rate_limit
+from api.rate_limit import rate_limit, rate_limit_by_session
 from db.models import AgentConversation
 from db.session import get_async_db
 from integrations.agent_contracts import chat as agent_chat
@@ -33,6 +33,10 @@ class ChatResponse(BaseModel):
 @router.post("", response_model=ChatResponse, dependencies=[Depends(_chat_rate)])
 @router.post("/message", response_model=ChatResponse, dependencies=[Depends(_chat_rate)])
 async def post_message(body: ChatRequest, db: AsyncSession = Depends(get_async_db)) -> ChatResponse:
+    # Segundo nivel de límite, por sesión: protege contra una conversación
+    # individual descontrolada más allá del límite compartido por IP (útil
+    # detrás de NAT/proxy donde varias sesiones comparten la misma IP).
+    rate_limit_by_session("chat_session", body.session_id, times=10, seconds=60)
     user_row = AgentConversation(
         session_id=body.session_id,
         role="user",
@@ -60,6 +64,8 @@ async def stream_message(body: ChatRequest, db: AsyncSession = Depends(get_async
     (igual que hace `chat()` hoy), así que la ruta solo retransmite los
     chunks como eventos SSE y comitea al final.
     """
+
+    rate_limit_by_session("chat_session", body.session_id, times=10, seconds=60)
 
     async def event_source():
         async for chunk in agent_chat_stream(body.message, body.session_id, db):
