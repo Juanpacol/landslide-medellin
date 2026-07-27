@@ -51,6 +51,11 @@ services:
     restart: "no"
 
   backend:
+    # Con `image:` + `build:`, `docker compose pull` baja la imagen ya
+    # construida por CI y `docker compose build` la reconstruye local con ese
+    # mismo tag. Preferir pull: evita que la imagen se quede sin las
+    # migraciones nuevas y el contenedor entre en crash loop de alembic.
+    image: ghcr.io/juanpacol/teyva-backend:latest
     build:
       context: ./platform/backend
     depends_on:
@@ -58,6 +63,9 @@ services:
         condition: service_healthy
       ollama:
         condition: service_started
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
       DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
@@ -76,6 +84,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ghcr.io/juanpacol/teyva-frontend:latest
     build:
       context: ./platform/frontend
       args:
@@ -90,11 +99,16 @@ services:
 
   # Scraper daemon: SIATA (30min), DAGRD (1h), IDEAM (6h), Medellín Datos (24h)
   scraper:
+    # Misma imagen que backend/ml-predictor: solo cambia el entrypoint.
+    image: ghcr.io/juanpacol/teyva-backend:latest
     build:
       context: ./platform/backend
     depends_on:
       backend:
         condition: service_started
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
       DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
@@ -109,11 +123,15 @@ services:
 
   # ML predictor daemon: genera predicciones cada 6 horas
   ml-predictor:
+    image: ghcr.io/juanpacol/teyva-backend:latest
     build:
       context: ./platform/backend
     depends_on:
       backend:
         condition: service_started
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}
       DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql://${POSTGRES_USER:-teyva}:${POSTGRES_PASSWORD:-teyva}@db:5432/${POSTGRES_DB:-teyva}}

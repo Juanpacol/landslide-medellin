@@ -1,0 +1,81 @@
+name: Build & Push — Imágenes Docker
+
+# Publica las imágenes en GitHub Container Registry (GHCR) para que el stack
+# local se levante con `docker compose pull` en vez de reconstruir a mano.
+# Esto es lo que evita el drift que ya nos mordió: la imagen del backend
+# quedó congelada semanas, sin las migraciones nuevas de alembic/versions/,
+# y el contenedor entraba en crash loop con "Can't locate revision" porque
+# Supabase ya iba varias revisiones adelante de lo horneado en la imagen.
+#
+# Solo se construyen DOS imágenes: los servicios backend, scraper y
+# ml-predictor comparten el mismo contexto (./platform/backend) y solo
+# difieren en el entrypoint del compose.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "platform/backend/**"
+      - "platform/frontend/**"
+      - ".github/workflows/build-images.yml"
+  workflow_dispatch:
+
+concurrency:
+  # Un push nuevo a main cancela builds viejos en vuelo: la imagen que importa
+  # es siempre la del último commit.
+  group: build-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: ./platform/backend
+          - name: frontend
+            context: ./platform/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # GHCR exige el nombre del repositorio en minúscula; el owner real es
+      # "Juanpacol" (con mayúscula) y el push falla si se pasa tal cual.
+      - name: Normalizar nombre de imagen
+        id: img
+        run: echo "repo=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/teyva-${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ steps.img.outputs.repo }}:latest
+            ${{ steps.img.outputs.repo }}:${{ github.sha }}
+          # Caché en el registro, NO en el de GitHub Actions: la imagen del
+          # backend pesa ~5 GB comprimida y el caché de Actions tiene un tope
+          # duro de 10 GB por repo — entre backend y frontend se desalojarían
+          # mutuamente en cada corrida, volviendo el caché inútil.
+          cache-from: type=registry,ref=${{ steps.img.outputs.repo }}:buildcache
+          cache-to: type=registry,ref=${{ steps.img.outputs.repo }}:buildcache,mode=max
