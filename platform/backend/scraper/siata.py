@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 from db.models.ml_feature import MLFeature
 from db.models.rainfall_timeseries import RainfallTimeseries
 from db.session import AsyncSessionLocal
+from domain.validation import validate_sensor_reading
 from infrastructure.external.arcgis_client import lookup_commune_for_point, parse_ml_commune_from_siata_field
 from scraper.common import httpx_client, log_scrape_run, ml_feature_exists, utcnow, with_retries
 
@@ -75,7 +76,8 @@ async def _collect_siata_payload() -> (
                 val = float(st.get("valor"))
             except (TypeError, ValueError):
                 continue
-            if val <= -900:
+            val = validate_sensor_reading(val, field="precip_mm")
+            if val is None:
                 continue
             lat = float(st.get("latitud"))
             lon = float(st.get("longitud"))

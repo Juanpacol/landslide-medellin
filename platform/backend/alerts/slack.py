@@ -9,7 +9,9 @@ import httpx
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.alert_scoring import compute_urgency_score, urgency_label
 from domain.risk_rules import ANTECEDENT_INDEX_THRESHOLD_MM, compute_alert_state, normalize_category
+from domain.validation import FAILURE_STATUSES, SUCCESS_STATUSES
 from constants import (
     ALERT_COOLDOWN_CRITICAL_RISK_HOURS,
     ALERT_COOLDOWN_RAINFALL_HOURS,
@@ -95,6 +97,60 @@ async def _fire_slack(webhook_url: str, payload: dict) -> tuple[str, int | None]
     return await post_webhook(webhook_url, payload)
 
 
+def _urgency_context_element(score: int) -> dict:
+    """Bloque `context` reusado por los 4 tipos de alerta para mostrar el
+    score de urgencia (0-100) calculado en domain/alert_scoring.py."""
+    return {
+        "type": "mrkdwn",
+        "text": f"⚡ Urgencia: {score}/100 ({urgency_label(score)})",
+    }
+
+
+def _dashboard_link_button() -> dict:
+    """Botón de ENLACE (no interactivo — el backend no tiene URL pública
+    accesible desde Slack, así que la interactividad real de Slack no es
+    viable hoy). Reusado en los 4 tipos de alerta."""
+    return {
+        "type": "button",
+        "text": {"type": "plain_text", "text": "🗺️ Abrir dashboard"},
+        "url": dashboard_url(),
+        "style": "primary",
+    }
+
+
+async def _hours_since_appsetting(session: AsyncSession, key: str) -> float | None:
+    """Horas desde el último ISO timestamp guardado en `app_settings[key]`,
+    o None si nunca se guardó. Usado tanto para el chequeo de cooldown
+    (booleano) como para alimentar el score de urgencia — misma fuente de
+    datos, sin agregar tablas nuevas."""
+    row = await session.get(AppSetting, key)
+    if not row or not row.value:
+        return None
+    try:
+        last_sent = datetime.fromisoformat(row.value)
+    except ValueError:
+        return None
+    if last_sent.tzinfo is None:
+        last_sent = last_sent.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - last_sent).total_seconds() / 3600
+
+
+async def _hours_since_last_rainfall_alert(session: AsyncSession, commune_id: str) -> float | None:
+    result = await session.execute(
+        select(AlertLog.triggered_at)
+        .where(AlertLog.commune_id == commune_id)
+        .where(AlertLog.status == "sent")
+        .order_by(AlertLog.triggered_at.desc())
+        .limit(1)
+    )
+    triggered_at = result.scalar_one_or_none()
+    if triggered_at is None:
+        return None
+    if triggered_at.tzinfo is None:
+        triggered_at = triggered_at.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - triggered_at).total_seconds() / 3600
+
+
 def _build_slack_payload(
     commune_id: str,
     name: str,
@@ -102,6 +158,7 @@ def _build_slack_payload(
     threshold_mm: float,
     risk_score: float | None,
     risk_category: str | None,
+    urgency_score: int = 0,
 ) -> dict:
     excess_pct = round((acum_mm - threshold_mm) / threshold_mm * 100)
     risk_text = f"{risk_category} ({risk_score:.2f})" if risk_score is not None else "Sin datos"
@@ -121,12 +178,17 @@ def _build_slack_payload(
                 ],
             },
             {
+                "type": "actions",
+                "elements": [_dashboard_link_button()],
+            },
+            {
                 "type": "context",
                 "elements": [
+                    _urgency_context_element(urgency_score),
                     {
                         "type": "mrkdwn",
                         "text": f"Hora Colombia: {datetime.now(COL_TZ).strftime('%Y-%m-%d %H:%M')} · Sistema TEYVA · Medellín",
-                    }
+                    },
                 ],
             },
         ]
@@ -166,7 +228,13 @@ async def check_and_fire_alerts(session: AsyncSession) -> list[str]:
 
         name = _NAMES.get(commune_id, f"Comuna {commune_id}")
         risk_score, risk_category = risks.get(commune_id, (None, None))
-        payload = _build_slack_payload(commune_id, name, acum_mm, threshold_mm, risk_score, risk_category)
+        hours_since = await _hours_since_last_rainfall_alert(session, commune_id)
+        urgency = compute_urgency_score(
+            risk_category=risk_category, alert_type="rainfall", hours_since_last_alert=hours_since
+        )
+        payload = _build_slack_payload(
+            commune_id, name, acum_mm, threshold_mm, risk_score, risk_category, urgency_score=urgency
+        )
         status, code = await _fire_slack(webhook_url, payload)
 
         session.add(
@@ -215,7 +283,7 @@ async def _mark_yellow_alert_sent(session: AsyncSession, commune_id: str) -> Non
         session.add(AppSetting(key=key, value=datetime.now(timezone.utc).isoformat()))
 
 
-def _build_yellow_alert_payload(commune_id: str, name: str, state: dict) -> dict:
+def _build_yellow_alert_payload(commune_id: str, name: str, state: dict, urgency_score: int = 0) -> dict:
     return {
         "attachments": [
             {
@@ -239,12 +307,17 @@ def _build_yellow_alert_payload(commune_id: str, name: str, state: dict) -> dict
                         "text": {"type": "mrkdwn", "text": f"💡 *Acción:* {state['action']}"},
                     },
                     {
+                        "type": "actions",
+                        "elements": [_dashboard_link_button()],
+                    },
+                    {
                         "type": "context",
                         "elements": [
+                            _urgency_context_element(urgency_score),
                             {
                                 "type": "mrkdwn",
                                 "text": f"Hora Colombia: {datetime.now(COL_TZ).strftime('%Y-%m-%d %H:%M')} · Sistema TEYVA",
-                            }
+                            },
                         ],
                     },
                 ],
@@ -289,7 +362,11 @@ async def check_and_fire_yellow_alerts(session: AsyncSession) -> list[str]:
             "risk_category": risk_category or "Sin datos",
             "action": result["action"],
         }
-        payload = _build_yellow_alert_payload(commune_id, name, state_payload)
+        hours_since = await _hours_since_appsetting(session, f"yellow_alert_cooldown_{commune_id}")
+        urgency = compute_urgency_score(
+            risk_category=risk_category, alert_type="yellow", hours_since_last_alert=hours_since
+        )
+        payload = _build_yellow_alert_payload(commune_id, name, state_payload, urgency_score=urgency)
         status, _ = await _fire_slack(webhook_url, payload)
         if status == "sent":
             await _mark_yellow_alert_sent(session, commune_id)
@@ -335,7 +412,7 @@ async def _mark_scraper_alert_sent(session: AsyncSession, source: str) -> None:
         session.add(AppSetting(key=key, value=datetime.now(timezone.utc).isoformat()))
 
 
-def _build_scraper_alert_payload(failing_sources: list[tuple[str, str]]) -> dict:
+def _build_scraper_alert_payload(failing_sources: list[tuple[str, str]], urgency_score: int = 0) -> dict:
     fields = []
     for source, reason in failing_sources:
         label = _SCRAPER_LABELS.get(source, source)
@@ -355,12 +432,17 @@ def _build_scraper_alert_payload(failing_sources: list[tuple[str, str]]) -> dict
             },
             {"type": "section", "fields": fields},
             {
+                "type": "actions",
+                "elements": [_dashboard_link_button()],
+            },
+            {
                 "type": "context",
                 "elements": [
+                    _urgency_context_element(urgency_score),
                     {
                         "type": "mrkdwn",
                         "text": f"Hora Colombia: {datetime.now(COL_TZ).strftime('%Y-%m-%d %H:%M')} · Sistema TEYVA · Medellín",
-                    }
+                    },
                 ],
             },
         ]
@@ -408,18 +490,20 @@ async def check_and_fire_scraper_alerts(session: AsyncSession) -> list[str]:
 
     now = datetime.now(timezone.utc)
     failing: list[tuple[str, str]] = []
+    max_consecutive = 0
 
     # Vía 1: fallos consecutivos (fuentes que sí reportan, pero fallando).
     for source, rows in by_source.items():
         consecutive = 0
         for row in rows:
-            if row.status in ("failed", "error"):
+            if row.status in FAILURE_STATUSES:
                 consecutive += 1
             elif row.status != "started":
                 break
         if consecutive >= _SCRAPER_FAILURE_THRESHOLD:
             if not await _scraper_alert_on_cooldown(session, source):
                 failing.append((source, f"{consecutive} fallos consecutivos"))
+                max_consecutive = max(max_consecutive, consecutive)
 
     # Vía 2: staleness — se evalúa sobre TODAS las fuentes esperadas, no solo
     # las que tienen filas (una fuente que jamás corrió también debe alertar).
@@ -430,7 +514,7 @@ async def check_and_fire_scraper_alerts(session: AsyncSession) -> list[str]:
         rows = by_source.get(source, [])
         last_success_at: datetime | None = None
         for row in rows:
-            if row.status in ("ok", "completed", "success"):
+            if row.status in SUCCESS_STATUSES:
                 ts = row.run_finished_at or row.run_started_at
                 if ts is not None:
                     last_success_at = ts.replace(tzinfo=timezone.utc) if ts.tzinfo is None else ts
@@ -449,7 +533,25 @@ async def check_and_fire_scraper_alerts(session: AsyncSession) -> list[str]:
     if not failing:
         return []
 
-    payload = _build_scraper_alert_payload(failing)
+    # Urgencia agregada del lote: si CUALQUIER fuente del lote nunca se
+    # alertó antes, el conjunto se trata como "hace rato no se avisa nada de
+    # esto" (None); si todas ya se alertaron antes, se usa la más
+    # desatendida (max) para no subestimar el peor caso del lote.
+    hours_values: list[float] = []
+    any_never_alerted = False
+    for source, _ in failing:
+        h = await _hours_since_appsetting(session, f"scraper_alert_cooldown_{source}")
+        if h is None:
+            any_never_alerted = True
+        else:
+            hours_values.append(h)
+    hours_since_agg = None if any_never_alerted else (max(hours_values) if hours_values else None)
+    urgency = compute_urgency_score(
+        risk_category=None, alert_type="scraper",
+        hours_since_last_alert=hours_since_agg, consecutive_failures=max_consecutive,
+    )
+
+    payload = _build_scraper_alert_payload(failing, urgency_score=urgency)
     status, _ = await _fire_slack(webhook_url, payload)
 
     alerted: list[str] = []
@@ -498,6 +600,7 @@ def _build_critical_risk_payload(
     sparkline: str,
     daily_values: list[float],
     explanation_structured: dict | None = None,
+    urgency_score: int = 0,
 ) -> dict:
     """Mensaje enriquecido de webhook: datos + por qué + recomendación + links."""
     rain_summary = (
@@ -555,10 +658,11 @@ def _build_critical_risk_payload(
     blocks.append({
         "type": "context",
         "elements": [
+            _urgency_context_element(urgency_score),
             {
                 "type": "mrkdwn",
                 "text": f"☎️ DAGRD 4444444 · Bomberos 119 · Cruz Roja 132 · {datetime.now(COL_TZ).strftime('%Y-%m-%d %H:%M')} Colombia",
-            }
+            },
         ],
     })
     return {"blocks": blocks}
@@ -609,6 +713,11 @@ async def check_and_fire_critical_risk_alerts(session: AsyncSession) -> list[str
         sparkline = ascii_sparkline(daily_values)
         sent_ok = False
 
+        hours_since = await _hours_since_appsetting(session, f"critical_risk_alert_{commune_id}")
+        urgency = compute_urgency_score(
+            risk_category="critico", alert_type="critical_risk", hours_since_last_alert=hours_since
+        )
+
         # "Por qué": viñetas si hay factores estructurados, texto plano si no.
         if factors and isinstance(factors, list):
             why_line = "📊 *Por qué:*\n" + "\n".join(f"• {f}" for f in factors) + "\n"
@@ -623,6 +732,7 @@ async def check_and_fire_critical_risk_alerts(session: AsyncSession) -> list[str
                 f"🔴 *RIESGO CRÍTICO — {name} ({commune_id})*  ·  Probabilidad {risk_score:.0%}\n"
                 + why_line
                 + f"💡 *Recomendación:* {recommendation}\n"
+                f"⚡ Urgencia: {urgency}/100 ({urgency_label(urgency)})\n"
                 f"🗺️ {dashboard_url()}  ·  ☎️ DAGRD 4444444"
             )
             sent_ok = await upload_chart_to_slack(
@@ -636,6 +746,7 @@ async def check_and_fire_critical_risk_alerts(session: AsyncSession) -> list[str
                 commune_id, name, risk_score, "crítico",
                 explanation, recommendation, sparkline, daily_values,
                 explanation_structured=explanation_structured,
+                urgency_score=urgency,
             )
             status, _ = await _fire_slack(webhook_url, payload)
             sent_ok = status == "sent"

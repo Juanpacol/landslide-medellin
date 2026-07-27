@@ -9,11 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from constants import SCRAPER_INTERVALS_MIN as SCRAPER_INTERVALS
 from db.models import ScrapingLog
 from db.session import get_async_db
+from domain.validation import FAILURE_STATUSES as _FAILURE_STATUSES
+from domain.validation import SUCCESS_STATUSES as _SUCCESS_STATUSES
+from domain.validation import validate_scrape_log_status
 
 router = APIRouter()
-
-_SUCCESS_STATUSES = {"ok", "completed", "success"}
-_FAILURE_STATUSES = {"failed", "error"}
 
 
 class ScraperRunBody(BaseModel):
@@ -24,10 +24,11 @@ class ScraperRunBody(BaseModel):
 
 @router.post("/log")
 async def create_scrape_log(body: ScraperRunBody, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    status = validate_scrape_log_status(body.status)
     now = datetime.now(timezone.utc)
     row = ScrapingLog(
         source=body.source,
-        status=body.status,
+        status=status,
         run_started_at=now,
         detail=body.detail,
     )

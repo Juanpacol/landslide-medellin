@@ -28,6 +28,8 @@ from agent.tools import (
     resolve_commune_id,
 )
 from domain.risk_rules import display_label, risk_level_from_score
+from domain.validation import validate_citizen_report
+from errors.error_handler import ValidationError
 from db.models import LandslideEvent, RainfallTimeseries, RiskPrediction, ScrapingLog
 from db.session import AsyncSessionLocal
 
@@ -363,13 +365,13 @@ async def report_incident(commune: str, descripcion: str, barrio: Optional[str] 
     """
     from db.models.citizen_report import CitizenReport
 
-    descripcion = (descripcion or "").strip()
-    if len(descripcion) < 10:
-        return (
-            "Para registrar el reporte necesito una descripción breve de lo que "
-            "observas (por ejemplo: grietas en una pared, movimiento de tierra, "
-            "agua turbia bajando por la ladera)."
-        )
+    try:
+        descripcion = validate_citizen_report(descripcion, commune)
+    except ValidationError as exc:
+        # Se atrapa aquí (en vez de dejarla burbujear) para devolver el
+        # mensaje amigable exacto que ya usa el chat, no un 422 crudo — esta
+        # función corre dentro del loop de tool-calling, no de una ruta HTTP.
+        return str(exc)
     cid = _resolve_commune_loose(commune)
     if cid is None:
         return f"No reconozco la comuna «{commune}». Dime el nombre o número de tu comuna."
