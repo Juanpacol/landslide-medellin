@@ -14,3 +14,6 @@ next.user-config.*
 node_modules
 .next/
 .DS_Store
+
+# Caché incremental de tsc — cambia en cada compilación local, sin valor en git.
+tsconfig.tsbuildinfo
