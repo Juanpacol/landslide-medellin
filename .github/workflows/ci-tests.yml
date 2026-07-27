@@ -111,10 +111,13 @@ jobs:
       - name: Habilitar pnpm
         run: corepack enable
 
+      # --ignore-scripts igual que el Dockerfile del frontend: evita compilar
+      # sharp (no se usa, images.unoptimized=true) y binarios nativos
+      # opcionales. Sin él, pnpm 10+ falla con ERR_PNPM_IGNORED_BUILDS.
       - name: Install dependencies
         run: |
           cd platform/frontend
-          pnpm install --frozen-lockfile
+          pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Type check
         run: |
