@@ -94,7 +94,11 @@ async def run_predictions(db: AsyncSession) -> None:
                 or 0.0
             )
             n_events = int(features_used.get("n_events_window") or 0)
-            explanation_text, generated_by, explanation_structured = await generate_risk_explanation(
+            (
+                explanation_text,
+                generated_by,
+                explanation_structured,
+            ) = await generate_risk_explanation(
                 commune_id=str(cid),
                 risk_score=risk_score,
                 risk_category=risk_level,

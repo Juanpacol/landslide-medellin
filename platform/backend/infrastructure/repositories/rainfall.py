@@ -23,9 +23,7 @@ async def thresholds_by_commune(session: AsyncSession) -> dict[str, float]:
     return {r.commune_id: r.threshold_mm for r in result.scalars().all()}
 
 
-async def accumulated_since_by_commune(
-    session: AsyncSession, since: datetime
-) -> dict[str, float]:
+async def accumulated_since_by_commune(session: AsyncSession, since: datetime) -> dict[str, float]:
     """Lluvia acumulada por comuna desde `since` (típicamente medianoche local)."""
     result = await session.execute(
         select(RainfallTimeseries.commune_id, func.sum(RainfallTimeseries.precip_mm))

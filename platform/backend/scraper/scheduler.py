@@ -43,16 +43,28 @@ def build_scheduler() -> AsyncIOScheduler:
     # Se escalonan unos segundos para no golpear la BD/red al mismo tiempo.
     now = datetime.now(timezone.utc)
     scheduler.add_job(
-        run_siata_scraper, "interval", minutes=30,
-        id="siata_pluvio", replace_existing=True, next_run_time=now + timedelta(seconds=5),
+        run_siata_scraper,
+        "interval",
+        minutes=30,
+        id="siata_pluvio",
+        replace_existing=True,
+        next_run_time=now + timedelta(seconds=5),
     )
     scheduler.add_job(
-        run_dagrd_scraper, "interval", hours=1,
-        id="dagrd_wp", replace_existing=True, next_run_time=now + timedelta(seconds=20),
+        run_dagrd_scraper,
+        "interval",
+        hours=1,
+        id="dagrd_wp",
+        replace_existing=True,
+        next_run_time=now + timedelta(seconds=20),
     )
     scheduler.add_job(
-        run_ideam_scraper, "interval", hours=6,
-        id="ideam_socrata", replace_existing=True, next_run_time=now + timedelta(seconds=35),
+        run_ideam_scraper,
+        "interval",
+        hours=6,
+        id="ideam_socrata",
+        replace_existing=True,
+        next_run_time=now + timedelta(seconds=35),
     )
     scheduler.add_job(
         run_medellin_datos_scraper,
@@ -63,14 +75,21 @@ def build_scheduler() -> AsyncIOScheduler:
         next_run_time=now + timedelta(seconds=50),
     )
     scheduler.add_job(
-        run_siata_sismos_scraper, "interval", minutes=30,
-        id="siata_sismos", replace_existing=True, next_run_time=now + timedelta(seconds=65),
+        run_siata_sismos_scraper,
+        "interval",
+        minutes=30,
+        id="siata_sismos",
+        replace_existing=True,
+        next_run_time=now + timedelta(seconds=65),
     )
     # Watchdog: alerta por Slack si alguna fuente lleva demasiado sin datos.
     # Arranca a los 5 min (les da tiempo a los scrapers iniciales de poblar logs).
     scheduler.add_job(
-        run_scraper_watchdog, "interval", minutes=30,
-        id="scraper_watchdog", replace_existing=True,
+        run_scraper_watchdog,
+        "interval",
+        minutes=30,
+        id="scraper_watchdog",
+        replace_existing=True,
         next_run_time=now + timedelta(minutes=5),
     )
     return scheduler

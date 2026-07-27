@@ -54,7 +54,9 @@ _OVERPASS_QUERY = (
 _TYPE_BY_TAG = {"park": "park", "school": "school", "stadium": "stadium"}
 
 
-async def fetch_safe_zones_osm(bbox: tuple[float, float, float, float] = MEDELLIN_BBOX) -> list[dict[str, Any]]:
+async def fetch_safe_zones_osm(
+    bbox: tuple[float, float, float, float] = MEDELLIN_BBOX,
+) -> list[dict[str, Any]]:
     """Consulta Overpass API por parques/colegios/estadios dentro del bbox."""
     south, west, north, east = bbox
     query = _OVERPASS_QUERY.format(south=south, west=west, north=north, east=east)
@@ -95,13 +97,15 @@ async def fetch_safe_zones_osm(bbox: tuple[float, float, float, float] = MEDELLI
         if lat is None or lon is None:
             continue
 
-        zones.append({
-            "id": f"osm_{el.get('type')}_{el.get('id')}",
-            "nombre": nombre,
-            "tipo": tipo,
-            "lat": float(lat),
-            "lon": float(lon),
-        })
+        zones.append(
+            {
+                "id": f"osm_{el.get('type')}_{el.get('id')}",
+                "nombre": nombre,
+                "tipo": tipo,
+                "lat": float(lat),
+                "lon": float(lon),
+            }
+        )
     return zones
 
 
@@ -140,7 +144,9 @@ async def _commune_centroid(session: AsyncSession, commune_id: str) -> tuple[flo
     return None
 
 
-async def _osrm_walking_route(origin_lat: float, origin_lon: float, dest_lat: float, dest_lon: float) -> dict[str, Any] | None:
+async def _osrm_walking_route(
+    origin_lat: float, origin_lon: float, dest_lat: float, dest_lon: float
+) -> dict[str, Any] | None:
     from infrastructure.external.osrm_client import walking_route
 
     return await walking_route(origin_lat, origin_lon, dest_lat, dest_lon)
@@ -179,16 +185,18 @@ async def get_evacuation_routes(
     for z in ranked:
         straight_km = round(haversine_km(origin_lon, origin_lat, z.lon, z.lat), 2)
         route = await _osrm_walking_route(origin_lat, origin_lon, z.lat, z.lon)
-        results.append({
-            "id": z.id,
-            "nombre": z.nombre,
-            "tipo": z.tipo,
-            "distance_straight_km": straight_km,
-            "distance_walking_m": route["distance_m"] if route else None,
-            "duration_walking_min": route["duration_min"] if route else None,
-            "route_geometry": route["geometry"] if route else None,
-            "validated": z.validated,
-        })
+        results.append(
+            {
+                "id": z.id,
+                "nombre": z.nombre,
+                "tipo": z.tipo,
+                "distance_straight_km": straight_km,
+                "distance_walking_m": route["distance_m"] if route else None,
+                "duration_walking_min": route["duration_min"] if route else None,
+                "route_geometry": route["geometry"] if route else None,
+                "validated": z.validated,
+            }
+        )
 
     return {
         "commune_id": commune_id,
@@ -206,7 +214,7 @@ async def get_evacuation_routes(
 async def main() -> None:
     """Refresca `safe_zones` desde Overpass API:
 
-        cd platform/backend && PYTHONPATH=. python -m alerts.evacuation
+    cd platform/backend && PYTHONPATH=. python -m alerts.evacuation
     """
     from db.session import AsyncSessionLocal
     from observability.logging_config import configure_logging

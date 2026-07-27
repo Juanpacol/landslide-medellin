@@ -50,6 +50,7 @@ def _get_anthropic_client():
         _anthropic_client = anthropic.Anthropic()
     return _anthropic_client
 
+
 # ── Grading prompts ──────────────────────────────────────────────────────────
 
 _GRADE_CHAT_RAG_PROMPT = """Eres un evaluador estricto de un chatbot de riesgo de deslizamientos en Medellín.
@@ -155,7 +156,11 @@ async def _call_ollama_grader(prompt: str) -> dict:
         logger.warning("Grader returned out-of-range score: %r", score)
         return {"score": None, "feedback": f"grader_error: invalid score {score!r}"}
 
-    return {"score": int(score), "feedback": str(feedback), "grader_model": f"ollama/{GRADER_MODEL}"}
+    return {
+        "score": int(score),
+        "feedback": str(feedback),
+        "grader_model": f"ollama/{GRADER_MODEL}",
+    }
 
 
 def _call_anthropic_grader_sync(prompt: str) -> dict:
@@ -170,10 +175,18 @@ def _call_anthropic_grader_sync(prompt: str) -> dict:
         )
     except Exception as exc:
         logger.warning("Grader Anthropic call failed: %s", exc)
-        return {"score": None, "feedback": f"grader_error: {exc}", "grader_model": f"anthropic/{ANTHROPIC_MODEL}"}
+        return {
+            "score": None,
+            "feedback": f"grader_error: {exc}",
+            "grader_model": f"anthropic/{ANTHROPIC_MODEL}",
+        }
 
     if response.stop_reason == "refusal":
-        return {"score": None, "feedback": "grader_error: refused", "grader_model": f"anthropic/{ANTHROPIC_MODEL}"}
+        return {
+            "score": None,
+            "feedback": "grader_error: refused",
+            "grader_model": f"anthropic/{ANTHROPIC_MODEL}",
+        }
 
     content = next((b.text for b in response.content if b.type == "text"), "")
     parsed = _extract_json(content)
@@ -196,7 +209,11 @@ def _call_anthropic_grader_sync(prompt: str) -> dict:
             "grader_model": f"anthropic/{ANTHROPIC_MODEL}",
         }
 
-    return {"score": int(score), "feedback": str(feedback), "grader_model": f"anthropic/{ANTHROPIC_MODEL}"}
+    return {
+        "score": int(score),
+        "feedback": str(feedback),
+        "grader_model": f"anthropic/{ANTHROPIC_MODEL}",
+    }
 
 
 async def _call_anthropic_grader(prompt: str) -> dict:

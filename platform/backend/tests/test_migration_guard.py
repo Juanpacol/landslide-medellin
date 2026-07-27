@@ -50,9 +50,7 @@ class TestIncidenteReal:
 
 class TestOtrosEstados:
     def test_sincronizado(self) -> None:
-        dx = diagnose(
-            db_heads=("abc",), repo_heads=("abc",), known=frozenset({"abc"}), pending=[]
-        )
+        dx = diagnose(db_heads=("abc",), repo_heads=("abc",), known=frozenset({"abc"}), pending=[])
 
         assert dx.kind is DriftKind.OK
         assert dx.status == STATUS_OK
@@ -86,9 +84,7 @@ class TestOtrosEstados:
         assert dx.safe_to_upgrade is False
 
     def test_bd_virgen(self) -> None:
-        dx = diagnose(
-            db_heads=(), repo_heads=("abc",), known=frozenset({"abc"}), pending=["abc"]
-        )
+        dx = diagnose(db_heads=(), repo_heads=("abc",), known=frozenset({"abc"}), pending=["abc"])
 
         assert dx.kind is DriftKind.EMPTY_DB
         assert dx.safe_to_upgrade is True

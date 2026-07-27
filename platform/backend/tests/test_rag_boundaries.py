@@ -62,6 +62,5 @@ async def test_answers_in_scope_questions_without_refusing(require_ollama, db_se
     session_id = f"test-boundary-{uuid.uuid4()}"
     reply = await chat_rag(question, session_id, db_session)
     assert OUT_OF_SCOPE_REFUSAL.lower() not in reply.lower(), (
-        f"El bot rechazó una pregunta que SÍ está en su dominio: {question!r}\n"
-        f"Respuesta: {reply}"
+        f"El bot rechazó una pregunta que SÍ está en su dominio: {question!r}\nRespuesta: {reply}"
     )

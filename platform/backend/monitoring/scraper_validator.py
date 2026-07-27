@@ -35,11 +35,7 @@ MAX_SEISMIC_MAG = 10.0
 
 async def validate_rainfall_data(session: AsyncSession) -> tuple[str, dict]:
     """Valida registros recientes de lluvia (rainfall_timeseries)."""
-    stmt = (
-        select(RainfallTimeseries)
-        .order_by(RainfallTimeseries.snapshot_at.desc())
-        .limit(1000)
-    )
+    stmt = select(RainfallTimeseries).order_by(RainfallTimeseries.snapshot_at.desc()).limit(1000)
     rows = (await session.scalars(stmt)).all()
 
     now = datetime.now(timezone.utc)
@@ -50,7 +46,9 @@ async def validate_rainfall_data(session: AsyncSession) -> tuple[str, dict]:
             out_of_range += 1
             logger.warning(
                 "Rainfall out of range: %.1fmm commune=%s at %s",
-                row.precip_mm, row.commune_id, row.snapshot_at,
+                row.precip_mm,
+                row.commune_id,
+                row.snapshot_at,
             )
         if row.snapshot_at and row.snapshot_at > now:
             future_timestamps += 1
@@ -77,7 +75,9 @@ async def validate_seismic_data(session: AsyncSession) -> tuple[str, dict]:
         if row.magnitude is not None and not (MIN_SEISMIC_MAG <= row.magnitude <= MAX_SEISMIC_MAG):
             out_of_range += 1
             logger.warning(
-                "Seismic event out of range: magnitude=%s at %s", row.magnitude, row.event_local_at,
+                "Seismic event out of range: magnitude=%s at %s",
+                row.magnitude,
+                row.event_local_at,
             )
 
     findings = {
@@ -95,9 +95,7 @@ async def validate_geo_coverage(session: AsyncSession) -> tuple[str, dict]:
     """Detecta comunas sin datos de lluvia en las últimas 24h."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
 
-    stmt = select(RainfallTimeseries.commune_id).where(
-        RainfallTimeseries.snapshot_at >= cutoff
-    )
+    stmt = select(RainfallTimeseries.commune_id).where(RainfallTimeseries.snapshot_at >= cutoff)
     covered = {row[0] for row in (await session.execute(stmt)).all()}
 
     all_communes = {c.id for c in COMMUNES}

@@ -55,7 +55,9 @@ async def post_message(body: ChatRequest, db: AsyncSession = Depends(get_async_d
 
 
 @router.post("/stream", dependencies=[Depends(_chat_rate)])
-async def stream_message(body: ChatRequest, db: AsyncSession = Depends(get_async_db)) -> StreamingResponse:
+async def stream_message(
+    body: ChatRequest, db: AsyncSession = Depends(get_async_db)
+) -> StreamingResponse:
     """Variante en streaming (SSE) de `post_message()`.
 
     A diferencia de `post_message()`, aquí NO se guardan filas de
@@ -104,14 +106,10 @@ async def list_sessions(
         )
         base = base.where(AgentConversation.session_id.in_(matching))
 
-    total = (
-        await db.execute(select(func.count()).select_from(base.subquery()))
-    ).scalar_one()
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
 
     rows = (
-        await db.execute(
-            base.order_by(desc("last_message_at")).limit(limit).offset(offset)
-        )
+        await db.execute(base.order_by(desc("last_message_at")).limit(limit).offset(offset))
     ).all()
     session_ids = [r.session_id for r in rows]
 
@@ -135,9 +133,7 @@ async def list_sessions(
             .subquery()
         )
         for sid, content in (
-            await db.execute(
-                select(firsts.c.session_id, firsts.c.content).where(firsts.c.rn == 1)
-            )
+            await db.execute(select(firsts.c.session_id, firsts.c.content).where(firsts.c.rn == 1))
         ).all():
             first_user_msg[sid] = content
 
@@ -161,9 +157,7 @@ async def list_sessions(
         )
         for sid, role, content in (
             await db.execute(
-                select(lasts.c.session_id, lasts.c.role, lasts.c.content).where(
-                    lasts.c.rn == 1
-                )
+                select(lasts.c.session_id, lasts.c.role, lasts.c.content).where(lasts.c.rn == 1)
             )
         ).all():
             last_msg[sid] = {"role": role, "content": content}
@@ -184,9 +178,7 @@ async def list_sessions(
                 "preview_role": last.get("role"),
                 "message_count": r.message_count,
                 "started_at": r.started_at.isoformat() if r.started_at else None,
-                "last_message_at": r.last_message_at.isoformat()
-                if r.last_message_at
-                else None,
+                "last_message_at": r.last_message_at.isoformat() if r.last_message_at else None,
             }
         )
 
@@ -210,7 +202,11 @@ async def get_history(
     return {
         "session_id": session_id,
         "messages": [
-            {"role": r.role, "content": r.content, "created_at": r.created_at.isoformat() if r.created_at else None}
+            {
+                "role": r.role,
+                "content": r.content,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
             for r in rows
         ],
     }

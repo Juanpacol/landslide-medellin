@@ -96,7 +96,7 @@ async def test_chat_rag_graded_evaluation(db_session, require_ollama, chat_rag_c
     print(format_graded_report_summary(report, previous_report))
 
     assert report.threshold_passed, (
-        f"Chat RAG accuracy {report.accuracy*100:.1f}% below threshold {report.threshold*100:.0f}%"
+        f"Chat RAG accuracy {report.accuracy * 100:.1f}% below threshold {report.threshold * 100:.0f}%"
     )
     if report.average_score is not None:
         assert report.average_score >= QUALITY_THRESHOLD, (

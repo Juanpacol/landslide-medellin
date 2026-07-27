@@ -16,10 +16,16 @@ from scraper.historical_backfill import _commune_from_text
 async def main() -> None:
     async with AsyncSessionLocal() as session:
         null_events = (
-            await session.execute(
-                select(LandslideEvent).where(LandslideEvent.commune_id.is_(None)).order_by(LandslideEvent.id.asc())
+            (
+                await session.execute(
+                    select(LandslideEvent)
+                    .where(LandslideEvent.commune_id.is_(None))
+                    .order_by(LandslideEvent.id.asc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         total_null = len(null_events)
         geocoded_from_coords = 0
@@ -31,7 +37,9 @@ async def main() -> None:
 
                 if event.latitud is not None and event.longitud is not None:
                     try:
-                        info = await lookup_commune_for_point(client, float(event.longitud), float(event.latitud))
+                        info = await lookup_commune_for_point(
+                            client, float(event.longitud), float(event.latitud)
+                        )
                         resolved_commune = info.get("ml_commune_id")
                     except Exception:
                         resolved_commune = None
@@ -55,8 +63,12 @@ async def main() -> None:
         remaining_null = int(
             len(
                 (
-                    await session.execute(select(LandslideEvent.id).where(LandslideEvent.commune_id.is_(None)))
-                ).scalars().all()
+                    await session.execute(
+                        select(LandslideEvent.id).where(LandslideEvent.commune_id.is_(None))
+                    )
+                )
+                .scalars()
+                .all()
             )
         )
 

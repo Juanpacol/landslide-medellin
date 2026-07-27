@@ -3,7 +3,6 @@ Test suite para verificar que los XML tags se aplican correctamente en prompts.
 Valida que los cambios de estructura sean internos (no rompan la API pública).
 """
 
-import pytest
 from agent.risk_explanations import _template_explanation_structured, _render_narrative
 
 
@@ -85,12 +84,12 @@ class TestXMLTagsApplied:
             "<retrieved_documents>\n"
             "Resultados de la base de conocimiento para «geotecnia»:\n"
             "\n"
-            "<document id=\"1\">\n"
+            '<document id="1">\n'
             "<source>Hoja de Vida geotécnica de Villatina — SIATA_Villatina.pdf</source>\n"
             "<content>La zona de Villatina presenta pendientes escarpadas...</content>\n"
             "</document>\n"
             "\n"
-            "<document id=\"2\">\n"
+            '<document id="2">\n'
             "<source>Reporte DAGRD eventos</source>\n"
             "<content>Se reportaron deslizamientos en Villatina el 2026-07-01...</content>\n"
             "</document>\n"
@@ -100,8 +99,8 @@ class TestXMLTagsApplied:
         # Verify estructura
         assert retrieved_xml.startswith("<retrieved_documents>")
         assert retrieved_xml.endswith("</retrieved_documents>")
-        assert "<document id=\"1\">" in retrieved_xml
-        assert "<document id=\"2\">" in retrieved_xml
+        assert '<document id="1">' in retrieved_xml
+        assert '<document id="2">' in retrieved_xml
         assert "<source>" in retrieved_xml
         assert "<content>" in retrieved_xml
 

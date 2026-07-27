@@ -3,11 +3,9 @@ Integration tests para XML tags — valida que los tags fluyen correctamente
 a través del sistema sin romper funcionamiento.
 """
 
-import asyncio
 import pytest
 from agent.chat_rag import chat_rag
 from agent.risk_explanations import generate_risk_explanation
-from db.session import AsyncSessionLocal
 
 
 @pytest.mark.asyncio

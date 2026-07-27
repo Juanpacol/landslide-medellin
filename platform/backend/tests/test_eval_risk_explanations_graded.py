@@ -129,7 +129,7 @@ async def test_risk_explanations_graded_evaluation(require_ollama, risk_explanat
     print(format_graded_report_summary(report, previous_report))
 
     assert report.threshold_passed, (
-        f"Risk explanations accuracy {report.accuracy*100:.1f}% below threshold {report.threshold*100:.0f}%"
+        f"Risk explanations accuracy {report.accuracy * 100:.1f}% below threshold {report.threshold * 100:.0f}%"
     )
     if report.average_score is not None:
         assert report.average_score >= QUALITY_THRESHOLD, (

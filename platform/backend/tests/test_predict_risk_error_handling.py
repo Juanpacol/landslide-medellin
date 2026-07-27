@@ -49,7 +49,12 @@ class TestPredictOneCommune:
     async def test_comuna_exitosa_devuelve_su_resultado(self, monkeypatch) -> None:
         import ml.predict
 
-        expected = {"risk_score": 0.42, "risk_level": "medio", "confidence": 0.8, "features_used": {}}
+        expected = {
+            "risk_score": 0.42,
+            "risk_level": "medio",
+            "confidence": 0.8,
+            "features_used": {},
+        }
 
         async def _ok(cid, db):
             return expected

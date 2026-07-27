@@ -61,9 +61,7 @@ def _diagnose_offline(repo: RepoState) -> Diagnosis:
     la cadena de migraciones (heads múltiples, revisiones colgantes).
     """
     if len(repo.heads) > 1:
-        return diagnose(
-            db_heads=(), repo_heads=repo.heads, known=repo.known, pending=[]
-        )
+        return diagnose(db_heads=(), repo_heads=repo.heads, known=repo.known, pending=[])
     return Diagnosis(
         kind=DriftKind.OK,
         status=STATUS_OK,
@@ -82,9 +80,7 @@ def _collect() -> Diagnosis:
     # DB_AHEAD primero, así que la lista vacía nunca se usa en ese caso.
     resolvable = all(rev in repo.known for rev in db_heads)
     pending = pending_revisions(db_heads, repo) if resolvable else []
-    return diagnose(
-        db_heads=db_heads, repo_heads=repo.heads, known=repo.known, pending=pending
-    )
+    return diagnose(db_heads=db_heads, repo_heads=repo.heads, known=repo.known, pending=pending)
 
 
 async def _should_alert(session: AsyncSession, dx: Diagnosis) -> bool:
@@ -113,9 +109,7 @@ async def _should_alert(session: AsyncSession, dx: Diagnosis) -> bool:
 
     # PENDING es el estado normal entre un merge a main y el siguiente cron.
     # Solo es señal real si el MISMO conjunto sigue sin aplicarse.
-    if dx.kind is DriftKind.PENDING and last_detail.get("pending") != dx.detail.get(
-        "pending"
-    ):
+    if dx.kind is DriftKind.PENDING and last_detail.get("pending") != dx.detail.get("pending"):
         return False
 
     created = last.created_at
@@ -140,20 +134,29 @@ async def _record(dx: Diagnosis, *, preflight: bool) -> None:
             # bien: serían ~100 filas/día de ruido en agent_run_logs.
             if not preflight:
                 await log_agent_run(
-                    session, agent_name=AGENT_NAME, status=dx.status,
-                    summary=dx.summary, detail=detail,
+                    session,
+                    agent_name=AGENT_NAME,
+                    status=dx.status,
+                    summary=dx.summary,
+                    detail=detail,
                 )
             return
 
         if await _should_alert(session, dx):
             await fire_agent_alert(
-                session, agent_name=AGENT_NAME, status=dx.status,
-                summary=dx.summary, detail=detail,
+                session,
+                agent_name=AGENT_NAME,
+                status=dx.status,
+                summary=dx.summary,
+                detail=detail,
             )
         else:
             await log_agent_run(
-                session, agent_name=AGENT_NAME, status=dx.status,
-                summary=dx.summary, detail=detail,
+                session,
+                agent_name=AGENT_NAME,
+                status=dx.status,
+                summary=dx.summary,
+                detail=detail,
             )
 
 
@@ -167,8 +170,11 @@ def _write_github_output(dx: Diagnosis) -> None:
 
 
 async def run(
-    *, offline: bool = False, preflight: bool = False,
-    github_output: bool = False, as_json: bool = False,
+    *,
+    offline: bool = False,
+    preflight: bool = False,
+    github_output: bool = False,
+    as_json: bool = False,
 ) -> int:
     try:
         dx = _diagnose_offline(read_repo_state()) if offline else _collect()
@@ -186,10 +192,19 @@ async def run(
         _write_github_output(dx)
 
     if as_json:
-        print(json.dumps({
-            "kind": dx.kind.value, "status": dx.status, "summary": dx.summary,
-            "safe_to_upgrade": dx.safe_to_upgrade, "detail": dx.detail,
-        }, indent=2, ensure_ascii=False))
+        print(
+            json.dumps(
+                {
+                    "kind": dx.kind.value,
+                    "status": dx.status,
+                    "summary": dx.summary,
+                    "safe_to_upgrade": dx.safe_to_upgrade,
+                    "detail": dx.detail,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
     else:
         print(f"[{dx.status.upper()}] {dx.summary}")
 
@@ -209,23 +224,34 @@ async def run(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Guard de drift de migraciones alembic")
-    parser.add_argument("--offline", action="store_true",
-                        help="solo chequeos del repo, sin conectar a la BD")
-    parser.add_argument("--preflight", action="store_true",
-                        help="modo cron: nunca falla, expone safe_to_upgrade")
-    parser.add_argument("--github-output", action="store_true",
-                        help="escribe kind/safe_to_upgrade a $GITHUB_OUTPUT")
-    parser.add_argument("--json", dest="as_json", action="store_true",
-                        help="imprime el diagnóstico completo en JSON")
+    parser.add_argument(
+        "--offline", action="store_true", help="solo chequeos del repo, sin conectar a la BD"
+    )
+    parser.add_argument(
+        "--preflight", action="store_true", help="modo cron: nunca falla, expone safe_to_upgrade"
+    )
+    parser.add_argument(
+        "--github-output", action="store_true", help="escribe kind/safe_to_upgrade a $GITHUB_OUTPUT"
+    )
+    parser.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="imprime el diagnóstico completo en JSON",
+    )
     args = parser.parse_args()
 
     from observability.logging_config import configure_logging
 
     configure_logging("migration-guard")
-    return asyncio.run(run(
-        offline=args.offline, preflight=args.preflight,
-        github_output=args.github_output, as_json=args.as_json,
-    ))
+    return asyncio.run(
+        run(
+            offline=args.offline,
+            preflight=args.preflight,
+            github_output=args.github_output,
+            as_json=args.as_json,
+        )
+    )
 
 
 if __name__ == "__main__":

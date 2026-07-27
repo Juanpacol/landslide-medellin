@@ -153,9 +153,15 @@ async def _run_siata_sismos(session: AsyncSession) -> int:
                 {
                     "titulo": row.get("epicenter_label") or "Sismo registrado",
                     "detalle": (
-                        f"M{row['magnitude']}" if row.get("magnitude") is not None else "magnitud s/d"
+                        f"M{row['magnitude']}"
+                        if row.get("magnitude") is not None
+                        else "magnitud s/d"
                     )
-                    + (f" · {row['depth_km']:.0f} km de profundidad" if row.get("depth_km") is not None else "")
+                    + (
+                        f" · {row['depth_km']:.0f} km de profundidad"
+                        if row.get("depth_km") is not None
+                        else ""
+                    )
                     + f" · estación {row['station_name']}",
                     "fecha": str(row.get("event_local_at") or ""),
                 }

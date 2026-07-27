@@ -83,6 +83,6 @@ async def test_chat_rag_batch_evaluation(db_session, require_ollama, chat_rag_co
     print(format_report_summary(report))
 
     # Assert threshold
-    assert (
-        report.threshold_passed
-    ), f"Chat RAG accuracy {report.accuracy*100:.1f}% below threshold {report.threshold*100:.0f}%"
+    assert report.threshold_passed, (
+        f"Chat RAG accuracy {report.accuracy * 100:.1f}% below threshold {report.threshold * 100:.0f}%"
+    )

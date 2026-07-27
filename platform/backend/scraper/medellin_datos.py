@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -80,7 +80,9 @@ async def _fetch_polygon(client, codigo: str) -> dict[str, Any] | None:
     return feats[0]
 
 
-async def _query_point_layer(client, base: str, layer_id: int, lon: float, lat: float) -> list[dict[str, Any]]:
+async def _query_point_layer(
+    client, base: str, layer_id: int, lon: float, lat: float
+) -> list[dict[str, Any]]:
     url = f"{base}/{layer_id}/query"
     params = {
         "geometry": f"{lon},{lat}",

@@ -24,7 +24,6 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from db.models.landslide_event import LandslideEvent  # noqa: E402
 from db.models.ml_feature import MLFeature  # noqa: E402
 from db.session import SyncSessionLocal, sync_engine  # noqa: E402
 from ml.features import FeatureBuilder  # noqa: E402
@@ -157,9 +156,14 @@ def _rows_until(commune_id: str, cutoff: datetime, all_rows: list[MLFeature]) ->
     out = [
         r
         for r in all_rows
-        if r.commune_id == commune_id and r.reference_date is not None and r.reference_date <= cutoff
+        if r.commune_id == commune_id
+        and r.reference_date is not None
+        and r.reference_date <= cutoff
     ]
-    out.sort(key=lambda r: (r.reference_date or datetime.min.replace(tzinfo=timezone.utc), r.id), reverse=True)
+    out.sort(
+        key=lambda r: (r.reference_date or datetime.min.replace(tzinfo=timezone.utc), r.id),
+        reverse=True,
+    )
     return out
 
 
@@ -289,7 +293,11 @@ def _temporal_validation(
     train_mask = days < cutoff
     test_mask = ~train_mask
     y_tr, y_te = y[train_mask], y[test_mask]
-    if len(np.unique(y_tr)) < 2 or len(np.unique(y_te)) < 2 or int(y_te.sum()) < _MIN_TEMPORAL_POSITIVES:
+    if (
+        len(np.unique(y_tr)) < 2
+        or len(np.unique(y_te)) < 2
+        or int(y_te.sum()) < _MIN_TEMPORAL_POSITIVES
+    ):
         return {
             "train_auc_temporal": None,
             "temporal_reason": f"corte {cutoff} no deja ambas clases (o <{_MIN_TEMPORAL_POSITIVES} positivos) en test",
@@ -363,7 +371,9 @@ def train() -> dict[str, Any]:
     X_res, y_res = sm.fit_resample(Xs, y)
 
     class_values = np.array([0, 1], dtype=int)
-    weights = class_weight.compute_class_weight(class_weight="balanced", classes=class_values, y=y_res)
+    weights = class_weight.compute_class_weight(
+        class_weight="balanced", classes=class_values, y=y_res
+    )
     class_weight_map = {int(cls): float(w) for cls, w in zip(class_values, weights)}
     scale_pos_weight = class_weight_map[1] / max(class_weight_map[0], 1e-9)
 

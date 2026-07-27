@@ -27,7 +27,9 @@ class MeshQuadrant(Base):
     geometry: Mapped[dict[str, Any]] = mapped_column(JSONB)  # GeoJSON Polygon
     commune_ids: Mapped[list[str]] = mapped_column(JSONB)  # comunas que intersecta
     barrio_codigos: Mapped[list[str]] = mapped_column(JSONB)  # barrios que intersecta
-    hazard_grade: Mapped[str | None] = mapped_column(String(64), nullable=True)  # peor grado entre sus barrios
+    hazard_grade: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )  # peor grado entre sus barrios
     n_barrios_alta: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

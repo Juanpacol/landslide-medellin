@@ -79,7 +79,11 @@ async def antecedent_indexes_for_all_communes(
 
     daily_by_commune: dict[str, dict[date, float]] = {}
     for commune_id, day_value, total in (await session.execute(stmt)).all():
-        d = day_value if isinstance(day_value, date) else datetime.fromisoformat(str(day_value)).date()
+        d = (
+            day_value
+            if isinstance(day_value, date)
+            else datetime.fromisoformat(str(day_value)).date()
+        )
         daily_by_commune.setdefault(str(commune_id), {})[d] = float(total or 0.0)
 
     return {

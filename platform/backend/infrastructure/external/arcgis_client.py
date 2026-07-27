@@ -56,7 +56,9 @@ def parse_ml_commune_from_siata_field(comuna_raw: str) -> str | None:
     return None
 
 
-async def lookup_commune_for_point(client: httpx.AsyncClient, lon: float, lat: float) -> dict[str, Any]:
+async def lookup_commune_for_point(
+    client: httpx.AsyncClient, lon: float, lat: float
+) -> dict[str, Any]:
     params = {
         "geometry": f"{lon},{lat}",
         "geometryType": "esriGeometryPoint",

@@ -128,7 +128,12 @@ async def ingest_historical_dagrd(session: AsyncSession) -> dict[str, Any]:
             if page > 30:
                 break
     await session.commit()
-    result = {"source": "historical_dagrd", "fetched": fetched, "inserted": inserted, "by_year": dict(years)}
+    result = {
+        "source": "historical_dagrd",
+        "fetched": fetched,
+        "inserted": inserted,
+        "by_year": dict(years),
+    }
     print(json.dumps(result, ensure_ascii=False), flush=True)
     return result
 
@@ -144,7 +149,9 @@ async def ingest_historical_ideam(session: AsyncSession) -> dict[str, Any]:
         offset = 0
         limit = 5000
         while True:
-            where = "upper(municipio) like '%MEDELL%' and fechaobservacion >= '2018-01-01T00:00:00.000'"
+            where = (
+                "upper(municipio) like '%MEDELL%' and fechaobservacion >= '2018-01-01T00:00:00.000'"
+            )
             params = {
                 "$where": where,
                 "$select": "fechaobservacion,latitud,longitud,valorobservado",
@@ -161,7 +168,10 @@ async def ingest_historical_ideam(session: AsyncSession) -> dict[str, Any]:
             if not isinstance(batch, list) or not batch:
                 break
             fetched += len(batch)
-            print(f"historical_ideam page offset={offset} rows={len(batch)} fetched={fetched}", flush=True)
+            print(
+                f"historical_ideam page offset={offset} rows={len(batch)} fetched={fetched}",
+                flush=True,
+            )
             for row in batch:
                 dt = _parse_dt(row.get("fechaobservacion", ""))
                 if not dt or dt.year < MIN_YEAR:
@@ -209,7 +219,12 @@ async def ingest_historical_ideam(session: AsyncSession) -> dict[str, Any]:
         )
         inserted += 1
     await session.commit()
-    result = {"source": "historical_ideam", "fetched": fetched, "inserted": inserted, "by_year": dict(years)}
+    result = {
+        "source": "historical_ideam",
+        "fetched": fetched,
+        "inserted": inserted,
+        "by_year": dict(years),
+    }
     print(json.dumps(result, ensure_ascii=False), flush=True)
     return result
 
@@ -313,7 +328,12 @@ async def ingest_historical_siata(session: AsyncSession) -> dict[str, Any]:
                 )
                 inserted += 1
             await write_session.commit()
-    result = {"source": "historical_siata", "fetched": fetched, "inserted": inserted, "by_year": dict(years)}
+    result = {
+        "source": "historical_siata",
+        "fetched": fetched,
+        "inserted": inserted,
+        "by_year": dict(years),
+    }
     print(json.dumps(result, ensure_ascii=False), flush=True)
     return result
 
@@ -363,7 +383,12 @@ async def ingest_historical_medata(session: AsyncSession) -> dict[str, Any]:
                 )
                 inserted += 1
             await write_session.commit()
-    result = {"source": "historical_medata", "fetched": fetched, "inserted": inserted, "by_year": dict(years)}
+    result = {
+        "source": "historical_medata",
+        "fetched": fetched,
+        "inserted": inserted,
+        "by_year": dict(years),
+    }
     print(json.dumps(result, ensure_ascii=False), flush=True)
     return result
 

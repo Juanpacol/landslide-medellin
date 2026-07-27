@@ -62,9 +62,7 @@ def _get_embedding_function():
         from chromadb.utils import embedding_functions
 
         logger.info(f"Loading embedding model: {EMBED_MODEL} (primera vez descarga ~470MB)")
-        _embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=EMBED_MODEL
-        )
+        _embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBED_MODEL)
     return _embed_fn
 
 
@@ -96,6 +94,7 @@ def _clean_metadata(chunk: dict[str, Any]) -> dict[str, Any]:
     Normaliza el metadata de un chunk a un set común compatible con ChromaDB.
     ChromaDB solo acepta valores str/int/float/bool (no None, no listas).
     """
+
     def s(key: str, default: str = "") -> str:
         v = chunk.get(key)
         return str(v) if v is not None else default
@@ -140,7 +139,9 @@ def _build_document(source_id: str, chunk: dict[str, Any]) -> str:
         codigo = chunk.get("codigo", "")
         header = f"[Comuna: {nombre} (código {codigo})]"
     elif source_id == "siata_hidromet":
-        header = f"[Reporte SIATA semana {chunk.get('week_start', '')} a {chunk.get('week_end', '')}]"
+        header = (
+            f"[Reporte SIATA semana {chunk.get('week_start', '')} a {chunk.get('week_end', '')}]"
+        )
     elif source_id == "dagrd_eventos":
         header = f"[Evento DAGRD {chunk.get('event_date', '')}: {chunk.get('event_title', '')}]"
     else:
@@ -340,8 +341,10 @@ def _run_tests() -> None:
         for i, r in enumerate(results, 1):
             meta = r["metadata"]
             preview = r["text"][:160].replace("\n", " ")
-            print(f"\n[{i}] dist={r['distance']:.4f} | {meta.get('source_id')} | "
-                  f"{meta.get('date', '')} {meta.get('zone', '')}")
+            print(
+                f"\n[{i}] dist={r['distance']:.4f} | {meta.get('source_id')} | "
+                f"{meta.get('date', '')} {meta.get('zone', '')}"
+            )
             print(f"    {preview}...")
 
 
@@ -364,7 +367,9 @@ def main() -> None:
     if args.query:
         for i, r in enumerate(search(args.query, n=5), 1):
             meta = r["metadata"]
-            print(f"\n[{i}] dist={r['distance']:.4f} | {meta.get('source_id')} | {meta.get('zone', '')}")
+            print(
+                f"\n[{i}] dist={r['distance']:.4f} | {meta.get('source_id')} | {meta.get('zone', '')}"
+            )
             print(f"    {r['text'][:200]}...")
 
     if not any([args.ingest, args.stats, args.test, args.query]):

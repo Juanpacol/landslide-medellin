@@ -23,7 +23,9 @@ class ScraperRunBody(BaseModel):
 
 
 @router.post("/log")
-async def create_scrape_log(body: ScraperRunBody, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+async def create_scrape_log(
+    body: ScraperRunBody, db: AsyncSession = Depends(get_async_db)
+) -> dict[str, Any]:
     status = validate_scrape_log_status(body.status)
     now = datetime.now(timezone.utc)
     row = ScrapingLog(
@@ -64,12 +66,10 @@ async def list_logs(limit: int = 30, db: AsyncSession = Depends(get_async_db)) -
 @router.get("/status")
 async def scraper_status(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
     latest_rows = (
-        await db.execute(
-            select(ScrapingLog)
-            .order_by(ScrapingLog.created_at.desc())
-            .limit(200)
-        )
-    ).scalars().all()
+        (await db.execute(select(ScrapingLog).order_by(ScrapingLog.created_at.desc()).limit(200)))
+        .scalars()
+        .all()
+    )
 
     by_source: dict[str, ScrapingLog] = {}
     for row in latest_rows:
@@ -146,9 +146,7 @@ async def scraper_health(db: AsyncSession = Depends(get_async_db)) -> dict[str, 
                 break
 
         # Most recent successful run
-        last_success = next(
-            (r for r in rows if r.status in _SUCCESS_STATUSES), None
-        )
+        last_success = next((r for r in rows if r.status in _SUCCESS_STATUSES), None)
         last_success_at: datetime | None = None
         if last_success:
             ts = last_success.run_finished_at or last_success.run_started_at
@@ -160,9 +158,15 @@ async def scraper_health(db: AsyncSession = Depends(get_async_db)) -> dict[str, 
 
         # 24-h success rate (ignore "started" rows that haven't finished yet)
         rows_24h = [
-            r for r in rows
+            r
+            for r in rows
             if r.run_started_at
-            and (r.run_started_at.replace(tzinfo=timezone.utc) if r.run_started_at.tzinfo is None else r.run_started_at) >= cutoff_24h
+            and (
+                r.run_started_at.replace(tzinfo=timezone.utc)
+                if r.run_started_at.tzinfo is None
+                else r.run_started_at
+            )
+            >= cutoff_24h
             and r.status != "started"
         ]
         success_rate_24h: float | None = None
@@ -173,9 +177,13 @@ async def scraper_health(db: AsyncSession = Depends(get_async_db)) -> dict[str, 
         # Status classification
         if not rows:
             status = "unknown"
-        elif consecutive_failures >= 3 or (data_lag_minutes is not None and data_lag_minutes > interval_min * 3):
+        elif consecutive_failures >= 3 or (
+            data_lag_minutes is not None and data_lag_minutes > interval_min * 3
+        ):
             status = "critical"
-        elif consecutive_failures >= 1 or (data_lag_minutes is not None and data_lag_minutes > interval_min * 2):
+        elif consecutive_failures >= 1 or (
+            data_lag_minutes is not None and data_lag_minutes > interval_min * 2
+        ):
             status = "warning"
         else:
             status = "healthy"
@@ -185,20 +193,22 @@ async def scraper_health(db: AsyncSession = Depends(get_async_db)) -> dict[str, 
         if last_started and last_started.tzinfo is None:
             last_started = last_started.replace(tzinfo=timezone.utc)
 
-        sources_health.append({
-            "source": source,
-            "status": status,
-            "last_success_at": last_success_at.isoformat() if last_success_at else None,
-            "consecutive_failures": consecutive_failures,
-            "success_rate_24h": success_rate_24h,
-            "data_lag_minutes": data_lag_minutes,
-            "interval_minutes": interval_min,
-            "total_runs_24h": len(rows_24h),
-            "last_run_status": last_row.status if last_row else None,
-            "last_run_at": last_started.isoformat() if last_started else None,
-            "last_records_valid": last_row.records_valid if last_row else None,
-            "last_detail": last_row.detail if last_row else None,
-        })
+        sources_health.append(
+            {
+                "source": source,
+                "status": status,
+                "last_success_at": last_success_at.isoformat() if last_success_at else None,
+                "consecutive_failures": consecutive_failures,
+                "success_rate_24h": success_rate_24h,
+                "data_lag_minutes": data_lag_minutes,
+                "interval_minutes": interval_min,
+                "total_runs_24h": len(rows_24h),
+                "last_run_status": last_row.status if last_row else None,
+                "last_run_at": last_started.isoformat() if last_started else None,
+                "last_records_valid": last_row.records_valid if last_row else None,
+                "last_detail": last_row.detail if last_row else None,
+            }
+        )
 
     statuses = {s["status"] for s in sources_health}
     if "critical" in statuses:
@@ -233,15 +243,17 @@ async def scraper_timeline(db: AsyncSession = Depends(get_async_db)) -> dict[str
                 started = started.replace(tzinfo=timezone.utc)
             if finished and finished.tzinfo is None:
                 finished = finished.replace(tzinfo=timezone.utc)
-            by_source[row.source].append({
-                "id": row.id,
-                "status": row.status,
-                "run_started_at": started.isoformat() if started else None,
-                "run_finished_at": finished.isoformat() if finished else None,
-                "records_downloaded": row.records_downloaded,
-                "records_valid": row.records_valid,
-                "detail": row.detail,
-            })
+            by_source[row.source].append(
+                {
+                    "id": row.id,
+                    "status": row.status,
+                    "run_started_at": started.isoformat() if started else None,
+                    "run_finished_at": finished.isoformat() if finished else None,
+                    "records_downloaded": row.records_downloaded,
+                    "records_valid": row.records_valid,
+                    "detail": row.detail,
+                }
+            )
 
     for source in SCRAPER_INTERVALS:
         if source not in by_source:

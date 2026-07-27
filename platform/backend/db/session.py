@@ -58,7 +58,9 @@ sync_engine = create_engine(
     connect_args=_sync_connect_args,
 )
 
-SyncSessionLocal = sessionmaker(bind=sync_engine, class_=Session, autoflush=False, expire_on_commit=False)
+SyncSessionLocal = sessionmaker(
+    bind=sync_engine, class_=Session, autoflush=False, expire_on_commit=False
+)
 
 
 async def get_async_db() -> AsyncGenerator[AsyncSession, None]:

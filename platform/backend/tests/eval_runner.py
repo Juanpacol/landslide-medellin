@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TestResult:
     """Result of a single test case execution."""
+
     test_id: str
     passed: bool
     expected: dict
@@ -35,6 +36,7 @@ class GradedTestResult(TestResult):
     `score` is None when grading failed or was skipped (e.g. Ollama down) —
     callers must treat None as "no data", not as a failing score.
     """
+
     score: int | None = None
     grader_feedback: str = ""
     grader_model: str = "ollama"
@@ -43,6 +45,7 @@ class GradedTestResult(TestResult):
 @dataclass
 class EvaluationReport:
     """Aggregated evaluation results."""
+
     prompt_module: str
     total_tests: int
     passed: int
@@ -189,9 +192,7 @@ def generate_report(
     }
 
     scored = [
-        r.score
-        for r in test_results
-        if isinstance(r, GradedTestResult) and r.score is not None
+        r.score for r in test_results if isinstance(r, GradedTestResult) and r.score is not None
     ]
     average_score = sum(scored) / len(scored) if scored else None
     quality_threshold_passed = (
@@ -252,10 +253,12 @@ def save_report(report: EvaluationReport, output_dir: Path | str) -> Path:
         "total_tests": report.total_tests,
         "passed": report.passed,
         "failed": report.failed,
-        "accuracy": f"{report.accuracy*100:.1f}%",
-        "threshold": f"{report.threshold*100:.0f}%",
+        "accuracy": f"{report.accuracy * 100:.1f}%",
+        "threshold": f"{report.threshold * 100:.0f}%",
         "threshold_passed": report.threshold_passed,
-        "average_score": round(report.average_score, 2) if report.average_score is not None else None,
+        "average_score": round(report.average_score, 2)
+        if report.average_score is not None
+        else None,
         "graded_count": report.graded_count,
         "quality_threshold": report.quality_threshold,
         "quality_threshold_passed": report.quality_threshold_passed,
@@ -298,13 +301,13 @@ def format_report_summary(report: EvaluationReport) -> str:
     status = "PASS" if report.threshold_passed else "FAIL"
 
     lines = [
-        f"\n{'='*60}",
+        f"\n{'=' * 60}",
         f"📊 EVALUATION REPORT: {report.prompt_module}",
-        f"{'='*60}",
-        f"Overall Accuracy: {report.passed}/{report.total_tests} ({report.accuracy*100:.1f}%)",
-        f"Threshold: {report.threshold*100:.0f}% {emoji_pass} {status}",
+        f"{'=' * 60}",
+        f"Overall Accuracy: {report.passed}/{report.total_tests} ({report.accuracy * 100:.1f}%)",
+        f"Threshold: {report.threshold * 100:.0f}% {emoji_pass} {status}",
         f"Executed: {report.executed_at}",
-        f"{'='*60}\n",
+        f"{'=' * 60}\n",
     ]
 
     if report.results and any(not r.passed for r in report.results):
@@ -333,20 +336,16 @@ def format_graded_report_summary(
     status_acc = "PASS" if report.threshold_passed else "FAIL"
 
     lines = [
-        f"\n{'='*60}",
+        f"\n{'=' * 60}",
         f"📊 EVALUATION REPORT (GRADED): {report.prompt_module}",
-        f"{'='*60}",
-        f"Overall Accuracy: {report.passed}/{report.total_tests} ({report.accuracy*100:.1f}%)",
-        f"Threshold (Accuracy): {report.threshold*100:.0f}% {emoji_acc} {status_acc}",
+        f"{'=' * 60}",
+        f"Overall Accuracy: {report.passed}/{report.total_tests} ({report.accuracy * 100:.1f}%)",
+        f"Threshold (Accuracy): {report.threshold * 100:.0f}% {emoji_acc} {status_acc}",
     ]
 
     if report.average_score is not None:
         emoji_q = "✅" if report.quality_threshold_passed in (True, None) else "❌"
-        status_q = (
-            "PASS"
-            if report.quality_threshold_passed in (True, None)
-            else "FAIL"
-        )
+        status_q = "PASS" if report.quality_threshold_passed in (True, None) else "FAIL"
         threshold_line = (
             f" | Threshold: {report.quality_threshold}/10 {emoji_q} {status_q}"
             if report.quality_threshold is not None
@@ -360,7 +359,7 @@ def format_graded_report_summary(
         lines.append("Average Quality Score: N/A (grading unavailable — Ollama down?)")
 
     lines.append(f"Executed: {report.executed_at}")
-    lines.append(f"{'='*60}\n")
+    lines.append(f"{'=' * 60}\n")
 
     lines.append("Per-Test Breakdown:")
     for r in report.results:
@@ -368,7 +367,7 @@ def format_graded_report_summary(
         score_part = ""
         if isinstance(r, GradedTestResult):
             if r.score is not None:
-                score_part = f" (score {r.score}/10) - \"{r.grader_feedback}\""
+                score_part = f' (score {r.score}/10) - "{r.grader_feedback}"'
             else:
                 score_part = f" (score N/A - {r.grader_feedback})"
         lines.append(f"  {status} {r.test_id}: {'PASS' if r.passed else 'FAIL'}{score_part}")
@@ -378,7 +377,7 @@ def format_graded_report_summary(
         prev_accuracy = previous_report.get("accuracy", "N/A")
         prev_score = previous_report.get("average_score")
         lines.append(f"Comparison vs Last Run ({previous_report.get('executed_at', 'unknown')}):")
-        lines.append(f"  Accuracy: {prev_accuracy} → {report.accuracy*100:.1f}%")
+        lines.append(f"  Accuracy: {prev_accuracy} → {report.accuracy * 100:.1f}%")
         if prev_score is not None and report.average_score is not None:
             delta = report.average_score - prev_score
             arrow = "+" if delta >= 0 else ""
@@ -398,6 +397,7 @@ def format_graded_report_summary(
 class GraderComparison:
     """One test case scored by two different judge providers, for agreement
     analysis — same artifact, same rubric prompt, different judge model."""
+
     test_id: str
     ollama_score: int | None
     anthropic_score: int | None
@@ -428,7 +428,9 @@ def save_comparison_report(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    paired = [c for c in comparisons if c.ollama_score is not None and c.anthropic_score is not None]
+    paired = [
+        c for c in comparisons if c.ollama_score is not None and c.anthropic_score is not None
+    ]
     deltas = [c.delta for c in paired]
     avg_ollama = sum(c.ollama_score for c in paired) / len(paired) if paired else None
     avg_anthropic = sum(c.anthropic_score for c in paired) / len(paired) if paired else None
@@ -467,22 +469,28 @@ def save_comparison_report(
 
 def format_comparison_summary(domain: str, comparisons: list[GraderComparison]) -> str:
     """Formats a grader-comparison report for console output."""
-    paired = [c for c in comparisons if c.ollama_score is not None and c.anthropic_score is not None]
+    paired = [
+        c for c in comparisons if c.ollama_score is not None and c.anthropic_score is not None
+    ]
     avg_ollama = sum(c.ollama_score for c in paired) / len(paired) if paired else None
     avg_anthropic = sum(c.anthropic_score for c in paired) / len(paired) if paired else None
     mean_abs_delta = sum(abs(c.delta) for c in paired) / len(paired) if paired else None
 
     lines = [
-        f"\n{'='*70}",
+        f"\n{'=' * 70}",
         f"⚖️  GRADER COMPARISON (Ollama vs Anthropic): {domain}",
-        f"{'='*70}",
+        f"{'=' * 70}",
     ]
     if avg_ollama is not None and avg_anthropic is not None:
-        lines.append(f"Average score — Ollama: {avg_ollama:.1f}/10  |  Anthropic: {avg_anthropic:.1f}/10")
-        lines.append(f"Mean absolute delta: {mean_abs_delta:.1f} points ({len(paired)}/{len(comparisons)} paired)")
+        lines.append(
+            f"Average score — Ollama: {avg_ollama:.1f}/10  |  Anthropic: {avg_anthropic:.1f}/10"
+        )
+        lines.append(
+            f"Mean absolute delta: {mean_abs_delta:.1f} points ({len(paired)}/{len(comparisons)} paired)"
+        )
     else:
         lines.append("No paired scores available (a grader failed on every case)")
-    lines.append(f"{'='*70}\n")
+    lines.append(f"{'=' * 70}\n")
 
     lines.append(f"{'test_id':<28} {'ollama':>7} {'claude':>7} {'delta':>7}")
     for c in comparisons:
@@ -495,7 +503,9 @@ def format_comparison_summary(domain: str, comparisons: list[GraderComparison]) 
     if high_disagreement:
         lines.append("\nHigh disagreement (|delta| >= 3):")
         for c in high_disagreement:
-            lines.append(f"  {c.test_id}: ollama={c.ollama_score} (\"{c.ollama_feedback}\")")
-            lines.append(f"  {' ' * len(c.test_id)}  claude={c.anthropic_score} (\"{c.anthropic_feedback}\")")
+            lines.append(f'  {c.test_id}: ollama={c.ollama_score} ("{c.ollama_feedback}")')
+            lines.append(
+                f'  {" " * len(c.test_id)}  claude={c.anthropic_score} ("{c.anthropic_feedback}")'
+            )
 
     return "\n".join(lines)

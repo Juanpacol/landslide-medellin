@@ -53,6 +53,8 @@ MAX_TOOL_ROUNDS = int(os.getenv("RAG_MAX_TOOL_ROUNDS", "3"))
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").strip().lower()
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
+
+
 def _get_anthropic_client():
     from infrastructure.external.llm_client import get_anthropic_client
 
@@ -70,11 +72,13 @@ def _openai_tools_to_claude(tools: list[dict]) -> list[dict]:
     claude_tools = []
     for t in tools:
         fn = t.get("function", {})
-        claude_tools.append({
-            "name": fn.get("name"),
-            "description": fn.get("description", ""),
-            "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
-        })
+        claude_tools.append(
+            {
+                "name": fn.get("name"),
+                "description": fn.get("description", ""),
+                "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+            }
+        )
     return claude_tools
 
 
@@ -271,6 +275,7 @@ def _extract_tool_calls(message: dict) -> list[dict]:
 # arriba, pero hablando el protocolo propio de la Messages API.
 # ─────────────────────────────────────────────────────────────────────────
 
+
 async def _anthropic_chat(messages: list[dict], system: str, use_tools: bool = True) -> Any:
     """Una llamada a Claude. Devuelve el objeto Message completo (se necesita
     `.content` para los bloques `tool_use` y poder reenviarlos tal cual)."""
@@ -430,7 +435,9 @@ async def _generate_reply_stream(system: str, conversation: list[dict]) -> Async
                 yield piece
             return
         except Exception as exc:  # noqa: BLE001
-            print(f"CHAT_RAG_STREAM anthropic error ({type(exc).__name__}): {exc} — fallback a Ollama")
+            print(
+                f"CHAT_RAG_STREAM anthropic error ({type(exc).__name__}): {exc} — fallback a Ollama"
+            )
 
     ollama_messages = [{"role": "system", "content": system}, *conversation]
     async for piece in _run_tool_loop_stream(ollama_messages):
@@ -511,15 +518,19 @@ async def _run_tool_loop(messages: list[dict]) -> str:
         for tc in tool_calls:
             result = await call_tool(tc["name"], tc["arguments"])
             print(f"  [tool] {tc['name']}({tc['arguments']}) → {result[:80]}...")
-            messages.append({
-                "role": "tool",
-                "tool_name": tc["name"],
-                "content": result,
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_name": tc["name"],
+                    "content": result,
+                }
+            )
 
     # Última pasada sin tools para que sintetice una respuesta final.
     final = await _ollama_chat(messages, use_tools=False)
-    return (final.get("content") or "No pude generar una respuesta con los datos disponibles.").strip()
+    return (
+        final.get("content") or "No pude generar una respuesta con los datos disponibles."
+    ).strip()
 
 
 async def _run_tool_loop_stream(messages: list[dict]) -> AsyncIterator[str]:
@@ -552,11 +563,13 @@ async def _run_tool_loop_stream(messages: list[dict]) -> AsyncIterator[str]:
         for tc in tool_calls:
             result = await call_tool(tc["name"], tc["arguments"])
             print(f"  [tool] {tc['name']}({tc['arguments']}) → {result[:80]}...")
-            messages.append({
-                "role": "tool",
-                "tool_name": tc["name"],
-                "content": result,
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_name": tc["name"],
+                    "content": result,
+                }
+            )
 
     # Última pasada sin tools: síntesis final en streaming real.
     got_any = False
@@ -611,7 +624,9 @@ async def chat_rag_stream(message: str, session_id: str, db: AsyncSession) -> As
             full_reply += piece
             yield piece
     except Exception as e:  # noqa: BLE001
-        print(f"CHAT_RAG_STREAM error ({type(e).__name__}): {e} — fallback a chat clásico (streaming)")
+        print(
+            f"CHAT_RAG_STREAM error ({type(e).__name__}): {e} — fallback a chat clásico (streaming)"
+        )
         from agent.chat import chat_stream as classic_chat_stream
 
         # Igual que en `chat_rag()`, el chat clásico vuelve a guardar el turno
@@ -627,7 +642,7 @@ async def chat_rag_stream(message: str, session_id: str, db: AsyncSession) -> As
     before = full_reply
     full_reply = _append_sources_footer(full_reply)
     full_reply = _append_emergency_line_if_needed(full_reply)
-    extra = scan_output(full_reply[len(before):])
+    extra = scan_output(full_reply[len(before) :])
     if extra:
         yield extra
     await save_turn(session_id, "assistant", full_reply, db)

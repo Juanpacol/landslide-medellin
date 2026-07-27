@@ -98,6 +98,7 @@ def display_name(value: str | int | None) -> str:
 
 # ── Resolución por nombre (para el chat: "¿cómo está el Poblado?") ────────────
 
+
 def _normalize_token(s: str) -> str:
     s = s.strip().lower()
     nkfd = unicodedata.normalize("NFD", s)

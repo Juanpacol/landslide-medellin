@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import html
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -132,7 +132,9 @@ async def _event_exists(
     source_row_id: str | None,
 ) -> bool:
     if source_row_id:
-        stmt = select(LandslideEvent.id).where(LandslideEvent.source_row_id == source_row_id).limit(1)
+        stmt = (
+            select(LandslideEvent.id).where(LandslideEvent.source_row_id == source_row_id).limit(1)
+        )
         if await session.scalar(stmt):
             return True
     if commune_id:
@@ -180,7 +182,9 @@ async def _run_dagrd(session: AsyncSession) -> int:
             new_items.append(
                 {
                     "titulo": ev["tipo_emergencia"] or "Evento de emergencia",
-                    "detalle": f"comuna {ev['commune_id']}" if ev["commune_id"] else "ubicación sin asignar",
+                    "detalle": f"comuna {ev['commune_id']}"
+                    if ev["commune_id"]
+                    else "ubicación sin asignar",
                     "fecha": ev["fecha"] or "",
                 }
             )

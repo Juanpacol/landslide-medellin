@@ -25,7 +25,6 @@ from db.models.rainfall_timeseries import RainfallTimeseries
 from db.models.risk_explanation import RiskExplanation
 from db.session import get_async_db
 from integrations.agent_contracts import predict_all_comunas, predict_risk_stub
-from observability.predictions import get_prediction_logs
 
 router = APIRouter()
 
@@ -68,7 +67,9 @@ def _arcgis_to_geojson_polygon(geometry: dict[str, Any]) -> dict[str, Any] | Non
     return {"type": "Polygon", "coordinates": rings}
 
 
-async def _fetch_single_commune_polygon(client: httpx.AsyncClient, codigo: str) -> dict[str, Any] | None:
+async def _fetch_single_commune_polygon(
+    client: httpx.AsyncClient, codigo: str
+) -> dict[str, Any] | None:
     where_codigo = codigo.zfill(2) if codigo not in {"50", "60", "70", "80", "90"} else codigo
     params = {
         "where": f"codigo='{where_codigo}'",
@@ -134,7 +135,9 @@ async def _load_real_commune_polygons() -> list[dict[str, Any]]:
         try:
             _POLYGON_CACHE_FILE.write_text(json.dumps(out), encoding="utf-8")
         except Exception:
-            logging.getLogger(__name__).warning("No se pudo escribir el cache de polígonos a disco.")
+            logging.getLogger(__name__).warning(
+                "No se pudo escribir el cache de polígonos a disco."
+            )
     return out
 
 
@@ -165,11 +168,7 @@ async def latest_predictions(
     limit: int = 50,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, Any]:
-    stmt = (
-        select(RiskPrediction)
-        .order_by(RiskPrediction.created_at.desc())
-        .limit(min(limit, 200))
-    )
+    stmt = select(RiskPrediction).order_by(RiskPrediction.created_at.desc()).limit(min(limit, 200))
     result = await db.execute(stmt)
     rows = result.scalars().all()
     return {
@@ -209,30 +208,38 @@ async def get_comunas(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any
         geo_obj = geo_by_cid.get(cid)
         geom = geo_obj.get("geometry") if geo_obj else None
         display_name = (geo_obj or {}).get("nombre_comuna") or nombre
-        features.append({
-            "type": "Feature",
-            "geometry": geom,
-            "properties": {
-                "commune_id": cid,
-                "nombre_comuna": display_name,
-                "categoria_riesgo": categoria,
-                "indice_riesgo": score,
-                "n_eventos": n_eventos,
-                "is_zona_ladera": is_ladera,
-            },
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": geom,
+                "properties": {
+                    "commune_id": cid,
+                    "nombre_comuna": display_name,
+                    "categoria_riesgo": categoria,
+                    "indice_riesgo": score,
+                    "n_eventos": n_eventos,
+                    "is_zona_ladera": is_ladera,
+                },
+            }
+        )
 
     return {"type": "FeatureCollection", "features": features}
 
 
 @router.get("/comuna/{commune_id}")
 async def get_comuna(commune_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
-    pred = (await db.execute(
-        select(RiskPrediction)
-        .where(RiskPrediction.commune_id == commune_id)
-        .order_by(RiskPrediction.created_at.desc())
-        .limit(1)
-    )).scalars().first()
+    pred = (
+        (
+            await db.execute(
+                select(RiskPrediction)
+                .where(RiskPrediction.commune_id == commune_id)
+                .order_by(RiskPrediction.created_at.desc())
+                .limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
 
     base = next((c for c in _COMUNAS_BASE if c[0] == commune_id), None)
     if base is None:
@@ -277,7 +284,11 @@ async def _rain_by_day_for_commune(
     )
     rain_by_day: dict[date, float] = {}
     for day_value, total in (await db.execute(stmt)).all():
-        d = day_value if isinstance(day_value, date) else datetime.fromisoformat(str(day_value)).date()
+        d = (
+            day_value
+            if isinstance(day_value, date)
+            else datetime.fromisoformat(str(day_value)).date()
+        )
         if start_day <= d <= end_day:
             rain_by_day[d] = round(float(total or 0.0), 2)
 
@@ -299,7 +310,9 @@ async def _rain_by_day_for_commune(
 
 
 @router.get("/comuna/{commune_id}/detalle")
-async def get_comuna_detalle(commune_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+async def get_comuna_detalle(
+    commune_id: str, db: AsyncSession = Depends(get_async_db)
+) -> dict[str, Any]:
     base = next((c for c in _COMUNAS_BASE if c[0] == commune_id), None)
     nombre = base[1] if base else commune_id
     is_ladera = base[2] if base else False
@@ -398,9 +411,7 @@ async def get_seismic_events(
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     stmt = (
         select(SeismicEvent)
-        .where(
-            (SeismicEvent.event_local_at >= cutoff) | (SeismicEvent.event_local_at.is_(None))
-        )
+        .where((SeismicEvent.event_local_at >= cutoff) | (SeismicEvent.event_local_at.is_(None)))
         .order_by(SeismicEvent.event_local_at.desc().nulls_last())
         .limit(200)
     )
@@ -440,13 +451,17 @@ async def _inherited_risk_for_communes(db: AsyncSession, commune_ids: list[str])
     worst_category: str | None = None
     for cid in commune_ids:
         pred = (
-            await db.execute(
-                select(RiskPrediction)
-                .where(RiskPrediction.commune_id == cid)
-                .order_by(RiskPrediction.created_at.desc())
-                .limit(1)
+            (
+                await db.execute(
+                    select(RiskPrediction)
+                    .where(RiskPrediction.commune_id == cid)
+                    .order_by(RiskPrediction.created_at.desc())
+                    .limit(1)
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         if pred and pred.risk_score is not None:
             if worst_score is None or pred.risk_score > worst_score:
                 worst_score = float(pred.risk_score)
@@ -483,7 +498,9 @@ async def get_mesh_grid(db: AsyncSession = Depends(get_async_db)) -> dict[str, A
 
 
 @router.get("/mesh-grid/{quad_id}")
-async def get_mesh_quadrant_detail(quad_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+async def get_mesh_quadrant_detail(
+    quad_id: str, db: AsyncSession = Depends(get_async_db)
+) -> dict[str, Any]:
     from db.models.mesh_quadrant import MeshQuadrant
 
     row = await db.get(MeshQuadrant, quad_id)
@@ -503,7 +520,9 @@ async def get_mesh_quadrant_detail(quad_id: str, db: AsyncSession = Depends(get_
 
 
 @router.get("/snake-line/{commune_id}")
-async def get_snake_line(commune_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+async def get_snake_line(
+    commune_id: str, db: AsyncSession = Depends(get_async_db)
+) -> dict[str, Any]:
     """Punto actual + historial 48h del gráfico Snake Line (SWI × lluvia
     intensa), metodología JMA. Ver `alerts/snake_line.py`."""
     from alerts.snake_line import get_snake_line_status
@@ -524,12 +543,18 @@ async def get_soil_water_index(db: AsyncSession = Depends(get_async_db)) -> dict
     items = []
     for cid, nombre, _ in _COMUNAS_BASE:
         swi = swi_by_commune.get(cid)
-        items.append({
-            "commune_id": cid,
-            "nombre_comuna": nombre,
-            "swi_pct": swi,
-            "state": "ROJO" if swi is not None and swi >= 85 else "AMARILLO" if swi is not None and swi >= 60 else "VERDE",
-        })
+        items.append(
+            {
+                "commune_id": cid,
+                "nombre_comuna": nombre,
+                "swi_pct": swi,
+                "state": "ROJO"
+                if swi is not None and swi >= 85
+                else "AMARILLO"
+                if swi is not None and swi >= 60
+                else "VERDE",
+            }
+        )
     return {"items": items, "total": len(items), "as_of": today.isoformat()}
 
 
@@ -541,13 +566,17 @@ async def _alert_state_for_commune(
     antecedent_index: float,
 ) -> dict[str, Any]:
     pred = (
-        await db.execute(
-            select(RiskPrediction)
-            .where(RiskPrediction.commune_id == commune_id)
-            .order_by(RiskPrediction.created_at.desc())
-            .limit(1)
+        (
+            await db.execute(
+                select(RiskPrediction)
+                .where(RiskPrediction.commune_id == commune_id)
+                .order_by(RiskPrediction.created_at.desc())
+                .limit(1)
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     risk_category = pred.risk_category if pred else None
 
     from domain.risk_rules import ANTECEDENT_INDEX_THRESHOLD_MM
@@ -571,7 +600,9 @@ async def _alert_state_for_commune(
 
 
 @router.get("/alert-state/{commune_id}")
-async def get_alert_state(commune_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+async def get_alert_state(
+    commune_id: str, db: AsyncSession = Depends(get_async_db)
+) -> dict[str, Any]:
     """Estado operativo compuesto (Verde/Amarillo/Rojo) para una comuna: cruza
     lluvia de hoy, índice de precipitación antecedente y categoría del modelo
     ML. Reutiliza el mismo umbral por comuna que las alertas de Slack."""
@@ -588,7 +619,9 @@ async def get_alert_state(commune_id: str, db: AsyncSession = Depends(get_async_
     antecedent_by_commune = await antecedent_indexes_for_all_communes(db, today)
     antecedent_index = antecedent_by_commune.get(commune_id, 0.0)
 
-    return await _alert_state_for_commune(db, commune_id, threshold_mm, rain_today, antecedent_index)
+    return await _alert_state_for_commune(
+        db, commune_id, threshold_mm, rain_today, antecedent_index
+    )
 
 
 @router.get("/alert-state")
@@ -598,7 +631,10 @@ async def get_alert_state_all(db: AsyncSession = Depends(get_async_db)) -> dict[
     from ml.precip_index import antecedent_indexes_for_all_communes
 
     today = datetime.now(timezone.utc).date()
-    thresholds = {r.commune_id: r.threshold_mm for r in (await db.execute(select(CommuneThreshold))).scalars().all()}
+    thresholds = {
+        r.commune_id: r.threshold_mm
+        for r in (await db.execute(select(CommuneThreshold))).scalars().all()
+    }
     antecedent_by_commune = await antecedent_indexes_for_all_communes(db, today)
 
     items = []
@@ -607,7 +643,9 @@ async def get_alert_state_all(db: AsyncSession = Depends(get_async_db)) -> dict[
         rain_by_day = await _rain_by_day_for_commune(db, cid, today, today)
         rain_today = rain_by_day.get(today, 0.0)
         antecedent_index = antecedent_by_commune.get(cid, 0.0)
-        items.append(await _alert_state_for_commune(db, cid, threshold_mm, rain_today, antecedent_index))
+        items.append(
+            await _alert_state_for_commune(db, cid, threshold_mm, rain_today, antecedent_index)
+        )
 
     items.sort(key=lambda it: {"ROJO": 0, "AMARILLO": 1, "VERDE": 2}[it["state"]])
     return {"items": items, "total": len(items)}
@@ -671,7 +709,11 @@ async def get_historia(commune_id: str, db: AsyncSession = Depends(get_async_db)
         if d < start_day or d > today:
             continue
         current = pred_by_day.get(d)
-        if current is None or (current.get("created_at") or datetime.min.replace(tzinfo=timezone.utc)) < p.created_at:
+        if (
+            current is None
+            or (current.get("created_at") or datetime.min.replace(tzinfo=timezone.utc))
+            < p.created_at
+        ):
             pred_by_day[d] = {
                 "risk_score": float(p.risk_score) if p.risk_score is not None else None,
                 "risk_category": p.risk_category or "Sin datos",
@@ -700,7 +742,10 @@ async def get_estadisticas(db: AsyncSession = Depends(get_async_db)) -> dict[str
     total_comunas = len(_COMUNAS_BASE)
 
     latest_pred_sq = (
-        select(RiskPrediction.commune_id, func.max(RiskPrediction.created_at).label("latest_created_at"))
+        select(
+            RiskPrediction.commune_id,
+            func.max(RiskPrediction.created_at).label("latest_created_at"),
+        )
         .group_by(RiskPrediction.commune_id)
         .subquery()
     )
@@ -723,17 +768,21 @@ async def get_estadisticas(db: AsyncSession = Depends(get_async_db)) -> dict[str
     # evento con fecha en los últimos 30 días no pudo ingestarse hace 30+ días.
     start_30_dt = datetime.now(timezone.utc) - timedelta(days=30)
     events_30 = (
-        await db.execute(
-            select(LandslideEvent).where(LandslideEvent.ingested_at >= start_30_dt)
-        )
-    ).scalars().all()
+        (await db.execute(select(LandslideEvent).where(LandslideEvent.ingested_at >= start_30_dt)))
+        .scalars()
+        .all()
+    )
     total_events_30d = 0
     for e in events_30:
         d = _safe_parse_date(e.fecha)
         if d and d >= start_30:
             total_events_30d += 1
 
-    recent_preds = (await db.execute(select(RiskPrediction).where(RiskPrediction.created_at >= start_14))).scalars().all()
+    recent_preds = (
+        (await db.execute(select(RiskPrediction).where(RiskPrediction.created_at >= start_14)))
+        .scalars()
+        .all()
+    )
     prev_scores: list[float] = []
     curr_scores: list[float] = []
     for p in recent_preds:
@@ -781,15 +830,17 @@ async def get_alerts(db: AsyncSession = Depends(get_async_db)) -> list[dict[str,
         seen.add(r.commune_id)  # nos quedamos con la predicción más reciente por comuna
         if not is_alert_category(r.risk_category):
             continue
-        alerts.append({
-            "id": r.id,
-            "commune_id": r.commune_id,
-            "nombre_comuna": by_cid.get(r.commune_id, r.commune_id),
-            "nivel": alert_level(r.risk_category),
-            "precipitacion_7d": 0,
-            "n_eventos_recientes": None,
-            "fecha_alerta": r.created_at.isoformat() if r.created_at else None,
-        })
+        alerts.append(
+            {
+                "id": r.id,
+                "commune_id": r.commune_id,
+                "nombre_comuna": by_cid.get(r.commune_id, r.commune_id),
+                "nivel": alert_level(r.risk_category),
+                "precipitacion_7d": 0,
+                "n_eventos_recientes": None,
+                "fecha_alerta": r.created_at.isoformat() if r.created_at else None,
+            }
+        )
     alerts.sort(key=lambda a: 0 if a["nivel"] == "Rojo" else 1)
     return alerts[:10]
 
@@ -798,7 +849,9 @@ async def get_alerts(db: AsyncSession = Depends(get_async_db)) -> list[dict[str,
     "/predict-all",
     dependencies=[Depends(require_token), Depends(rate_limit("predict", times=5, seconds=60))],
 )
-async def run_predict_all(request: Request, db: AsyncSession = Depends(get_async_db)) -> dict[str, str]:
+async def run_predict_all(
+    request: Request, db: AsyncSession = Depends(get_async_db)
+) -> dict[str, str]:
     from api.audit import log_audit_event
 
     log_audit_event(
@@ -837,12 +890,12 @@ async def run_predict_commune(
 
 
 @router.get("/observability/predictions")
-async def get_prediction_metrics(limit: int = 100, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+async def get_prediction_metrics(
+    limit: int = 100, db: AsyncSession = Depends(get_async_db)
+) -> dict[str, Any]:
     """Observability: recent prediction logs from DB for drift detection and monitoring."""
     result = await db.execute(
-        select(RiskPrediction)
-        .order_by(RiskPrediction.created_at.desc())
-        .limit(limit)
+        select(RiskPrediction).order_by(RiskPrediction.created_at.desc()).limit(limit)
     )
     predictions = result.scalars().all()
     predictions.reverse()

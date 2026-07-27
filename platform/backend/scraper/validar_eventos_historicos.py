@@ -25,7 +25,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -91,43 +91,51 @@ async def main() -> None:
         cid = str(ev.commune_id) if ev.commune_id is not None else None
 
         if d is None or cid is None:
-            resultados.append({
-                "evento_id": ev.id,
-                "commune_id": cid,
-                "fecha": ev.fecha,
-                "fuente": ev.source_row_id,
-                "evaluable": False,
-                "motivo": "sin fecha" if d is None else "sin commune_id",
-            })
+            resultados.append(
+                {
+                    "evento_id": ev.id,
+                    "commune_id": cid,
+                    "fecha": ev.fecha,
+                    "fuente": ev.source_row_id,
+                    "evaluable": False,
+                    "motivo": "sin fecha" if d is None else "sin commune_id",
+                }
+            )
             continue
 
         daily_rain = daily_rain_by_commune.get(cid)
         if not daily_rain:
-            resultados.append({
+            resultados.append(
+                {
+                    "evento_id": ev.id,
+                    "commune_id": cid,
+                    "fecha": d.isoformat(),
+                    "fuente": ev.source_row_id,
+                    "evaluable": False,
+                    "motivo": "sin lluvia histórica para esa comuna",
+                }
+            )
+            continue
+
+        swi = compute_swi(
+            daily_rain, d, drain_rate=DRAIN_RATE_DEFAULT, window_days=SWI_LOOKBACK_DAYS
+        )
+        y_rain_day_proxy = daily_rain.get(d, 0.0)
+        status = classify_point(swi, y_rain_day_proxy, cid)
+
+        resultados.append(
+            {
                 "evento_id": ev.id,
                 "commune_id": cid,
                 "fecha": d.isoformat(),
                 "fuente": ev.source_row_id,
-                "evaluable": False,
-                "motivo": "sin lluvia histórica para esa comuna",
-            })
-            continue
-
-        swi = compute_swi(daily_rain, d, drain_rate=DRAIN_RATE_DEFAULT, window_days=SWI_LOOKBACK_DAYS)
-        y_rain_day_proxy = daily_rain.get(d, 0.0)
-        status = classify_point(swi, y_rain_day_proxy, cid)
-
-        resultados.append({
-            "evento_id": ev.id,
-            "commune_id": cid,
-            "fecha": d.isoformat(),
-            "fuente": ev.source_row_id,
-            "evaluable": True,
-            "swi_pct": swi,
-            "lluvia_dia_evento_mm": round(y_rain_day_proxy, 2),
-            "snake_line_status": status,
-            "hubiera_alertado": status in ("AMARILLO", "ROJO"),
-        })
+                "evaluable": True,
+                "swi_pct": swi,
+                "lluvia_dia_evento_mm": round(y_rain_day_proxy, 2),
+                "snake_line_status": status,
+                "hubiera_alertado": status in ("AMARILLO", "ROJO"),
+            }
+        )
 
     df = pd.DataFrame(resultados)
     evaluables = df[df["evaluable"] == True] if not df.empty else df
@@ -142,7 +150,9 @@ async def main() -> None:
         logger.warning("\nNinguno evaluable todavía. Causas más comunes:")
         if not df.empty:
             logger.warning(df["motivo"].value_counts().to_string())
-        logger.warning("\nEjecuta en orden: historical_backfill.py → geocode_events.py → este script.")
+        logger.warning(
+            "\nEjecuta en orden: historical_backfill.py → geocode_events.py → este script."
+        )
         return
 
     aciertos = int(evaluables["hubiera_alertado"].sum())
@@ -153,13 +163,21 @@ async def main() -> None:
     logger.info("\nDistribución de status:")
     logger.info(evaluables["snake_line_status"].value_counts().to_string())
 
-    logger.info(f"\nParámetros evaluados: drain_rate={DRAIN_RATE_DEFAULT}, línea crítica={CRITICAL_LINES['default']}")
-    logger.info("(y = lluvia del día del evento, proxy de la ventana de 60min que usa Snake Line en vivo)")
+    logger.info(
+        f"\nParámetros evaluados: drain_rate={DRAIN_RATE_DEFAULT}, línea crítica={CRITICAL_LINES['default']}"
+    )
+    logger.info(
+        "(y = lluvia del día del evento, proxy de la ventana de 60min que usa Snake Line en vivo)"
+    )
 
     if tasa < 60:
-        logger.warning(f"\n⚠️ Tasa baja ({tasa:.1f}%). Considerar: subir drain_rate o bajar intercept en alerts/snake_line.py")
+        logger.warning(
+            f"\n⚠️ Tasa baja ({tasa:.1f}%). Considerar: subir drain_rate o bajar intercept en alerts/snake_line.py"
+        )
     elif tasa > 90:
-        logger.info(f"\n✅ Tasa alta ({tasa:.1f}%) — revisar que no sea por proxy de lluvia diaria demasiado laxo.")
+        logger.info(
+            f"\n✅ Tasa alta ({tasa:.1f}%) — revisar que no sea por proxy de lluvia diaria demasiado laxo."
+        )
     else:
         logger.info(f"\n🟡 Tasa razonable ({tasa:.1f}%).")
 

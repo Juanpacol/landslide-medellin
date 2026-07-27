@@ -3,7 +3,6 @@ Test suite para verificar que los examples están presentes en prompts.
 Valida estructura, formato y cobertura de casos.
 """
 
-import pytest
 from agent.chat_rag import _RAG_SYSTEM_SUFFIX
 from agent.risk_explanations import _SYSTEM_PROMPT
 
@@ -111,10 +110,12 @@ class TestExamplesStructure:
         if "CONTRA-EJEMPLO" in _SYSTEM_PROMPT:
             contra_section = _SYSTEM_PROMPT.split("CONTRA-EJEMPLO")[1]
             # El CONTRA-EJEMPLO debe mostrar ejemplos de vagueness
-            assert "Tal vez hay mucha lluvia" in contra_section, \
+            assert "Tal vez hay mucha lluvia" in contra_section, (
                 "Counter-example should show vague language like 'Tal vez'"
-            assert "Monitorear la situación" in contra_section, \
+            )
+            assert "Monitorear la situación" in contra_section, (
                 "Counter-example should show generic action"
+            )
 
     def test_examples_are_realistic(self):
         """Examples deben ser realistas y aplicables."""
@@ -148,5 +149,6 @@ class TestExamplesInContext:
     def test_examples_before_schema_hint(self):
         """Examples deben venir antes del schema hint."""
         # En risk_explanations, los ejemplos deben estar antes del JSON schema
-        assert "EJEMPLO" in _SYSTEM_PROMPT.split("_EXPLANATION_SCHEMA_HINT")[0], \
+        assert "EJEMPLO" in _SYSTEM_PROMPT.split("_EXPLANATION_SCHEMA_HINT")[0], (
             "Examples should come before schema hint"
+        )

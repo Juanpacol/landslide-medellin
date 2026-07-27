@@ -96,10 +96,14 @@ async def ml_feature_exists(
     reference_date: datetime,
     source_key: str,
 ) -> bool:
-    stmt = select(func.count()).select_from(MLFeature).where(
-        MLFeature.commune_id == commune_id,
-        MLFeature.reference_date == reference_date,
-        MLFeature.features["source"].as_string() == source_key,
+    stmt = (
+        select(func.count())
+        .select_from(MLFeature)
+        .where(
+            MLFeature.commune_id == commune_id,
+            MLFeature.reference_date == reference_date,
+            MLFeature.features["source"].as_string() == source_key,
+        )
     )
     n = await session.scalar(stmt)
     return bool(n and int(n) > 0)

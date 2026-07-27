@@ -31,6 +31,7 @@ except ImportError:
 def _rag_enabled() -> bool:
     return os.getenv("ENABLE_RAG", "false").strip().lower() in ("1", "true", "yes", "on")
 
+
 try:
     from ml.predict import predict_all_comunas as _predict_all_impl  # type: ignore[import-not-found]
 except ImportError:

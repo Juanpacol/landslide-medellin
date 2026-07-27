@@ -22,13 +22,12 @@ from __future__ import annotations
 import asyncio
 import json
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from alerts.snake_line import CRITICAL_LINES, classify_point
+from alerts.snake_line import classify_point
 from db.models.landslide_event import LandslideEvent
 from db.models.ml_feature import MLFeature
 from db.session import AsyncSessionLocal
@@ -111,9 +110,7 @@ async def _load_daily_rain_by_commune(
             func.sum(cast(MLFeature.features["precip_sum_mm_day"].astext, Float)),
         )
         .where(
-            MLFeature.features["source"].astext.in_(
-                ["historical_siata", "historical_ideam"]
-            ),
+            MLFeature.features["source"].astext.in_(["historical_siata", "historical_ideam"]),
             MLFeature.reference_date.isnot(None),
         )
         .group_by(MLFeature.commune_id, func.date(MLFeature.reference_date))
@@ -133,9 +130,7 @@ async def _load_daily_rain_by_commune(
     return result
 
 
-def _find_high_risk_days(
-    commune_id: str, daily_rain: dict[date, float]
-) -> list[dict]:
+def _find_high_risk_days(commune_id: str, daily_rain: dict[date, float]) -> list[dict]:
     """Encuentra días donde SWI + lluvia hubieran clasificado como ROJO/AMARILLO.
     Retorna lista de dicts para LandslideEvent.
     """

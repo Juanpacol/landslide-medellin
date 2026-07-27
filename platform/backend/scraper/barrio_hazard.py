@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 
 # El GeoJSON vive en el frontend (lo consume el mapa); este script se corre
 # desde el repo, así que se resuelve por ruta relativa (override por env var).
-_DEFAULT_GEOJSON = Path(__file__).resolve().parents[2] / "frontend" / "lib" / "barrios-medellin.json"
+_DEFAULT_GEOJSON = (
+    Path(__file__).resolve().parents[2] / "frontend" / "lib" / "barrios-medellin.json"
+)
 BARRIOS_GEOJSON = Path(os.getenv("BARRIOS_GEOJSON", str(_DEFAULT_GEOJSON)))
 
 _CONCURRENCY = 8

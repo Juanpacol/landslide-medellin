@@ -16,7 +16,10 @@ from db.models.ml_feature import MLFeature
 from db.models.rainfall_timeseries import RainfallTimeseries
 from db.session import AsyncSessionLocal
 from domain.validation import validate_sensor_reading
-from infrastructure.external.arcgis_client import lookup_commune_for_point, parse_ml_commune_from_siata_field
+from infrastructure.external.arcgis_client import (
+    lookup_commune_for_point,
+    parse_ml_commune_from_siata_field,
+)
 from scraper.common import httpx_client, log_scrape_run, ml_feature_exists, utcnow, with_retries
 
 SIATA_HOME = "https://www.siata.gov.co"
@@ -52,9 +55,9 @@ async def _fetch_pluvio(client) -> dict[str, Any]:
     return await with_retries(_call)
 
 
-async def _collect_siata_payload() -> (
-    tuple[dict[str, list[float]], dict[str, dict[str, Any]], datetime, str | None, int]
-):
+async def _collect_siata_payload() -> tuple[
+    dict[str, list[float]], dict[str, dict[str, Any]], datetime, str | None, int
+]:
     detail: str | None = None
     async with httpx_client() as client:
         html = await _fetch_siata_home_html(client)
@@ -135,7 +138,10 @@ async def _run_siata(session: AsyncSession) -> int:
 
         # % de barrios en amenaza "Alta" por comuna — puente estadístico entre
         # la granularidad de barrio (VM05) y el modelo, que predice por comuna.
-        from ml.barrio_hazard_features import FEATURE_KEY as HAZARD_PCT_KEY, pct_barrios_alta_amenaza
+        from ml.barrio_hazard_features import (
+            FEATURE_KEY as HAZARD_PCT_KEY,
+            pct_barrios_alta_amenaza,
+        )
 
         try:
             hazard_pct_by_commune = await pct_barrios_alta_amenaza(session)
@@ -182,7 +188,11 @@ async def _run_siata(session: AsyncSession) -> int:
                     "mean_precip_mm_snapshot": round(mean_p, 3),
                     **({API_KEY: api_by_commune[cid]} if cid in api_by_commune else {}),
                     **({SEISMIC_KEY: seismic_val} if seismic_val is not None else {}),
-                    **({HAZARD_PCT_KEY: hazard_pct_by_commune[cid]} if cid in hazard_pct_by_commune else {}),
+                    **(
+                        {HAZARD_PCT_KEY: hazard_pct_by_commune[cid]}
+                        if cid in hazard_pct_by_commune
+                        else {}
+                    ),
                     **({SWI_KEY: swi_val} if swi_val is not None else {}),
                     **({"seismic_x_swi": seismic_x_swi} if seismic_x_swi is not None else {}),
                     "siata_json_url": PLUVIO_JSON,

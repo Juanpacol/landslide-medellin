@@ -39,7 +39,6 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from db.models.landslide_event import LandslideEvent  # noqa: E402
 from db.models.ml_feature import MLFeature  # noqa: E402
 from ml.features import FeatureBuilder  # noqa: E402
 
@@ -72,7 +71,9 @@ def freeze_benchmark(session: Session) -> dict[str, Any]:
         d = _parse_date(ev.fecha)
         if d is None or not ev.commune_id:
             continue
-        cid = str(int("".join(ch for ch in str(ev.commune_id) if ch.isdigit()) or 0) or ev.commune_id)
+        cid = str(
+            int("".join(ch for ch in str(ev.commune_id) if ch.isdigit()) or 0) or ev.commune_id
+        )
         positives.append({"commune_id": cid, "reference_date": d.isoformat(), "label": "1"})
         event_days.add((cid, d))
 
@@ -121,7 +122,10 @@ def evaluate_benchmark(
     """AUC del modelo dado contra el snapshot congelado. None si no hay
     snapshot o si no tiene ambas clases (motivo en el dict de retorno)."""
     if not BENCHMARK_PATH.exists():
-        return {"benchmark_auc": None, "reason": "sin benchmark.json — correr `python -m ml.benchmark --freeze`"}
+        return {
+            "benchmark_auc": None,
+            "reason": "sin benchmark.json — correr `python -m ml.benchmark --freeze`",
+        }
 
     snapshot = json.loads(BENCHMARK_PATH.read_text(encoding="utf-8"))
     cases = snapshot.get("cases") or []
@@ -146,7 +150,12 @@ def evaluate_benchmark(
             r
             for r in rows_by_commune.get(cid, [])
             if r.reference_date is not None
-            and (r.reference_date.astimezone(timezone.utc).date() if r.reference_date.tzinfo else r.reference_date.date()) <= ref_d
+            and (
+                r.reference_date.astimezone(timezone.utc).date()
+                if r.reference_date.tzinfo
+                else r.reference_date.date()
+            )
+            <= ref_d
         ]
         if not hist:
             continue
@@ -157,7 +166,10 @@ def evaluate_benchmark(
 
     y = np.array(y_list, dtype=int)
     if len(y) == 0 or len(np.unique(y)) < 2:
-        return {"benchmark_auc": None, "reason": "casos evaluables sin ambas clases (gap de cobertura de features)"}
+        return {
+            "benchmark_auc": None,
+            "reason": "casos evaluables sin ambas clases (gap de cobertura de features)",
+        }
 
     from sklearn.metrics import roc_auc_score
 

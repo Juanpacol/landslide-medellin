@@ -29,7 +29,6 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from domain.risk_rules import RISK_THRESHOLD_ALTO, RISK_THRESHOLD_CRITICO, RISK_THRESHOLD_MEDIO
 from db.models.ml_feature import MLFeature
 from db.models.risk_prediction import RiskPrediction
 
@@ -38,10 +37,13 @@ logger = logging.getLogger(__name__)
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
+
+
 def _get_anthropic_client():
     from infrastructure.external.llm_client import get_anthropic_client
 
     return get_anthropic_client()
+
 
 from domain.communes import COMMUNES as _COMMUNES
 
@@ -50,10 +52,27 @@ _NOMBRES: dict[str, str] = {c.id: c.nombre for c in _COMMUNES} | {
 }
 
 _IS_LADERA: dict[str, bool] = {
-    "1": True, "2": True, "3": True, "4": False, "5": False,
-    "6": True, "7": True, "8": True, "9": True, "10": False,
-    "11": False, "12": False, "13": True, "14": False, "15": False,
-    "16": True, "50": True, "60": True, "70": True, "80": False, "90": True,
+    "1": True,
+    "2": True,
+    "3": True,
+    "4": False,
+    "5": False,
+    "6": True,
+    "7": True,
+    "8": True,
+    "9": True,
+    "10": False,
+    "11": False,
+    "12": False,
+    "13": True,
+    "14": False,
+    "15": False,
+    "16": True,
+    "50": True,
+    "60": True,
+    "70": True,
+    "80": False,
+    "90": True,
 }
 
 # ── Structured output schema (JSON mode, OpenAI-compatible) ────────────────────
@@ -70,7 +89,8 @@ Responde ÚNICAMENTE con un objeto JSON (sin markdown, sin texto fuera del JSON)
 
 # ── System prompt (applied once, high token efficiency) ────────────────────────
 
-_SYSTEM_PROMPT = """TAREA: Genera un análisis estructurado (JSON) sobre POR QUÉ una comuna
+_SYSTEM_PROMPT = (
+    """TAREA: Genera un análisis estructurado (JSON) sobre POR QUÉ una comuna
 de Medellín tiene su nivel de riesgo de deslizamiento actual, listo
 para que un operario de campo actúe de inmediato.
 
@@ -136,7 +156,9 @@ CONTRA-EJEMPLO — NO HAGAS ESTO (vago, sin datos):
   "recommended_action": "Monitorear la situación"
 }
 Errores: vaguedad ("podría", "tal vez"), sin números, acción genérica.
-""" + _EXPLANATION_SCHEMA_HINT
+"""
+    + _EXPLANATION_SCHEMA_HINT
+)
 
 # ── Tool definitions (formato OpenAI; se convierten a formato Claude abajo) ────
 
@@ -154,17 +176,17 @@ _TOOLS = [
                 "properties": {
                     "commune_id": {
                         "type": "string",
-                        "description": "ID de la comuna (número como string, ej: '1', '13')"
+                        "description": "ID de la comuna (número como string, ej: '1', '13')",
                     },
                     "days": {
                         "type": "integer",
                         "description": "Días atrás a consultar. Entre 1 y 30.",
-                        "default": 7
-                    }
+                        "default": 7,
+                    },
                 },
-                "required": ["commune_id"]
-            }
-        }
+                "required": ["commune_id"],
+            },
+        },
     },
     {
         "type": "function",
@@ -177,20 +199,17 @@ _TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "commune_id": {
-                        "type": "string",
-                        "description": "ID de la comuna"
-                    },
+                    "commune_id": {"type": "string", "description": "ID de la comuna"},
                     "days": {
                         "type": "integer",
                         "description": "Ventana de días a consultar. Default 30.",
-                        "default": 30
-                    }
+                        "default": 30,
+                    },
                 },
-                "required": ["commune_id"]
-            }
-        }
-    }
+                "required": ["commune_id"],
+            },
+        },
+    },
 ]
 
 
@@ -228,6 +247,7 @@ _EXPLANATION_JSON_SCHEMA = {
 }
 
 # ── Tool handlers (run against real DB) ───────────────────────────────────────
+
 
 async def _handle_get_historical_trend(
     commune_id: str,
@@ -270,7 +290,6 @@ async def _handle_get_recent_events_count(
     days: int,
     db: AsyncSession,
 ) -> dict[str, Any]:
-    from db.models.landslide_event import LandslideEvent
     cutoff = datetime.now(timezone.utc) - timedelta(days=max(1, min(days, 90)))
     stmt = (
         select(MLFeature.n_events_window)
@@ -285,7 +304,9 @@ async def _handle_get_recent_events_count(
     return {"commune_id": commune_id, "days": days, "n_events": n_events}
 
 
-async def _dispatch_tool(name: str, args: dict, commune_id: str, db: AsyncSession) -> dict[str, Any]:
+async def _dispatch_tool(
+    name: str, args: dict, commune_id: str, db: AsyncSession
+) -> dict[str, Any]:
     if name == "get_historical_trend":
         return await _handle_get_historical_trend(
             args.get("commune_id", commune_id),
@@ -300,7 +321,9 @@ async def _dispatch_tool(name: str, args: dict, commune_id: str, db: AsyncSessio
         )
     return {"error": f"Tool desconocida: {name}"}
 
+
 # ── Template fallback (no API key needed) ──────────────────────────────────────
+
 
 def _template_explanation_structured(
     commune_id: str,
@@ -327,8 +350,9 @@ def _template_explanation_structured(
     if cat == "critico":
         lluvia_frag = (
             f"La lluvia acumulada ({precip_acum_mm:.1f} mm) supera el umbral crítico "
-            f"en {exceso:.1f} mm" if exceso > 0 else
-            f"El score de riesgo es {score_pct}% (umbral crítico)"
+            f"en {exceso:.1f} mm"
+            if exceso > 0
+            else f"El score de riesgo es {score_pct}% (umbral crítico)"
         )
         factors = [lluvia_frag]
         if n_events_7d > 0:
@@ -344,8 +368,8 @@ def _template_explanation_structured(
     if cat == "alto":
         lluvia_frag = (
             f"La lluvia acumulada ({precip_acum_mm:.1f} mm) supera el umbral operativo en {exceso:.1f} mm"
-            if exceso > 0 else
-            f"El modelo estima {score_pct}% de probabilidad de evento"
+            if exceso > 0
+            else f"El modelo estima {score_pct}% de probabilidad de evento"
         )
         factors = [lluvia_frag]
         if n_events_7d > 0:
@@ -361,12 +385,15 @@ def _template_explanation_structured(
     if cat == "medio":
         lluvia_frag = (
             f"La lluvia acumulada ({precip_acum_mm:.1f} mm) se aproxima al umbral de alerta ({threshold_mm} mm)"
-            if precip_acum_mm > threshold_mm * 0.6 else
-            f"El modelo estima {score_pct}% de probabilidad de evento en 7 días"
+            if precip_acum_mm > threshold_mm * 0.6
+            else f"El modelo estima {score_pct}% de probabilidad de evento en 7 días"
         )
         return {
             "title": f"{nombre} muestra nivel MEDIO de riesgo ({score_pct}%)",
-            "factors": [lluvia_frag, "Monitorear evolución de precipitaciones en las próximas 24 horas"],
+            "factors": [
+                lluvia_frag,
+                "Monitorear evolución de precipitaciones en las próximas 24 horas",
+            ],
             "urgency": "medio",
             "recommended_action": "Revisar canales de drenaje y mantener informada a la comunidad.",
         }
@@ -397,7 +424,9 @@ def _render_narrative(structured: dict[str, Any]) -> str:
     narrative = ". ".join(p.rstrip(".") for p in parts)
     return f"{narrative}." if narrative else ""
 
+
 # ── OpenRouter client ──────────────────────────────────────────────────────────
+
 
 def _validate_structured(data: Any) -> dict[str, Any] | None:
     """Valida que el JSON parseado tenga las 4 claves esperadas y bien formadas.
@@ -420,7 +449,12 @@ def _validate_structured(data: Any) -> dict[str, Any] | None:
     factors_clean = [str(f).strip() for f in factors if str(f).strip()]
     if not factors_clean:
         return None
-    if not isinstance(urgency, str) or urgency.strip().lower() not in {"bajo", "medio", "alto", "critico"}:
+    if not isinstance(urgency, str) or urgency.strip().lower() not in {
+        "bajo",
+        "medio",
+        "alto",
+        "critico",
+    }:
         return None
     if not isinstance(recommended_action, str) or not recommended_action.strip():
         return None
@@ -466,11 +500,13 @@ async def _call_anthropic(
         tool_results = []
         for tc in tool_calls:
             result = await _dispatch_tool(tc.name, tc.input, commune_id, db)
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tc.id,
-                "content": json.dumps(result, ensure_ascii=False),
-            })
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tc.id,
+                    "content": json.dumps(result, ensure_ascii=False),
+                }
+            )
         messages.append({"role": "user", "content": tool_results})
 
         response = await asyncio.to_thread(client.messages.create, messages=messages, **kwargs)
@@ -503,10 +539,14 @@ async def _call_anthropic_structured(
 
     structured = _validate_structured(parsed)
     if structured is None:
-        logger.warning("Claude devolvió estructura incompleta para commune %s: %r", commune_id, parsed)
+        logger.warning(
+            "Claude devolvió estructura incompleta para commune %s: %r", commune_id, parsed
+        )
     return structured
 
+
 # ── Public API ─────────────────────────────────────────────────────────────────
+
 
 async def generate_risk_explanation(
     commune_id: str,
@@ -531,8 +571,14 @@ async def generate_risk_explanation(
     if not api_key:
         # Sin API key → template determinístico
         structured = _template_explanation_structured(
-            commune_id, nombre, risk_score, risk_category,
-            precip_acum_mm, threshold_mm, n_events_7d, is_ladera,
+            commune_id,
+            nombre,
+            risk_score,
+            risk_category,
+            precip_acum_mm,
+            threshold_mm,
+            n_events_7d,
+            is_ladera,
         )
         return _render_narrative(structured), "template", structured
 
@@ -566,7 +612,13 @@ async def generate_risk_explanation(
 
     # Fallback siempre disponible
     structured = _template_explanation_structured(
-        commune_id, nombre, risk_score, risk_category,
-        precip_acum_mm, threshold_mm, n_events_7d, is_ladera,
+        commune_id,
+        nombre,
+        risk_score,
+        risk_category,
+        precip_acum_mm,
+        threshold_mm,
+        n_events_7d,
+        is_ladera,
     )
     return _render_narrative(structured), "template", structured

@@ -132,42 +132,67 @@ def _as_iso(value: Any) -> str | None:
 
 
 async def _load_prompt_context(db: AsyncSession) -> str:
-    predictions_stmt = select(
-        RiskPrediction.commune_id, RiskPrediction.risk_category, RiskPrediction.risk_score, RiskPrediction.created_at
-    ).order_by(RiskPrediction.risk_score.desc()).limit(3)
+    predictions_stmt = (
+        select(
+            RiskPrediction.commune_id,
+            RiskPrediction.risk_category,
+            RiskPrediction.risk_score,
+            RiskPrediction.created_at,
+        )
+        .order_by(RiskPrediction.risk_score.desc())
+        .limit(3)
+    )
     predictions_rows = (await db.execute(predictions_stmt)).all()
-    predictions_text = "; ".join(
-        f"{commune_display_name(str(r.commune_id))}: {r.risk_category or 'Sin datos'} ({round(float(r.risk_score), 3) if r.risk_score is not None else 'Sin datos'})"
-        for r in predictions_rows
-    ) or "Sin datos"
+    predictions_text = (
+        "; ".join(
+            f"{commune_display_name(str(r.commune_id))}: {r.risk_category or 'Sin datos'} ({round(float(r.risk_score), 3) if r.risk_score is not None else 'Sin datos'})"
+            for r in predictions_rows
+        )
+        or "Sin datos"
+    )
 
-    events_stmt = select(LandslideEvent.commune_id, LandslideEvent.fecha, LandslideEvent.tipo_emergencia).order_by(
-        desc(LandslideEvent.fecha)
-    ).limit(5)
+    events_stmt = (
+        select(LandslideEvent.commune_id, LandslideEvent.fecha, LandslideEvent.tipo_emergencia)
+        .order_by(desc(LandslideEvent.fecha))
+        .limit(5)
+    )
     events_rows = (await db.execute(events_stmt)).all()
-    events_text = "; ".join(
-        f"{r.commune_id or 'Sin datos'}-{r.fecha or 'Sin datos'}-{r.tipo_emergencia or 'Sin datos'}"
-        for r in events_rows
-    ) or "Sin datos"
+    events_text = (
+        "; ".join(
+            f"{r.commune_id or 'Sin datos'}-{r.fecha or 'Sin datos'}-{r.tipo_emergencia or 'Sin datos'}"
+            for r in events_rows
+        )
+        or "Sin datos"
+    )
 
-    rain_stmt = select(MLFeature.commune_id, MLFeature.reference_date, MLFeature.features).order_by(
-        MLFeature.reference_date.desc()
-    ).limit(6)
+    rain_stmt = (
+        select(MLFeature.commune_id, MLFeature.reference_date, MLFeature.features)
+        .order_by(MLFeature.reference_date.desc())
+        .limit(6)
+    )
     rain_rows = (await db.execute(rain_stmt)).all()
-    rain_text = "; ".join(
-        f"{r.commune_id}:{((r.features or {}).get('precip_sum_mm_day') if isinstance(r.features, dict) else 'Sin datos')}"
-        for r in rain_rows
-    ) or "Sin datos"
+    rain_text = (
+        "; ".join(
+            f"{r.commune_id}:{((r.features or {}).get('precip_sum_mm_day') if isinstance(r.features, dict) else 'Sin datos')}"
+            for r in rain_rows
+        )
+        or "Sin datos"
+    )
 
-    alerts_stmt = select(
-        RiskPrediction.commune_id, RiskPrediction.risk_category, RiskPrediction.risk_score
-    ).where(func.lower(RiskPrediction.risk_category).in_(["alto", "crítico", "critico"])).order_by(
-        RiskPrediction.risk_score.desc()
-    ).limit(3)
+    alerts_stmt = (
+        select(RiskPrediction.commune_id, RiskPrediction.risk_category, RiskPrediction.risk_score)
+        .where(func.lower(RiskPrediction.risk_category).in_(["alto", "crítico", "critico"]))
+        .order_by(RiskPrediction.risk_score.desc())
+        .limit(3)
+    )
     alert_rows = (await db.execute(alerts_stmt)).all()
-    alerts_text = ", ".join(
-        f"{commune_display_name(str(r.commune_id))} ({r.risk_category or 'Sin datos'})" for r in alert_rows
-    ) or "Sin datos"
+    alerts_text = (
+        ", ".join(
+            f"{commune_display_name(str(r.commune_id))} ({r.risk_category or 'Sin datos'})"
+            for r in alert_rows
+        )
+        or "Sin datos"
+    )
 
     return (
         "DATOS REALES RESUMIDOS:\n"
@@ -237,9 +262,9 @@ async def chat(message: str, session_id: str, db: AsyncSession) -> str:
         communes = find_communes_in_text(message)
         mnorm = _norm_msg(message)
         context_parts: list[str] = []
-        direct_commune_query = (
-            len(communes) == 1
-            and any(token in mnorm for token in ("como esta", "cómo esta", "estado", "situacion", "situación"))
+        direct_commune_query = len(communes) == 1 and any(
+            token in mnorm
+            for token in ("como esta", "cómo esta", "estado", "situacion", "situación")
         )
         if direct_commune_query:
             row = await get_risk_by_comuna(communes[0], db)
@@ -278,7 +303,9 @@ async def chat(message: str, session_id: str, db: AsyncSession) -> str:
             )
 
         global_data_context = await _load_prompt_context(db)
-        local_context = "\n".join(p for p in context_parts if p.strip()) or "Sin datos recientes disponibles."
+        local_context = (
+            "\n".join(p for p in context_parts if p.strip()) or "Sin datos recientes disponibles."
+        )
         data_context = f"{global_data_context}\n\nCONTEXTO DE LA PREGUNTA ACTUAL:\n{local_context}"
         system_with_context = f"{SYSTEM_PROMPT}\n\nCONTEXTO ACTUAL:\n{data_context}"
         selected_row: dict[str, Any] | None = None
@@ -335,9 +362,9 @@ async def chat_stream(message: str, session_id: str, db: AsyncSession) -> AsyncI
         communes = find_communes_in_text(message)
         mnorm = _norm_msg(message)
         context_parts: list[str] = []
-        direct_commune_query = (
-            len(communes) == 1
-            and any(token in mnorm for token in ("como esta", "cómo esta", "estado", "situacion", "situación"))
+        direct_commune_query = len(communes) == 1 and any(
+            token in mnorm
+            for token in ("como esta", "cómo esta", "estado", "situacion", "situación")
         )
         if direct_commune_query:
             row = await get_risk_by_comuna(communes[0], db)
@@ -377,7 +404,9 @@ async def chat_stream(message: str, session_id: str, db: AsyncSession) -> AsyncI
             )
 
         global_data_context = await _load_prompt_context(db)
-        local_context = "\n".join(p for p in context_parts if p.strip()) or "Sin datos recientes disponibles."
+        local_context = (
+            "\n".join(p for p in context_parts if p.strip()) or "Sin datos recientes disponibles."
+        )
         data_context = f"{global_data_context}\n\nCONTEXTO DE LA PREGUNTA ACTUAL:\n{local_context}"
         system_with_context = f"{SYSTEM_PROMPT}\n\nCONTEXTO ACTUAL:\n{data_context}"
 
@@ -394,7 +423,7 @@ async def chat_stream(message: str, session_id: str, db: AsyncSession) -> AsyncI
 
     before_emergency = full_reply
     final_reply = _append_emergency_line_if_needed(full_reply)
-    extra = final_reply[len(before_emergency):]
+    extra = final_reply[len(before_emergency) :]
     if extra:
         yield extra
     await save_turn(session_id, "assistant", final_reply, db)

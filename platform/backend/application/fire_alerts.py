@@ -40,10 +40,12 @@ async def alerts_after_rain_ingest(session: AsyncSession, commune_ids: list[str]
 
         await check_and_fire_snake_line_alerts(session, commune_ids)
 
-    await run_steps([
-        Step("rainfall_threshold", _rainfall),
-        Step("snake_line", _snake_line),
-    ])
+    await run_steps(
+        [
+            Step("rainfall_threshold", _rainfall),
+            Step("snake_line", _snake_line),
+        ]
+    )
 
 
 async def alerts_after_prediction(session: AsyncSession) -> None:
@@ -59,10 +61,12 @@ async def alerts_after_prediction(session: AsyncSession) -> None:
 
         await check_and_fire_yellow_alerts(session)
 
-    await run_steps([
-        Step("critical_risk_alerts", _critical_risk),
-        Step("yellow_alerts", _yellow),
-    ])
+    await run_steps(
+        [
+            Step("critical_risk_alerts", _critical_risk),
+            Step("yellow_alerts", _yellow),
+        ]
+    )
 
 
 async def alerts_scraper_watchdog(session: AsyncSession) -> list[str]:

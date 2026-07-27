@@ -64,7 +64,10 @@ def _build_payload(test_case: dict) -> dict:
             "blocks": [
                 {
                     "type": "header",
-                    "text": {"type": "plain_text", "text": f"⚠️ Riesgo {test_case['risk_category']}"},
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"⚠️ Riesgo {test_case['risk_category']}",
+                    },
                 },
                 {
                     "type": "section",
@@ -169,7 +172,10 @@ class TestSlackWebhookStructure:
                 {"type": "divider"},
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "📊 *Por qué:*\n• Lluvia acumulada 200mm\n• 15 eventos recientes"},
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "📊 *Por qué:*\n• Lluvia acumulada 200mm\n• 15 eventos recientes",
+                    },
                 },
             ]
         }
@@ -224,6 +230,6 @@ def test_slack_webhooks_batch_evaluation(slack_webhooks_config):
     print(format_report_summary(report))
 
     # Assert threshold
-    assert (
-        report.threshold_passed
-    ), f"Slack webhooks accuracy {report.accuracy*100:.1f}% below threshold {report.threshold*100:.0f}%"
+    assert report.threshold_passed, (
+        f"Slack webhooks accuracy {report.accuracy * 100:.1f}% below threshold {report.threshold * 100:.0f}%"
+    )

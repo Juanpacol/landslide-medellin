@@ -125,9 +125,15 @@ def compute_alert_state(
     un estado operativo de 3 niveles. `rainfall_pct`/`antecedent_pct` son
     fracciones del umbral configurado (1.0 = 100% del umbral)."""
     category = normalize_category(risk_category)
-    if category == RISK_CRITICO or (rainfall_pct >= RED_RAINFALL_PCT and antecedent_pct >= RED_ANTECEDENT_PCT):
+    if category == RISK_CRITICO or (
+        rainfall_pct >= RED_RAINFALL_PCT and antecedent_pct >= RED_ANTECEDENT_PCT
+    ):
         state = "ROJO"
-    elif category == RISK_ALTO or rainfall_pct >= YELLOW_RAINFALL_PCT or antecedent_pct >= YELLOW_ANTECEDENT_PCT:
+    elif (
+        category == RISK_ALTO
+        or rainfall_pct >= YELLOW_RAINFALL_PCT
+        or antecedent_pct >= YELLOW_ANTECEDENT_PCT
+    ):
         state = "AMARILLO"
     else:
         state = "VERDE"

@@ -54,10 +54,14 @@ async def predict_risk(comuna_id: int, db: AsyncSession) -> dict[str, Any]:
         }
 
     model = artifact["model"]
-    feature_names: list[str] = list(artifact.get("feature_names") or metrics.get("feature_names") or [])
+    feature_names: list[str] = list(
+        artifact.get("feature_names") or metrics.get("feature_names") or []
+    )
 
     builder = FeatureBuilder(MODELS_DIR)
-    bundle = await builder.build_feature_vector(comuna_id, db, feature_order=feature_names or None, apply_scaler=True)
+    bundle = await builder.build_feature_vector(
+        comuna_id, db, feature_order=feature_names or None, apply_scaler=True
+    )
 
     order = bundle.get("feature_order") or feature_names
     vec_scaled = bundle.get("vector_scaled")

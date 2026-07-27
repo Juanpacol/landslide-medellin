@@ -53,7 +53,9 @@ async def _collect_ideam_rows() -> tuple[list[dict[str, Any]], int]:
     return rows, len(rows)
 
 
-async def _aggregate_ideam(rows: list[dict[str, Any]]) -> dict[tuple[str, datetime], tuple[list[float], list[str]]]:
+async def _aggregate_ideam(
+    rows: list[dict[str, Any]],
+) -> dict[tuple[str, datetime], tuple[list[float], list[str]]]:
     by_commune_day: dict[tuple[str, datetime], list[float]] = defaultdict(list)
     station_meta: dict[tuple[str, datetime], list[str]] = defaultdict(list)
     cache: dict[tuple[int, int], str | None] = {}

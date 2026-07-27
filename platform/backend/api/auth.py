@@ -68,7 +68,9 @@ async def require_token(authorization: str | None = Header(default=None)) -> Non
         if is_production():
             # assert_production_auth() ya debería haber tumbado el arranque;
             # defensa en profundidad por si la app se montó sin ese hook.
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth no configurada.")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth no configurada."
+            )
         logger.warning(
             "API_TOKEN no configurado: endpoint crítico accesible sin auth (modo dev). "
             "Definir API_TOKEN en producción."
@@ -90,7 +92,9 @@ async def require_viewer(authorization: str | None = Header(default=None)) -> No
 
     if not admin and not viewer:
         if is_production():
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth no configurada.")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth no configurada."
+            )
         logger.warning("Sin tokens configurados: acceso viewer sin auth (modo dev).")
         return
 

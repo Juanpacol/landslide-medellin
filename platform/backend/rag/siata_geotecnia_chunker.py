@@ -80,12 +80,12 @@ SECTION_MAP = {
 class Chunk:
     chunk_id: str
     text: str
-    source_id: str         # "siata_geotecnia"
-    source_pdf: str        # "HV_Villatina.pdf"
-    zone_name: str         # "Villatina"
-    zone_slug: str         # "villatina"
-    municipio: str         # "Medellín" (extraído del PDF)
-    barrio: str            # "Olaya Herrera, occidente de Medellín"
+    source_id: str  # "siata_geotecnia"
+    source_pdf: str  # "HV_Villatina.pdf"
+    zone_name: str  # "Villatina"
+    zone_slug: str  # "villatina"
+    municipio: str  # "Medellín" (extraído del PDF)
+    barrio: str  # "Olaya Herrera, occidente de Medellín"
     lat: Optional[float]
     lon: Optional[float]
     page: int
@@ -105,13 +105,31 @@ def _fix_encoding(text: str) -> str:
     """
     fixes = {
         # minúsculas
-        "a´": "á", "e´": "é", "ı´": "í", "o´": "ó", "u´": "ú",
-        "´a": "á", "´e": "é", "´ı": "í", "´o": "ó", "´u": "ú",
-        "a¨": "ä", "u¨": "ü",
-        "˜n": "ñ", "n˜": "ñ",
+        "a´": "á",
+        "e´": "é",
+        "ı´": "í",
+        "o´": "ó",
+        "u´": "ú",
+        "´a": "á",
+        "´e": "é",
+        "´ı": "í",
+        "´o": "ó",
+        "´u": "ú",
+        "a¨": "ä",
+        "u¨": "ü",
+        "˜n": "ñ",
+        "n˜": "ñ",
         # mayúsculas
-        "A´": "Á", "E´": "É", "I´": "Í", "O´": "Ó", "U´": "Ú",
-        "´A": "Á", "´E": "É", "´I": "Í", "´O": "Ó", "´U": "Ú",
+        "A´": "Á",
+        "E´": "É",
+        "I´": "Í",
+        "O´": "Ó",
+        "U´": "Ú",
+        "´A": "Á",
+        "´E": "É",
+        "´I": "Í",
+        "´O": "Ó",
+        "´U": "Ú",
         "˜N": "Ñ",
     }
     for bad, good in fixes.items():
@@ -192,12 +210,12 @@ def _download_pdf(url: str, output_path: Path, max_retries: int = 3) -> bool:
             resp = requests.get(url, timeout=120)
             resp.raise_for_status()
             output_path.write_bytes(resp.content)
-            logger.info(f"  ↓ {output_path.name} ({len(resp.content)/1024/1024:.1f} MB)")
+            logger.info(f"  ↓ {output_path.name} ({len(resp.content) / 1024 / 1024:.1f} MB)")
             return True
         except Exception as e:
-            logger.warning(f"  Attempt {attempt+1}/{max_retries} failed: {e}")
+            logger.warning(f"  Attempt {attempt + 1}/{max_retries} failed: {e}")
             if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
     return False
 
 
@@ -284,10 +302,20 @@ def _chunks_to_markdown(
 ) -> str:
     all_text = " ".join(c.text for c in chunks)
     keywords = [
-        kw for kw in [
-            "deslizamiento", "movimiento en masa", "geotécnica", "ladera",
-            "monitoreo", "sensor", "riesgo", "evacuación", "geología",
-            "instrumentación", "SIATA", "Medellín",
+        kw
+        for kw in [
+            "deslizamiento",
+            "movimiento en masa",
+            "geotécnica",
+            "ladera",
+            "monitoreo",
+            "sensor",
+            "riesgo",
+            "evacuación",
+            "geología",
+            "instrumentación",
+            "SIATA",
+            "Medellín",
         ]
         if kw.lower() in all_text.lower()
     ]
@@ -297,15 +325,15 @@ def _chunks_to_markdown(
 
     md_lines = [
         f"# HOJA DE VIDA — DESLIZAMIENTO: {zone_name.upper()}",
-        f"SIATA — Sistema de Alerta Temprana de Medellín",
+        "SIATA — Sistema de Alerta Temprana de Medellín",
         f"Zona: {zone_name} | Municipio: {municipio}",
         f"Barrio/Vereda: {barrio}",
         f"Coordenadas: {coords_str}",
-        f"",
+        "",
         f"**Quick Summary**: {first_preview}",
-        f"",
+        "",
         f"**Keywords**: {', '.join(keywords) if keywords else 'deslizamiento, geotécnica, SIATA, Medellín'}",
-        f"",
+        "",
         "---",
         "",
     ]
@@ -314,15 +342,15 @@ def _chunks_to_markdown(
         title = f"CHUNK {chunk.chunk_index}: {chunk.section.upper()} — PÁGINA {chunk.page}"
         md_lines += [
             f"## {title}",
-            f"",
-            f"SOURCE: SIATA — Hoja de Vida de Deslizamiento",
+            "",
+            "SOURCE: SIATA — Hoja de Vida de Deslizamiento",
             f"ZONE: {chunk.zone_name}",
             f"MUNICIPIO: {chunk.municipio}",
             f"SECTION: {chunk.section}",
             f"PAGE: {chunk.page}",
             f"ID: {chunk.chunk_id}",
             f"TOKENS: ~{chunk.token_estimate} (self-contained)",
-            f"",
+            "",
         ]
 
         content_lines = chunk.text.splitlines()
@@ -348,7 +376,7 @@ def process_pdf(pdf_path: Path) -> list[Chunk]:
 
     pages = _extract_pages(pdf_path)
     if not pages:
-        logger.warning(f"  No text extracted — likely image-only PDF")
+        logger.warning("  No text extracted — likely image-only PDF")
         return []
 
     # Extrae metadatos de la primera página
@@ -405,10 +433,7 @@ def run(zones: Optional[list[str]] = None, test: bool = False) -> None:
         logger.info("TEST MODE — only Olaya Herrera")
     elif zones:
         filter_slugs = {z.lower().replace(" ", "_") for z in zones}
-        all_pdf_urls = [
-            (f, u) for f, u in all_pdf_urls
-            if _slug(f) in filter_slugs
-        ]
+        all_pdf_urls = [(f, u) for f, u in all_pdf_urls if _slug(f) in filter_slugs]
         logger.info(f"Filtered to {len(all_pdf_urls)} zones: {zones}")
 
     logger.info(f"Processing {len(all_pdf_urls)} PDFs")
@@ -456,15 +481,17 @@ def run(zones: Optional[list[str]] = None, test: bool = False) -> None:
 
     # 5. Markdown combinado
     if len(chunks_by_zone) > 1:
-        header = "\n".join([
-            f"# SIATA GEOTECNIA — HOJAS DE VIDA DE DESLIZAMIENTOS ({len(all_chunks)} chunks)",
-            f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            f"Fuente: {GEOTECNIA_URL}",
-            f"Zonas: {', '.join(_zone_display_name(s) for s in chunks_by_zone)}",
-            "",
-            "---",
-            "",
-        ])
+        header = "\n".join(
+            [
+                f"# SIATA GEOTECNIA — HOJAS DE VIDA DE DESLIZAMIENTOS ({len(all_chunks)} chunks)",
+                f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                f"Fuente: {GEOTECNIA_URL}",
+                f"Zonas: {', '.join(_zone_display_name(s) for s in chunks_by_zone)}",
+                "",
+                "---",
+                "",
+            ]
+        )
         sections = []
         for zone_slug, chunks in chunks_by_zone.items():
             c0 = chunks[0]
@@ -508,7 +535,9 @@ if __name__ == "__main__":
     configure_logging("rag-siata-geotecnia-chunker")
     parser = argparse.ArgumentParser(description="SIATA Geotecnia PDF Chunker")
     parser.add_argument("--zones", nargs="+", help="Zonas específicas (ej: Villatina Pajarito)")
-    parser.add_argument("--test", action="store_true", help="Solo procesa Olaya Herrera (más pequeño)")
+    parser.add_argument(
+        "--test", action="store_true", help="Solo procesa Olaya Herrera (más pequeño)"
+    )
     args = parser.parse_args()
 
     run(zones=args.zones, test=args.test)

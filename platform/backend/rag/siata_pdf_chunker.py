@@ -74,16 +74,17 @@ SECTION_KEYWORDS = {
 @dataclass
 class Chunk:
     """Representa un fragmento de texto con metadatos completos."""
-    chunk_id: str          # p.ej. "siata_hidromet_20260615_p1_c1"
+
+    chunk_id: str  # p.ej. "siata_hidromet_20260615_p1_c1"
     text: str
-    source_id: str         # "siata_hidromet"
-    source_pdf: str        # "HIDROMET_20260615_20260621.pdf"
-    week_start: str        # "2026-06-15"
-    week_end: str          # "2026-06-21"
+    source_id: str  # "siata_hidromet"
+    source_pdf: str  # "HIDROMET_20260615_20260621.pdf"
+    week_start: str  # "2026-06-15"
+    week_end: str  # "2026-06-21"
     page: int
-    section: str           # Sección detectada
-    chunk_index: int       # Índice global en el documento
-    token_estimate: int    # Estimado de tokens
+    section: str  # Sección detectada
+    chunk_index: int  # Índice global en el documento
+    token_estimate: int  # Estimado de tokens
 
 
 def _estimate_tokens(text: str) -> int:
@@ -131,10 +132,27 @@ def _detect_section(text: str) -> str:
 def _extract_keywords(text: str) -> list[str]:
     """Extrae palabras clave relevantes del texto para el header Markdown."""
     keyword_pool = [
-        "precipitación", "lluvia", "acumulado", "mm", "movimientos en masa",
-        "deslizamiento", "alerta", "riesgo", "temperatura", "vientos",
-        "humedad", "descargas eléctricas", "rayos", "pronóstico", "Valle de Aburrá",
-        "Medellín", "SIATA", "hidromet", "nubosidad", "satélite", "ciclón",
+        "precipitación",
+        "lluvia",
+        "acumulado",
+        "mm",
+        "movimientos en masa",
+        "deslizamiento",
+        "alerta",
+        "riesgo",
+        "temperatura",
+        "vientos",
+        "humedad",
+        "descargas eléctricas",
+        "rayos",
+        "pronóstico",
+        "Valle de Aburrá",
+        "Medellín",
+        "SIATA",
+        "hidromet",
+        "nubosidad",
+        "satélite",
+        "ciclón",
     ]
     text_lower = text.lower()
     return [kw for kw in keyword_pool if kw.lower() in text_lower][:12]
@@ -171,7 +189,7 @@ def _download_pdf(url: str, output_path: Path, max_retries: int = 3) -> bool:
         except Exception as e:
             logger.warning(f"  Attempt {attempt + 1}/{max_retries} failed: {e}")
             if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
     return False
 
 
@@ -268,14 +286,14 @@ def _chunks_to_markdown(chunks: list[Chunk], week_start: str, week_end: str) -> 
     first_chunk_preview = chunks[0].text[:300].replace("\n", " ").strip() + "..." if chunks else ""
 
     md_lines = [
-        f"# INFORME HIDROMET SEMANAL — SIATA",
-        f"Sistema de Alerta Temprana de Medellín (SIATA)",
+        "# INFORME HIDROMET SEMANAL — SIATA",
+        "Sistema de Alerta Temprana de Medellín (SIATA)",
         f"Semana: {week_start} → {week_end}",
-        f"",
+        "",
         f"**Quick Summary**: {first_chunk_preview}",
-        f"",
+        "",
         f"**Keywords**: {keywords_str}",
-        f"",
+        "",
         "---",
         "",
     ]
@@ -287,14 +305,14 @@ def _chunks_to_markdown(chunks: list[Chunk], week_start: str, week_end: str) -> 
 
         md_lines += [
             f"## {title}",
-            f"",
-            f"SOURCE: SIATA INFORME HIDROMET SEMANAL",
+            "",
+            "SOURCE: SIATA INFORME HIDROMET SEMANAL",
             f"SECTION: {section_label}",
             f"WEEK: {chunk.week_start} → {chunk.week_end}",
             f"PAGE: {chunk.page}",
             f"ID: {chunk.chunk_id}",
             f"TOKENS: ~{chunk.token_estimate} (self-contained)",
-            f"",
+            "",
         ]
 
         # Contenido del chunk con subsecciones
@@ -436,9 +454,7 @@ def run(weeks: int = 4, max_downloads: Optional[int] = None) -> None:
         for pdf_name, chunks in chunks_by_pdf.items():
             dates = _extract_dates_from_filename(pdf_name)
             if dates:
-                all_md_lines.append(
-                    _chunks_to_markdown(chunks, dates[0], dates[1])
-                )
+                all_md_lines.append(_chunks_to_markdown(chunks, dates[0], dates[1]))
         combined_path = MD_DIR / f"{SOURCE_ID}_all.md"
         combined_path.write_text("\n\n".join(all_md_lines), encoding="utf-8")
         logger.info(f"  Saved combined MD: {combined_path.name}")

@@ -50,8 +50,8 @@ class Chunk:
     chunk_id: str
     text: str
     source_id: str
-    event_id: str           # WordPress post ID
-    event_date: str         # YYYY-MM-DD
+    event_id: str  # WordPress post ID
+    event_date: str  # YYYY-MM-DD
     event_title: str
     commune_mentioned: Optional[str]
     url: str
@@ -138,9 +138,9 @@ def _post_to_chunks(post: dict, chunk_counter: list[int]) -> list[Chunk]:
     except (ValueError, TypeError):
         event_date = raw_date[:10] if raw_date else "sin-fecha"
 
-    title = BeautifulSoup(
-        post.get("title", {}).get("rendered", ""), "html.parser"
-    ).get_text(strip=True)
+    title = BeautifulSoup(post.get("title", {}).get("rendered", ""), "html.parser").get_text(
+        strip=True
+    )
 
     content_html = post.get("content", {}).get("rendered", "")
     excerpt_html = post.get("excerpt", {}).get("rendered", "")
@@ -199,8 +199,15 @@ def _chunks_to_markdown(chunks: list[Chunk]) -> str:
         by_date.setdefault(c.event_date, []).append(c)
 
     keywords = [
-        "deslizamiento", "derrumbe", "movimiento en masa", "DAGRD",
-        "emergencia", "evacuación", "Medellín", "riesgo", "lluvia",
+        "deslizamiento",
+        "derrumbe",
+        "movimiento en masa",
+        "DAGRD",
+        "emergencia",
+        "evacuación",
+        "Medellín",
+        "riesgo",
+        "lluvia",
     ]
 
     md_lines = [
@@ -208,9 +215,9 @@ def _chunks_to_markdown(chunks: list[Chunk]) -> str:
         "Alcaldía de Medellín — Portal Oficial / DAGRD",
         f"Eventos procesados: {len(chunks)} chunks de {len(by_date)} fechas únicas",
         "",
-        f"**Quick Summary**: Reportes oficiales de emergencias asociadas a deslizamientos, "
-        f"derrumbes y movimientos en masa en Medellín y el Valle de Aburrá. "
-        f"Fuente: portal oficial Alcaldía de Medellín.",
+        "**Quick Summary**: Reportes oficiales de emergencias asociadas a deslizamientos, "
+        "derrumbes y movimientos en masa en Medellín y el Valle de Aburrá. "
+        "Fuente: portal oficial Alcaldía de Medellín.",
         "",
         f"**Keywords**: {', '.join(keywords)}",
         "",
@@ -225,7 +232,7 @@ def _chunks_to_markdown(chunks: list[Chunk]) -> str:
         md_lines += [
             f"## {title}",
             "",
-            f"SOURCE: DAGRD — Alcaldía de Medellín",
+            "SOURCE: DAGRD — Alcaldía de Medellín",
             f"EVENT_ID: {chunk.event_id}",
             f"DATE: {chunk.event_date}",
             f"TITLE: {chunk.event_title}",
@@ -307,6 +314,8 @@ if __name__ == "__main__":
 
     configure_logging("rag-dagrd-chunker")
     parser = argparse.ArgumentParser(description="DAGRD Eventos Chunker")
-    parser.add_argument("--max-pages", type=int, help="Límite de páginas por término (para testing)")
+    parser.add_argument(
+        "--max-pages", type=int, help="Límite de páginas por término (para testing)"
+    )
     args = parser.parse_args()
     run(max_pages=args.max_pages)

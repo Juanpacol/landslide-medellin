@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from scipy.stats import spearmanr
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import require_token
@@ -18,7 +18,6 @@ from db.models.commune_threshold import CommuneThreshold
 from db.models.landslide_event import LandslideEvent
 from db.models.ml_feature import MLFeature
 from db.models.rainfall_timeseries import RainfallTimeseries
-from db.models.risk_prediction import RiskPrediction
 from db.session import get_async_db
 
 logger = logging.getLogger(__name__)
@@ -39,6 +38,7 @@ def _midnight_utc() -> datetime:
 
 # ── Live rainfall ──────────────────────────────────────────────────────────────
 
+
 @router.get("/live")
 async def get_live_rainfall(session: AsyncSession = Depends(get_async_db)) -> dict:
     midnight = _midnight_utc()
@@ -57,11 +57,13 @@ async def get_live_rainfall(session: AsyncSession = Depends(get_async_db)) -> di
     running: dict[str, float] = {}
     for cid, snap_at, pmm in rows.all():
         running[cid] = running.get(cid, 0.0) + pmm
-        by_commune[cid].append({
-            "time": snap_at.astimezone(COL_TZ).strftime("%H:%M"),
-            "snapshot_mm": round(pmm, 2),
-            "acum_mm": round(running[cid], 2),
-        })
+        by_commune[cid].append(
+            {
+                "time": snap_at.astimezone(COL_TZ).strftime("%H:%M"),
+                "snapshot_mm": round(pmm, 2),
+                "acum_mm": round(running[cid], 2),
+            }
+        )
 
     from infrastructure.repositories.rainfall import thresholds_by_commune
     from infrastructure.repositories.risk_predictions import latest_scores_by_commune
@@ -75,16 +77,18 @@ async def get_live_rainfall(session: AsyncSession = Depends(get_async_db)) -> di
         acum = round(running.get(cid, 0.0), 2)
         threshold = thresholds.get(cid, 35.0)
         risk_score, risk_category = risks.get(cid, (None, None))
-        comunas_out.append({
-            "commune_id": cid,
-            "nombre_comuna": name,
-            "snapshots": by_commune.get(cid, []),
-            "precip_acum_mm": acum,
-            "threshold_mm": threshold,
-            "is_over_threshold": acum > threshold,
-            "risk_score": risk_score,
-            "risk_category": risk_category,
-        })
+        comunas_out.append(
+            {
+                "commune_id": cid,
+                "nombre_comuna": name,
+                "snapshots": by_commune.get(cid, []),
+                "precip_acum_mm": acum,
+                "threshold_mm": threshold,
+                "is_over_threshold": acum > threshold,
+                "risk_score": risk_score,
+                "risk_category": risk_category,
+            }
+        )
 
     return {
         "date": now_utc.astimezone(COL_TZ).strftime("%Y-%m-%d"),
@@ -94,6 +98,7 @@ async def get_live_rainfall(session: AsyncSession = Depends(get_async_db)) -> di
 
 
 # ── Spearman correlation ───────────────────────────────────────────────────────
+
 
 @router.get("/spearman")
 async def get_spearman(session: AsyncSession = Depends(get_async_db)) -> dict:
@@ -115,9 +120,7 @@ async def get_spearman(session: AsyncSession = Depends(get_async_db)) -> dict:
         day_str = ref_date.astimezone(COL_TZ).strftime("%Y-%m-%d")
         daily_rain[(cid, day_str)].append(float(precip))
 
-    rain_by_day: dict[tuple[str, str], float] = {
-        k: sum(v) / len(v) for k, v in daily_rain.items()
-    }
+    rain_by_day: dict[tuple[str, str], float] = {k: sum(v) / len(v) for k, v in daily_rain.items()}
 
     # Daily event count per commune
     event_rows = await session.execute(
@@ -159,19 +162,22 @@ async def get_spearman(session: AsyncSession = Depends(get_async_db)) -> dict:
             except Exception:
                 pass
 
-        comunas_out.append({
-            "commune_id": cid,
-            "nombre_comuna": name,
-            "rho": rho,
-            "p_value": p_value,
-            "n_observations": len(scatter),
-            "scatter_data": scatter[-120:],
-        })
+        comunas_out.append(
+            {
+                "commune_id": cid,
+                "nombre_comuna": name,
+                "rho": rho,
+                "p_value": p_value,
+                "n_observations": len(scatter),
+                "scatter_data": scatter[-120:],
+            }
+        )
 
     return {"comunas": comunas_out}
 
 
 # ── Thresholds ─────────────────────────────────────────────────────────────────
+
 
 class ThresholdIn(BaseModel):
     threshold_mm: float = Field(..., ge=0.0, le=500.0, description="Umbral diario en mm (0-500)")
@@ -217,6 +223,7 @@ async def set_threshold(
 
 
 # ── Webhook settings ───────────────────────────────────────────────────────────
+
 
 class WebhookIn(BaseModel):
     url: str = Field(..., min_length=12, max_length=500, pattern=r"^https://")
@@ -265,10 +272,16 @@ async def test_webhook(request: Request, session: AsyncSession = Depends(get_asy
     if not row or not row.value:
         return {"ok": False, "error": "No hay webhook URL configurada"}
     payload = _build_slack_payload("0", "Prueba TEYVA", 42.0, 35.0, 0.85, "Alto")
-    payload["blocks"].insert(0, {
-        "type": "section",
-        "text": {"type": "mrkdwn", "text": "✅ *Este es un mensaje de prueba del sistema TEYVA*"},
-    })
+    payload["blocks"].insert(
+        0,
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "✅ *Este es un mensaje de prueba del sistema TEYVA*",
+            },
+        },
+    )
     status, code = await _fire_slack(row.value, payload)
     log_audit_event(
         session,
@@ -283,11 +296,10 @@ async def test_webhook(request: Request, session: AsyncSession = Depends(get_asy
 
 # ── Alert log ──────────────────────────────────────────────────────────────────
 
+
 @router.get("/alerts/log")
 async def get_alert_log(session: AsyncSession = Depends(get_async_db)) -> dict:
-    rows = await session.execute(
-        select(AlertLog).order_by(AlertLog.created_at.desc()).limit(50)
-    )
+    rows = await session.execute(select(AlertLog).order_by(AlertLog.created_at.desc()).limit(50))
     return {
         "logs": [
             {

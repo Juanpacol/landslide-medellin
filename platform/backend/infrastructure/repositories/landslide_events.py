@@ -17,9 +17,7 @@ def real_events_sync(session: Session) -> list[LandslideEvent]:
     """Eventos REALES (excluye sintéticos). Versión sync para ml/train y
     ml/benchmark, que corren fuera del event loop."""
     return list(
-        session.scalars(
-            select(LandslideEvent).where(LandslideEvent.is_synthetic.is_(False))
-        ).all()
+        session.scalars(select(LandslideEvent).where(LandslideEvent.is_synthetic.is_(False))).all()
     )
 
 

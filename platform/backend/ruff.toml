@@ -1,12 +1,30 @@
 target-version = "py311"
 line-length = 100
 
+# Las migraciones ya aplicadas no se tocan (regla de CLAUDE.md): reformatearlas
+# genera diff sin ningún beneficio sobre archivos que son historia inmutable.
+# Alembic además las genera con su propia plantilla.
+extend-exclude = ["alembic/versions"]
+
 [lint]
-# Arranque lenient para no romper CI con deuda histórica del repo:
-# errores reales (E/F) sí bloquean, estilo (line-length, imports) no.
 select = ["E", "F", "B"]
 ignore = [
     "E501",  # line too long — lo cubre ruff format, no bloquear por esto
+]
+
+[lint.flake8-bugbear]
+# B008 marca llamadas en argumentos por defecto, pero `Depends()`/`Query()`/
+# `Body()` en la firma ES la API de FastAPI, no un descuido. Sin esto son 39
+# falsos positivos (30% del total) y "arreglarlos" implicaría reescribir la
+# firma de cada endpoint del proyecto.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Header",
+    "fastapi.Body",
+    "fastapi.Path",
+    "fastapi.File",
+    "fastapi.Form",
 ]
 
 [format]

@@ -31,7 +31,13 @@ MEDATA_ALERTS_CSV = (
 )
 
 SIATA_FILES = ["7.txt", "20.txt", "41.txt", "54.txt", "56.txt", "311.txt", "198.txt", "362.txt"]
-LANDSLIDE_KEYWORDS = ("desliz", "movimiento en masa", "derrumbe", "emergencia", "avenida torrencial")
+LANDSLIDE_KEYWORDS = (
+    "desliz",
+    "movimiento en masa",
+    "derrumbe",
+    "emergencia",
+    "avenida torrencial",
+)
 _CORREG_TO_ML = {"50": "17", "60": "18", "70": "19", "80": "20", "90": "21"}
 
 
@@ -57,7 +63,9 @@ def _commune_from_text(text: str) -> str | None:
 
 
 async def _max_ml_date(session: AsyncSession, source: str) -> datetime | None:
-    stmt = select(func.max(MLFeature.reference_date)).where(MLFeature.features["source"].as_string() == source)
+    stmt = select(func.max(MLFeature.reference_date)).where(
+        MLFeature.features["source"].as_string() == source
+    )
     return await session.scalar(stmt)
 
 
@@ -128,7 +136,9 @@ async def _ingest_ideam_incremental_session(session: AsyncSession) -> tuple[int,
                 break
 
     for (cid, day), vals in by_commune_day.items():
-        if await ml_feature_exists(session, commune_id=cid, reference_date=day, source_key="historical_ideam"):
+        if await ml_feature_exists(
+            session, commune_id=cid, reference_date=day, source_key="historical_ideam"
+        ):
             continue
         session.add(
             MLFeature(
@@ -168,7 +178,10 @@ async def _ingest_siata_incremental_session(session: AsyncSession) -> tuple[int,
         station_to_latlon: dict[str, tuple[float, float]] = {}
         for st in stations:
             try:
-                station_to_latlon[str(st.get("codigo"))] = (float(st.get("latitud")), float(st.get("longitud")))
+                station_to_latlon[str(st.get("codigo"))] = (
+                    float(st.get("latitud")),
+                    float(st.get("longitud")),
+                )
             except (TypeError, ValueError):
                 continue
 
@@ -196,7 +209,9 @@ async def _ingest_siata_incremental_session(session: AsyncSession) -> tuple[int,
             )
             if df.empty:
                 continue
-            df["dt"] = pd.to_datetime(df["fecha"], format="%Y-%m-%d %H:%M:%S", errors="coerce", utc=True)
+            df["dt"] = pd.to_datetime(
+                df["fecha"], format="%Y-%m-%d %H:%M:%S", errors="coerce", utc=True
+            )
             df = df.dropna(subset=["dt", "precip"])
             df = df[df["dt"] >= start_day]
             if df.empty:

@@ -24,7 +24,6 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import requests
 
@@ -96,7 +95,7 @@ class ComunaProfile:
     codigo: str
     nombre: str
     ml_id: str
-    tipo: str               # "comuna" o "corregimiento"
+    tipo: str  # "comuna" o "corregimiento"
     grado_amenaza: str
     densidad_franja: str
     token_estimate: int
@@ -246,7 +245,7 @@ def _profile_to_markdown(profile: ComunaProfile) -> str:
         f"## CHUNK {profile.chunk_id.split('_', 2)[-1].upper()}: "
         f"{tipo_label} {profile.nombre.upper()} — PERFIL DE RIESGO",
         "",
-        f"SOURCE: Alcaldía de Medellín — Ordenamiento Territorial / ArcGIS",
+        "SOURCE: Alcaldía de Medellín — Ordenamiento Territorial / ArcGIS",
         f"COMUNA: {profile.nombre} (Código: {profile.codigo})",
         f"TIPO: {tipo_label.title()}",
         f"ID_ML: {profile.ml_id}",
@@ -298,23 +297,25 @@ def run() -> None:
         md_path.write_text(md_content, encoding="utf-8")
 
     # Markdown combinado
-    header = "\n".join([
-        "# MEDELLÍN — PERFILES DE RIESGO POR COMUNA Y CORREGIMIENTO",
-        "Alcaldía de Medellín — Ordenamiento Territorial / ArcGIS",
-        f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        f"Comunas: {len([p for p in profiles if p.tipo == 'comuna'])} urbanas + "
-        f"{len([p for p in profiles if p.tipo == 'corregimiento'])} corregimientos",
-        "",
-        "**Quick Summary**: Perfiles oficiales de riesgo por movimientos en masa "
-        "y densidad habitacional para las 16 comunas y 5 corregimientos de Medellín. "
-        "Fuente: Alcaldía de Medellín, servicios de ordenamiento territorial.",
-        "",
-        "**Keywords**: amenaza, movimientos en masa, deslizamiento, densidad, "
-        "comuna, corregimiento, riesgo, Medellín, ordenamiento territorial",
-        "",
-        "---",
-        "",
-    ])
+    header = "\n".join(
+        [
+            "# MEDELLÍN — PERFILES DE RIESGO POR COMUNA Y CORREGIMIENTO",
+            "Alcaldía de Medellín — Ordenamiento Territorial / ArcGIS",
+            f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            f"Comunas: {len([p for p in profiles if p.tipo == 'comuna'])} urbanas + "
+            f"{len([p for p in profiles if p.tipo == 'corregimiento'])} corregimientos",
+            "",
+            "**Quick Summary**: Perfiles oficiales de riesgo por movimientos en masa "
+            "y densidad habitacional para las 16 comunas y 5 corregimientos de Medellín. "
+            "Fuente: Alcaldía de Medellín, servicios de ordenamiento territorial.",
+            "",
+            "**Keywords**: amenaza, movimientos en masa, deslizamiento, densidad, "
+            "comuna, corregimiento, riesgo, Medellín, ordenamiento territorial",
+            "",
+            "---",
+            "",
+        ]
+    )
     combined = header + "\n\n".join(_profile_to_markdown(p) for p in profiles)
     combined_path = MD_DIR / f"{SOURCE_ID}_all.md"
     combined_path.write_text(combined, encoding="utf-8")

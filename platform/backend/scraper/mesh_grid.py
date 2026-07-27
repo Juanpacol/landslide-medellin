@@ -39,7 +39,9 @@ from scraper.common import log_scrape_run, utcnow
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_GEOJSON = Path(__file__).resolve().parents[2] / "frontend" / "lib" / "barrios-medellin.json"
+_DEFAULT_GEOJSON = (
+    Path(__file__).resolve().parents[2] / "frontend" / "lib" / "barrios-medellin.json"
+)
 BARRIOS_GEOJSON = Path(os.getenv("BARRIOS_GEOJSON", str(_DEFAULT_GEOJSON)))
 
 GRID_SIZE_KM = 1.5
@@ -62,7 +64,9 @@ def _km_to_degrees(km: float, lat_ref: float) -> tuple[float, float]:
     return lat_deg, lon_deg
 
 
-def _build_grid(bounds: tuple[float, float, float, float], grid_size_km: float) -> list[dict[str, Any]]:
+def _build_grid(
+    bounds: tuple[float, float, float, float], grid_size_km: float
+) -> list[dict[str, Any]]:
     """bounds = (minx, miny, maxx, maxy) en lon/lat. Genera cuadrículas cuadradas."""
     minx, miny, maxx, maxy = bounds
     lat_step, lon_step = _km_to_degrees(grid_size_km, MEDELLIN_LAT_REF)
@@ -73,10 +77,12 @@ def _build_grid(bounds: tuple[float, float, float, float], grid_size_km: float) 
     while lat < maxy:
         lon = minx
         while lon < maxx:
-            quads.append({
-                "id": f"Q_{quad_id:04d}",
-                "geometry": box(lon, lat, lon + lon_step, lat + lat_step),
-            })
+            quads.append(
+                {
+                    "id": f"Q_{quad_id:04d}",
+                    "geometry": box(lon, lat, lon + lon_step, lat + lat_step),
+                }
+            )
             quad_id += 1
             lon += lon_step
         lat += lat_step

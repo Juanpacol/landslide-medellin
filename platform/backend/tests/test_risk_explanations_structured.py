@@ -61,7 +61,10 @@ def test_template_explanation_structured_has_expected_schema(
     # La urgencia estructurada debe reflejar la categoría de riesgo pedida.
     assert structured["urgency"] == risk_category
 
-    assert isinstance(structured["recommended_action"], str) and structured["recommended_action"].strip()
+    assert (
+        isinstance(structured["recommended_action"], str)
+        and structured["recommended_action"].strip()
+    )
 
 
 @pytest.mark.parametrize(

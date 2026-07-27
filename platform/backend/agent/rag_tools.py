@@ -18,12 +18,11 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import func, select
 
 from agent.tools import (
     commune_display_name,
     find_communes_in_text,
-    get_alert_status,
     get_top_risk_comunas,
     resolve_commune_id,
 )
@@ -75,8 +74,11 @@ def _citation_base(meta: dict[str, Any]) -> str:
         ref = f"Reporte DAGRD ({date}): {title}".strip().rstrip(":")
         return f"{ref} — {url}" if url else ref
     if src == "medellin_comunas":
-        return f"Perfil de riesgo de {zone} (Alcaldía de Medellín, ArcGIS)" if zone else \
-            "Perfil de riesgo por comuna (Alcaldía de Medellín, ArcGIS)"
+        return (
+            f"Perfil de riesgo de {zone} (Alcaldía de Medellín, ArcGIS)"
+            if zone
+            else "Perfil de riesgo por comuna (Alcaldía de Medellín, ArcGIS)"
+        )
     return src or "Fuente desconocida"
 
 
@@ -180,7 +182,7 @@ async def search_knowledge(query: str, source: Optional[str] = None) -> str:
         if len(text) > 600:
             text = text[:600] + "…"
         # La línea FUENTE permite que el modelo cite inline si quiere.
-        lines.append(f"\n<document id=\"{i}\">")
+        lines.append(f'\n<document id="{i}">')
         lines.append(f"<source>{citation}</source>")
         lines.append(f"<content>{text}</content>")
         lines.append("</document>")
@@ -209,9 +211,7 @@ async def get_risk_predictions(commune: Optional[str] = None) -> str:
                 return f"No hay predicción reciente para {commune_display_name(cid)}."
             nivel = display_label(row.risk_category or risk_level_from_score(row.risk_score))
             cuando = _humanize_age(row.created_at)
-            return (
-                f"Comuna {commune_display_name(cid)}: riesgo {nivel}. {cuando}."
-            )
+            return f"Comuna {commune_display_name(cid)}: riesgo {nivel}. {cuando}."
 
         # Sin comuna → top 5 de mayor riesgo.
         top = await get_top_risk_comunas(5, db)
@@ -249,7 +249,9 @@ async def get_recent_events(days: int = 7, commune: Optional[str] = None) -> str
 
         lines = [f"Eventos en los últimos {days} días ({len(rows)}):"]
         for r in rows:
-            nombre = commune_display_name(str(r.commune_id)) if r.commune_id else "ubicación sin asignar"
+            nombre = (
+                commune_display_name(str(r.commune_id)) if r.commune_id else "ubicación sin asignar"
+            )
             fecha = r.fecha or "fecha s/d"
             tipo = r.tipo_emergencia or "evento"
             lines.append(f"- {fecha} | {nombre} | {tipo}")
@@ -329,7 +331,11 @@ def _humanize_age(value: Any) -> str:
     if not value:
         return "sin fecha"
     try:
-        dt = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        dt = (
+            value
+            if isinstance(value, datetime)
+            else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        )
     except (ValueError, TypeError):
         return "hace poco"
     if dt.tzinfo is None:
@@ -429,7 +435,11 @@ async def get_evacuation_routes(commune: str) -> str:
     nombre = commune_display_name(cid)
     lines = [f"Zonas seguras candidatas cerca de {nombre} (sin validar por Defensoría/DAGRD):"]
     for z in result.get("zones", []):
-        tiempo = f"{z['duration_walking_min']:.0f} min caminando" if z.get("duration_walking_min") else f"~{z['distance_straight_km']} km en línea recta"
+        tiempo = (
+            f"{z['duration_walking_min']:.0f} min caminando"
+            if z.get("duration_walking_min")
+            else f"~{z['distance_straight_km']} km en línea recta"
+        )
         lines.append(f"- {z['nombre']} ({z['tipo']}): {tiempo}")
     lines.append("Recuerda: en caso de emergencia real, contacta primero a DAGRD 4444444.")
     return "\n".join(lines)
@@ -471,7 +481,10 @@ TOOL_SCHEMAS: list[dict] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "commune": {"type": "string", "description": "Nombre o número de comuna (opcional)"},
+                    "commune": {
+                        "type": "string",
+                        "description": "Nombre o número de comuna (opcional)",
+                    },
                 },
             },
         },
@@ -527,8 +540,14 @@ TOOL_SCHEMAS: list[dict] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "commune": {"type": "string", "description": "Nombre o número de la comuna donde se observa"},
-                    "descripcion": {"type": "string", "description": "Qué está observando la persona, en sus palabras"},
+                    "commune": {
+                        "type": "string",
+                        "description": "Nombre o número de la comuna donde se observa",
+                    },
+                    "descripcion": {
+                        "type": "string",
+                        "description": "Qué está observando la persona, en sus palabras",
+                    },
                     "barrio": {"type": "string", "description": "Barrio específico (opcional)"},
                 },
                 "required": ["commune", "descripcion"],

@@ -75,7 +75,11 @@ async def _daily_rain_for_commune(
     )
     out: dict[date, float] = {}
     for day_value, total in (await session.execute(stmt)).all():
-        d = day_value if isinstance(day_value, date) else datetime.fromisoformat(str(day_value)).date()
+        d = (
+            day_value
+            if isinstance(day_value, date)
+            else datetime.fromisoformat(str(day_value)).date()
+        )
         out[d] = float(total or 0.0)
     return out
 
@@ -94,7 +98,8 @@ async def get_snake_line_status(
         select(RainfallTimeseries.snapshot_at, RainfallTimeseries.precip_mm)
         .where(
             RainfallTimeseries.commune_id == commune_id,
-            RainfallTimeseries.snapshot_at >= window_start - timedelta(minutes=TRAILING_RAIN_MINUTES),
+            RainfallTimeseries.snapshot_at
+            >= window_start - timedelta(minutes=TRAILING_RAIN_MINUTES),
         )
         .order_by(RainfallTimeseries.snapshot_at)
     )
@@ -117,12 +122,14 @@ async def get_snake_line_status(
             continue
         x = swi_for_day(ts.date())
         y = trailing_rain(ts)
-        history.append({
-            "timestamp": ts.isoformat(),
-            "x": x,
-            "y": y,
-            "status": classify_point(x, y, commune_id),
-        })
+        history.append(
+            {
+                "timestamp": ts.isoformat(),
+                "x": x,
+                "y": y,
+                "status": classify_point(x, y, commune_id),
+            }
+        )
 
     current_x = swi_for_day(now.date())
     current_y = trailing_rain(now)
@@ -150,7 +157,9 @@ async def _snake_alert_on_cooldown(session: AsyncSession, commune_id: str) -> bo
         last_sent = datetime.fromisoformat(row.value)
         if last_sent.tzinfo is None:
             last_sent = last_sent.replace(tzinfo=timezone.utc)
-        return (datetime.now(timezone.utc) - last_sent).total_seconds() < SNAKE_LINE_COOLDOWN_HOURS * 3600
+        return (
+            datetime.now(timezone.utc) - last_sent
+        ).total_seconds() < SNAKE_LINE_COOLDOWN_HOURS * 3600
     except ValueError:
         return False
 
@@ -174,14 +183,20 @@ def _build_snake_line_payload(commune_id: str, name: str, point: dict) -> dict:
                 "blocks": [
                     {
                         "type": "header",
-                        "text": {"type": "plain_text", "text": "🐍 Snake Line — Línea crítica cruzada"},
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🐍 Snake Line — Línea crítica cruzada",
+                        },
                     },
                     {
                         "type": "section",
                         "fields": [
                             {"type": "mrkdwn", "text": f"*Comuna:*\n{name} ({commune_id})"},
                             {"type": "mrkdwn", "text": f"*Saturación (SWI):*\n{point['x']:.0f}%"},
-                            {"type": "mrkdwn", "text": f"*Lluvia últimos 60min:*\n{point['y']:.1f} mm"},
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Lluvia últimos 60min:*\n{point['y']:.1f} mm",
+                            },
                         ],
                     },
                     {
@@ -197,7 +212,9 @@ def _build_snake_line_payload(commune_id: str, name: str, point: dict) -> dict:
     }
 
 
-async def check_and_fire_snake_line_alerts(session: AsyncSession, commune_ids: list[str]) -> list[str]:
+async def check_and_fire_snake_line_alerts(
+    session: AsyncSession, commune_ids: list[str]
+) -> list[str]:
     """Dispara Slack cuando el punto actual (SWI × lluvia 60min) de una comuna
     cruza la línea crítica (estado ROJO). Cooldown propio por comuna."""
     from alerts.slack import _NAMES, _fire_slack, _get_webhook_url

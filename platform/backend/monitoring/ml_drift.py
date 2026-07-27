@@ -138,7 +138,10 @@ async def run() -> None:
 
         dist = await check_risk_category_distribution()
         findings["category_distribution"] = dist
-        if dist["total_predictions_7d"] > 0 and dist["critical_share"] > CRITICAL_SHARE_WARNING_THRESHOLD:
+        if (
+            dist["total_predictions_7d"] > 0
+            and dist["critical_share"] > CRITICAL_SHARE_WARNING_THRESHOLD
+        ):
             if worst_status != "critical":
                 worst_status = "warning"
             findings["category_distribution"]["status"] = "WARNING"

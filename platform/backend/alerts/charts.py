@@ -22,19 +22,20 @@ from sqlalchemy import func, select  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from db.models.rainfall_timeseries import RainfallTimeseries  # noqa: E402
-from db.models.risk_prediction import RiskPrediction  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 # Paleta TEYVA (coherente con el dashboard)
-_COLOR_BAR = "#5B8DEF"        # azul lluvia normal
-_COLOR_PEAK = "#E5484D"       # rojo pico/sobre umbral
+_COLOR_BAR = "#5B8DEF"  # azul lluvia normal
+_COLOR_PEAK = "#E5484D"  # rojo pico/sobre umbral
 _COLOR_THRESHOLD = "#F5A623"  # naranja umbral
 _COLOR_TEXT = "#2D2A26"
 _COLOR_GRID = "#E6E1DA"
 
 
-async def _daily_rainfall(commune_id: str, db: AsyncSession, days: int = 7) -> list[tuple[datetime, float]]:
+async def _daily_rainfall(
+    commune_id: str, db: AsyncSession, days: int = 7
+) -> list[tuple[datetime, float]]:
     """Suma diaria de lluvia de los últimos `days` días para una comuna."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     day = func.date_trunc("day", RainfallTimeseries.snapshot_at)
@@ -66,8 +67,16 @@ def build_rainfall_alert_chart(
     ax.set_facecolor("white")
 
     if not daily:
-        ax.text(0.5, 0.5, "Sin datos de lluvia recientes", ha="center", va="center",
-                fontsize=12, color=_COLOR_TEXT, transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "Sin datos de lluvia recientes",
+            ha="center",
+            va="center",
+            fontsize=12,
+            color=_COLOR_TEXT,
+            transform=ax.transAxes,
+        )
         ax.axis("off")
         return _fig_to_png(fig)
 
@@ -78,14 +87,28 @@ def build_rainfall_alert_chart(
     bars = ax.bar(dates, values, color=colors, width=0.6, zorder=3)
 
     # Línea de umbral
-    ax.axhline(threshold_mm, color=_COLOR_THRESHOLD, linestyle="--", linewidth=1.6,
-               zorder=2, label=f"Umbral {threshold_mm:.0f} mm")
+    ax.axhline(
+        threshold_mm,
+        color=_COLOR_THRESHOLD,
+        linestyle="--",
+        linewidth=1.6,
+        zorder=2,
+        label=f"Umbral {threshold_mm:.0f} mm",
+    )
 
     # Etiquetas de valor sobre cada barra
     for bar, v in zip(bars, values):
         if v > 0:
-            ax.text(bar.get_x() + bar.get_width() / 2, v, f"{v:.0f}",
-                    ha="center", va="bottom", fontsize=8.5, color=_COLOR_TEXT, zorder=4)
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                v,
+                f"{v:.0f}",
+                ha="center",
+                va="bottom",
+                fontsize=8.5,
+                color=_COLOR_TEXT,
+                zorder=4,
+            )
 
     # Estilo
     ax.set_ylabel("Lluvia (mm)", fontsize=10, color=_COLOR_TEXT)
@@ -121,8 +144,16 @@ def build_risk_trend_chart(
     ax.set_facecolor("white")
 
     if not history:
-        ax.text(0.5, 0.5, "Sin histórico de riesgo", ha="center", va="center",
-                fontsize=12, color=_COLOR_TEXT, transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "Sin histórico de riesgo",
+            ha="center",
+            va="center",
+            fontsize=12,
+            color=_COLOR_TEXT,
+            transform=ax.transAxes,
+        )
         ax.axis("off")
         return _fig_to_png(fig)
 
@@ -136,8 +167,13 @@ def build_risk_trend_chart(
     ax.axhspan(0.65, 0.90, color="#F5A623", alpha=0.06)
 
     ax.set_ylabel("Score de riesgo", fontsize=10, color=_COLOR_TEXT)
-    ax.set_title(f"Evolución del riesgo — {commune_name}", fontsize=11.5,
-                 color=_COLOR_TEXT, fontweight="bold", pad=10)
+    ax.set_title(
+        f"Evolución del riesgo — {commune_name}",
+        fontsize=11.5,
+        color=_COLOR_TEXT,
+        fontweight="bold",
+        pad=10,
+    )
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
     ax.grid(axis="y", color=_COLOR_GRID, linewidth=0.8, zorder=0)
     for spine in ("top", "right"):

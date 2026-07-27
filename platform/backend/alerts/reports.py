@@ -88,6 +88,7 @@ async def _claude_summary(context: str, max_words: int) -> str | None:
 
 # ── 1) Digest de scraper ───────────────────────────────────────────────────────
 
+
 def _template_digest(source: str, new_items: list[dict]) -> str:
     label = _SOURCE_LABELS.get(source, source)
     lines = [f"{label} registró {len(new_items)} novedad{'es' if len(new_items) != 1 else ''}:"]
@@ -160,6 +161,7 @@ def build_scraper_digest_payload(source: str, summary: str, n_items: int) -> dic
 
 # ── 2) Reporte de situación bajo demanda ───────────────────────────────────────
 
+
 async def _collect_situation_data(session: AsyncSession) -> dict:
     """Junta el panorama actual con las mismas fuentes que usan API y alertas."""
     from domain.risk_rules import display_label, normalize_category
@@ -211,7 +213,9 @@ async def _collect_situation_data(session: AsyncSession) -> dict:
     week_ago = now - timedelta(days=7)
     n_events = (
         await session.scalar(
-            select(func.count()).select_from(LandslideEvent).where(LandslideEvent.ingested_at >= week_ago)
+            select(func.count())
+            .select_from(LandslideEvent)
+            .where(LandslideEvent.ingested_at >= week_ago)
         )
     ) or 0
     seismic = (
@@ -247,13 +251,16 @@ def _template_situation_report(data: dict) -> str:
     cats = ", ".join(f"{v} en {k}" for k, v in data["por_categoria"].items()) or "sin predicciones"
     lines = [
         "Reporte de situación TEYVA — "
-        + datetime.now(COL_TZ).strftime("%Y-%m-%d %H:%M") + " (Colombia).",
+        + datetime.now(COL_TZ).strftime("%Y-%m-%d %H:%M")
+        + " (Colombia).",
         f"Comunas por nivel de riesgo: {cats}.",
         f"Lluvia máxima acumulada hoy: {data['lluvia_max_hoy_mm']} mm.",
         f"Eventos de emergencia registrados en la última semana: {data['eventos_7d']}.",
     ]
     if data["comunas_criticas"]:
-        detalle = ", ".join(f"comuna {cid} ({score:.0%})" for cid, score in data["comunas_criticas"])
+        detalle = ", ".join(
+            f"comuna {cid} ({score:.0%})" for cid, score in data["comunas_criticas"]
+        )
         lines.append(f"Mayor atención en: {detalle}.")
     if data["sismos_recientes"]:
         s = data["sismos_recientes"][0]
@@ -265,9 +272,7 @@ def _template_situation_report(data: dict) -> str:
     return "\n".join(lines)
 
 
-async def generate_situation_report(
-    session: AsyncSession, *, max_words: int = 200
-) -> str:
+async def generate_situation_report(session: AsyncSession, *, max_words: int = 200) -> str:
     """Reporte de situación completo en lenguaje plano (para Slack o el chat)."""
     data = await _collect_situation_data(session)
     if _llm_available():

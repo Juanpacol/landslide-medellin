@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -45,10 +44,7 @@ async def get_risk_by_comuna(nombre_o_id: str, db: AsyncSession) -> dict[str, An
         return None
     rp = RiskPrediction
     stmt = (
-        select(rp)
-        .where(rp.commune_id == cid)
-        .order_by(rp.created_at.desc(), rp.id.desc())
-        .limit(1)
+        select(rp).where(rp.commune_id == cid).order_by(rp.created_at.desc(), rp.id.desc()).limit(1)
     )
     result = await db.execute(stmt)
     row = result.scalar_one_or_none()
@@ -176,7 +172,9 @@ async def get_alert_status(db: AsyncSession) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     for r in rows:
         cat = (r.risk_category or "").strip().lower()
-        cat_norm = "".join(c for c in unicodedata.normalize("NFD", cat) if unicodedata.category(c) != "Mn")
+        cat_norm = "".join(
+            c for c in unicodedata.normalize("NFD", cat) if unicodedata.category(c) != "Mn"
+        )
         if cat_norm in _ALERT_LEVELS:
             alerts.append(
                 {
@@ -189,5 +187,3 @@ async def get_alert_status(db: AsyncSession) -> list[dict[str, Any]]:
             )
     alerts.sort(key=lambda x: (-(x["risk_score"] or 0), x["commune_id"]))
     return alerts
-
-

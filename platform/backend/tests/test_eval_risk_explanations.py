@@ -171,9 +171,7 @@ class TestRiskExplanationsStructure:
         vague_words = ["podría", "tal vez", "posiblemente", "quizás"]
 
         for word in vague_words:
-            assert word.lower() not in text.lower(), (
-                f"Found vague word '{word}' in explanation"
-            )
+            assert word.lower() not in text.lower(), f"Found vague word '{word}' in explanation"
 
     def test_factors_are_concrete(self):
         """Test that factors contain concrete data, not vague statements."""
@@ -236,6 +234,6 @@ def test_risk_explanations_batch_evaluation(risk_explanations_config):
     print(format_report_summary(report))
 
     # Assert threshold
-    assert (
-        report.threshold_passed
-    ), f"Risk explanations accuracy {report.accuracy*100:.1f}% below threshold {report.threshold*100:.0f}%"
+    assert report.threshold_passed, (
+        f"Risk explanations accuracy {report.accuracy * 100:.1f}% below threshold {report.threshold * 100:.0f}%"
+    )
