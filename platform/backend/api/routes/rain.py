@@ -19,13 +19,12 @@ from db.models.landslide_event import LandslideEvent
 from db.models.ml_feature import MLFeature
 from db.models.rainfall_timeseries import RainfallTimeseries
 from db.session import get_async_db
+from domain.communes import COMMUNES as _DOMAIN_COMMUNES
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 COL_TZ = ZoneInfo("America/Bogota")
-
-from domain.communes import COMMUNES as _DOMAIN_COMMUNES
 
 _COMUNAS: list[tuple[str, str]] = [(c.id, c.nombre) for c in _DOMAIN_COMMUNES]
 _NAMES: dict[str, str] = dict(_COMUNAS)

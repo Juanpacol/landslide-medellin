@@ -82,7 +82,7 @@ async def ingest_historical_dagrd(session: AsyncSession) -> dict[str, Any]:
         while True:
             params = {"search": "deslizamiento", "per_page": 100, "page": page}
 
-            async def _call():
+            async def _call(params=params):
                 r = await client.get(WP_POSTS_URL, params=params)
                 if r.status_code == 400:
                     return []
@@ -159,7 +159,7 @@ async def ingest_historical_ideam(session: AsyncSession) -> dict[str, Any]:
                 "$offset": str(offset),
             }
 
-            async def _call():
+            async def _call(params=params):
                 r = await client.get(IDEAM_S54A_URL, params=params)
                 r.raise_for_status()
                 return r.json()
@@ -252,7 +252,7 @@ async def ingest_historical_siata(session: AsyncSession) -> dict[str, Any]:
         for fname in SIATA_FILES:
             url = f"{SIATA_HIST_BASE}/{fname}"
 
-            async def _dl():
+            async def _dl(url=url):
                 r = await client.get(url)
                 r.raise_for_status()
                 return r.text

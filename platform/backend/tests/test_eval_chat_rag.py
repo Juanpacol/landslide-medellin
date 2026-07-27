@@ -79,7 +79,7 @@ async def test_chat_rag_batch_evaluation(db_session, require_ollama, chat_rag_co
         threshold=0.90,
     )
 
-    report_path = save_report(report, RESULTS_DIR)
+    save_report(report, RESULTS_DIR)
     print(format_report_summary(report))
 
     # Assert threshold

@@ -24,9 +24,6 @@ from db.models import LandslideEvent, MLFeature, RiskPrediction
 from db.models.rainfall_timeseries import RainfallTimeseries
 from db.models.risk_explanation import RiskExplanation
 from db.session import get_async_db
-from integrations.agent_contracts import predict_all_comunas, predict_risk_stub
-
-router = APIRouter()
 
 # Territorio desde la fuente única (domain/communes.py), en id CANÓNICO —
 # el mismo que usan risk_predictions/ml_features. El código oficial (ArcGIS)
@@ -34,6 +31,9 @@ router = APIRouter()
 from domain.communes import BY_ID as _COMMUNES_BY_ID
 from domain.communes import COMMUNES as _DOMAIN_COMMUNES
 from domain.communes import canonical_id as _canonical_commune_id
+from integrations.agent_contracts import predict_all_comunas, predict_risk_stub
+
+router = APIRouter()
 
 _COMUNAS_BASE = [(c.id, c.nombre, c.is_ladera) for c in _DOMAIN_COMMUNES]
 

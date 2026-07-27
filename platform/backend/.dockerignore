@@ -11,3 +11,19 @@ _commune_polygons_cache.json
 data/raw/
 .git/
 .DS_Store
+
+# Corpus fuente del RAG: 1.31 GB de PDFs que SOLO se usan para re-ingestar
+# (`python -m rag.chroma_store --ingest`, vía los chunkers, que hacen mkdir y
+# los re-descargan). Lo que sirve las búsquedas es rag/data/chroma_db/ (42 MB)
+# y los *_chunks.json (3.3 MB, que rag/chroma_store.py lee en caliente para
+# detect_zone) — esos SÍ entran en la imagen. No los excluyas: el RAG seguiría
+# respondiendo pero el filtro por zona se degradaría en silencio.
+rag/data/*/raw_pdfs/
+
+# Gitignoreado: existe en el build local pero NO en el checkout de CI, así que
+# sin esto la imagen local y la de CI difieren.
+validacion_eventos.csv
+observability/predictions.jsonl
+
+# Los tests corren sobre el checkout en CI, no dentro de la imagen.
+tests/

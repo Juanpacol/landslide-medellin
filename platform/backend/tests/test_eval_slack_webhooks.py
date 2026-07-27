@@ -226,7 +226,7 @@ def test_slack_webhooks_batch_evaluation(slack_webhooks_config):
         threshold=0.85,
     )
 
-    report_path = save_report(report, RESULTS_DIR)
+    save_report(report, RESULTS_DIR)
     print(format_report_summary(report))
 
     # Assert threshold

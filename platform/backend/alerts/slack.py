@@ -30,6 +30,7 @@ from alerts.slack_media import (
 from db.models.alert_log import AlertLog
 from db.models.app_setting import AppSetting
 from db.models.scraping_log import ScrapingLog
+from domain.communes import COMMUNES as _COMMUNES
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +38,6 @@ COL_TZ = ZoneInfo("America/Bogota")
 
 # Nombres desde la fuente única (domain/communes.py). Acepta id canónico
 # ("18") Y código oficial ("60") porque hay datos históricos con ambos.
-from domain.communes import COMMUNES as _COMMUNES
-
 _NAMES: dict[str, str] = {c.id: c.nombre for c in _COMMUNES} | {
     c.official_code: c.nombre for c in _COMMUNES
 }

@@ -27,6 +27,8 @@ from pathlib import Path
 
 import requests
 
+from domain.communes import COMMUNES as _DOMAIN_COMMUNES
+
 logger = logging.getLogger(__name__)
 
 RAG_DIR = Path(__file__).parent
@@ -52,8 +54,6 @@ HEADERS = {"User-Agent": "TEYVA-Scraper/1.0"}
 
 # Territorio desde la fuente única (domain/communes.py). El ml_id es el id
 # canónico bajo el que viven los datos (corregimientos = 17-21, no 50-90).
-from domain.communes import COMMUNES as _DOMAIN_COMMUNES
-
 COMUNAS = [
     {"codigo": c.official_code, "nombre": c.nombre, "ml_id": c.id, "tipo": c.tipo}
     for c in _DOMAIN_COMMUNES
@@ -173,7 +173,6 @@ def _build_comuna_profile(
     # (ladera nororiental y suroccidental = alta, centros = media)
     amenaza_alta = {"01", "02", "03", "08", "09", "13", "50", "60", "70"}
     amenaza_media = {"04", "05", "06", "07", "16", "80", "90"}
-    amenaza_baja = {"10", "11", "12", "14", "15"}
 
     if codigo in amenaza_alta:
         grado_amenaza = "Alta"
@@ -186,7 +185,6 @@ def _build_comuna_profile(
     densidad_alta = {"01", "02", "03", "04", "06", "07", "08", "13"}
     densidad_media_alta = {"05", "09", "12", "16"}
     densidad_media_baja = {"10", "11", "14", "15"}
-    densidad_baja = {"50", "60", "70", "80", "90"}
 
     if codigo in densidad_alta:
         densidad_franja = "Alta"

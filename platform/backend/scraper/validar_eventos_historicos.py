@@ -138,7 +138,7 @@ async def main() -> None:
         )
 
     df = pd.DataFrame(resultados)
-    evaluables = df[df["evaluable"] == True] if not df.empty else df
+    evaluables = df[df["evaluable"]] if not df.empty else df
 
     logger.info("=" * 70)
     logger.info("VALIDACIÓN: EVENTOS HISTÓRICOS vs SNAKE LINE")

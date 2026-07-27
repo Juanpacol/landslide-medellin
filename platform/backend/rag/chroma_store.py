@@ -263,7 +263,7 @@ def search(
     docs = (res.get("documents") or [[]])[0]
     metas = (res.get("metadatas") or [[]])[0]
     dists = (res.get("distances") or [[]])[0]
-    for doc, meta, dist in zip(docs, metas, dists):
+    for doc, meta, dist in zip(docs, metas, dists, strict=False):
         out.append({"text": doc, "metadata": meta or {}, "distance": dist})
     _search_cache.set(cache_key, out)
     return out

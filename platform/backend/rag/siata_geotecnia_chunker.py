@@ -493,7 +493,7 @@ def run(zones: Optional[list[str]] = None, test: bool = False) -> None:
             ]
         )
         sections = []
-        for zone_slug, chunks in chunks_by_zone.items():
+        for _zone_slug, chunks in chunks_by_zone.items():
             c0 = chunks[0]
             sections.append(
                 _chunks_to_markdown(chunks, c0.zone_name, c0.municipio, c0.barrio, c0.lat, c0.lon)

@@ -9,20 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import LandslideEvent, RiskPrediction
 
+# Fuente única de verdad del territorio: domain/communes.py.
+# Se re-exportan resolve_commune_id / commune_display_name / find_communes_in_text
+# porque media docena de módulos (chat, rag_tools, alerts) los importan de aquí.
+from domain.communes import COMMUNES as _COMMUNES
+from domain.communes import display_name as commune_display_name  # noqa: F401
+from domain.communes import find_communes_in_text  # noqa: F401
+from domain.communes import resolve_commune_id  # noqa: F401
+
 
 def _normalize_token(s: str) -> str:
     s = s.strip().lower()
     nkfd = unicodedata.normalize("NFD", s)
     return "".join(c for c in nkfd if unicodedata.category(c) != "Mn")
 
-
-# Fuente única de verdad del territorio: domain/communes.py.
-# Se re-exportan resolve_commune_id / commune_display_name porque media docena
-# de módulos (chat, rag_tools, alerts) los importan de aquí.
-from domain.communes import COMMUNES as _COMMUNES
-from domain.communes import display_name as commune_display_name  # noqa: F401
-from domain.communes import find_communes_in_text  # noqa: F401
-from domain.communes import resolve_commune_id  # noqa: F401
 
 COMMUNE_LABELS: dict[str, str] = {c.id: c.nombre for c in _COMMUNES}
 

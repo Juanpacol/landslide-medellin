@@ -230,7 +230,7 @@ def test_risk_explanations_batch_evaluation(risk_explanations_config):
         threshold=0.90,
     )
 
-    report_path = save_report(report, RESULTS_DIR)
+    save_report(report, RESULTS_DIR)
     print(format_report_summary(report))
 
     # Assert threshold

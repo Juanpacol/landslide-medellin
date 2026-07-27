@@ -10,8 +10,6 @@ from bs4 import BeautifulSoup
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
-
 from db.models.ml_feature import MLFeature
 from db.models.rainfall_timeseries import RainfallTimeseries
 from db.session import AsyncSessionLocal
@@ -21,6 +19,8 @@ from infrastructure.external.arcgis_client import (
     parse_ml_commune_from_siata_field,
 )
 from scraper.common import httpx_client, log_scrape_run, ml_feature_exists, utcnow, with_retries
+
+logger = logging.getLogger(__name__)
 
 SIATA_HOME = "https://www.siata.gov.co"
 PLUVIO_JSON = "https://siata.gov.co/data/siata_app/Pluviometrica.json"

@@ -111,7 +111,7 @@ def _detect_section(text: str) -> str:
     Primero intenta leer el encabezado explícito de la página (segunda línea),
     luego hace keyword matching como fallback.
     """
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
 
     # Los PDFs HIDROMET tienen en la segunda línea el nombre de la sección
     if len(lines) >= 2:

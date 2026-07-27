@@ -97,7 +97,7 @@ def build_rainfall_alert_chart(
     )
 
     # Etiquetas de valor sobre cada barra
-    for bar, v in zip(bars, values):
+    for bar, v in zip(bars, values, strict=False):
         if v > 0:
             ax.text(
                 bar.get_x() + bar.get_width() / 2,

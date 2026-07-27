@@ -374,7 +374,7 @@ def train() -> dict[str, Any]:
     weights = class_weight.compute_class_weight(
         class_weight="balanced", classes=class_values, y=y_res
     )
-    class_weight_map = {int(cls): float(w) for cls, w in zip(class_values, weights)}
+    class_weight_map = {int(cls): float(w) for cls, w in zip(class_values, weights, strict=False)}
     scale_pos_weight = class_weight_map[1] / max(class_weight_map[0], 1e-9)
 
     cv, cv_name = _cv_splitter(y_res)

@@ -102,7 +102,7 @@ async def _ingest_ideam_incremental_session(session: AsyncSession) -> tuple[int,
                 "$offset": str(offset),
             }
 
-            async def _call():
+            async def _call(params=params):
                 r = await client.get(IDEAM_S54A_URL, params=params)
                 r.raise_for_status()
                 return r.json()
@@ -191,7 +191,7 @@ async def _ingest_siata_incremental_session(session: AsyncSession) -> tuple[int,
         for fname in SIATA_FILES:
             url = f"{SIATA_HIST_BASE}/{fname}"
 
-            async def _dl():
+            async def _dl(url=url):
                 r = await client.get(url)
                 r.raise_for_status()
                 return r.text
@@ -284,7 +284,7 @@ async def _ingest_dagrd_incremental_session(session: AsyncSession) -> tuple[int,
         for page in range(1, 6):
             params = {"search": "deslizamiento", "per_page": 100, "page": page}
 
-            async def _call():
+            async def _call(params=params):
                 r = await client.get(WP_POSTS_URL, params=params)
                 if r.status_code == 400:
                     return []

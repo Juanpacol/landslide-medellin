@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.ml_feature import MLFeature
 from db.models.risk_prediction import RiskPrediction
+from domain.communes import COMMUNES as _COMMUNES
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,6 @@ def _get_anthropic_client():
 
     return get_anthropic_client()
 
-
-from domain.communes import COMMUNES as _COMMUNES
 
 _NOMBRES: dict[str, str] = {c.id: c.nombre for c in _COMMUNES} | {
     c.official_code: c.nombre for c in _COMMUNES

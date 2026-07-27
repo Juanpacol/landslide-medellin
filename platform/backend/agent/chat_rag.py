@@ -502,7 +502,7 @@ def _append_sources_footer(text: str) -> str:
 
 async def _run_tool_loop(messages: list[dict]) -> str:
     """Ejecuta el ciclo modelo→tools→modelo hasta MAX_TOOL_ROUNDS."""
-    for round_num in range(MAX_TOOL_ROUNDS):
+    for _round_num in range(MAX_TOOL_ROUNDS):
         message = await _ollama_chat(messages, use_tools=True)
         tool_calls = _extract_tool_calls(message)
 
@@ -543,7 +543,7 @@ async def _run_tool_loop_stream(messages: list[dict]) -> AsyncIterator[str]:
     resultados de las tools y redacta la respuesta— se transmite en vivo con
     `_ollama_chat_stream()`.
     """
-    for round_num in range(MAX_TOOL_ROUNDS):
+    for _round_num in range(MAX_TOOL_ROUNDS):
         message = await _ollama_chat(messages, use_tools=True)
         tool_calls = _extract_tool_calls(message)
 
