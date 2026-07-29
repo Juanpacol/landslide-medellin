@@ -25,6 +25,13 @@ logger = logging.getLogger(__name__)
 SIATA_HOME = "https://www.siata.gov.co"
 PLUVIO_JSON = "https://siata.gov.co/data/siata_app/Pluviometrica.json"
 
+# Identificador de la fuente. Se usa en `scraping_logs.source`, en la clave
+# `source` del JSONB de `ml_features`, y —desde la migración b1c2d3e4f501— en
+# la columna `rainfall_timeseries.source`, que forma parte del índice único.
+# Una sola constante porque estaba repetido en cuatro sitios: si divergen, el
+# `ON CONFLICT` deja de casar con el índice y la ingesta entera se cae.
+SOURCE_KEY = "siata"
+
 
 def _floor_minute_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
@@ -160,7 +167,7 @@ async def _run_siata(session: AsyncSession) -> int:
 
         for cid, values in by_commune.items():
             exists = await ml_feature_exists(
-                session, commune_id=cid, reference_date=ref_dt, source_key="siata"
+                session, commune_id=cid, reference_date=ref_dt, source_key=SOURCE_KEY
             )
             if exists:
                 discarded += 1
@@ -181,7 +188,7 @@ async def _run_siata(session: AsyncSession) -> int:
                 commune_id=cid,
                 reference_date=ref_dt,
                 features={
-                    "source": "siata",
+                    "source": SOURCE_KEY,
                     "station_count": len(values),
                     "station_codes": m["station_codes"][:50],
                     "barrios": sorted(m["barrios"])[:30],
@@ -202,7 +209,11 @@ async def _run_siata(session: AsyncSession) -> int:
             )
             session.add(row)
 
-            # Write to rainfall_timeseries for the live rain monitor (idempotent)
+            # Write to rainfall_timeseries for the live rain monitor (idempotent).
+            # `source` es OBLIGATORIO en el conflicto: el índice único es
+            # (commune_id, snapshot_at, source) desde la migración b1c2d3e4f501.
+            # Sin la tercera columna, Postgres no encuentra un índice que case y
+            # aborta con InvalidColumnReferenceError, tumbando toda la ingesta.
             stmt = (
                 pg_insert(RainfallTimeseries)
                 .values(
@@ -210,8 +221,9 @@ async def _run_siata(session: AsyncSession) -> int:
                     snapshot_at=ref_dt,
                     precip_mm=round(mean_p, 3),
                     station_count=len(values),
+                    source=SOURCE_KEY,
                 )
-                .on_conflict_do_nothing(index_elements=["commune_id", "snapshot_at"])
+                .on_conflict_do_nothing(index_elements=["commune_id", "snapshot_at", "source"])
             )
             await session.execute(stmt)
 
@@ -231,7 +243,7 @@ async def _run_siata(session: AsyncSession) -> int:
     finally:
         await log_scrape_run(
             session,
-            source="siata",
+            source=SOURCE_KEY,
             status=status,
             run_started_at=started,
             records_downloaded=downloaded,

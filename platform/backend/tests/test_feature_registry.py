@@ -155,3 +155,63 @@ def test_geografia_reconocible() -> None:
     de Santa Elena (21). Detecta un copiar-pegar de coordenadas."""
     assert CENTROIDS["14"][0] < CENTROIDS["1"][0]
     assert CENTROIDS["17"][1] < CENTROIDS["21"][1]
+
+
+# ── Coherencia entre el ON CONFLICT y el índice único ─────────────────────────
+
+
+def test_el_upsert_de_lluvia_incluye_source_en_el_conflicto() -> None:
+    """El índice único de `rainfall_timeseries` es
+    (commune_id, snapshot_at, source) desde la migración b1c2d3e4f501.
+
+    Si el `on_conflict_do_nothing` de `scraper/siata.py` no nombra las TRES
+    columnas, Postgres no encuentra un índice que case y aborta con
+    `InvalidColumnReferenceError`, tumbando la ingesta de lluvia entera. Pasó en
+    producción el 2026-07-29: la migración amplió el índice y el llamador se
+    quedó con dos columnas.
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    import scraper.siata as siata
+    from db.models.rainfall_timeseries import RainfallTimeseries
+
+    # El modelo declara el índice de 3 columnas...
+    idx = {i.name: [c.name for c in i.columns] for i in RainfallTimeseries.__table__.indexes}
+    columnas = idx["ix_rainfall_ts_commune_snap_src"]
+    assert columnas == ["commune_id", "snapshot_at", "source"]
+
+    # ...y el ON CONFLICT del scraper nombra EXACTAMENTE esas tres. Se parsea el
+    # AST en vez de buscar en el texto: una comprobación por substring pasaría
+    # con cualquier mención suelta de "source" y no protegería nada.
+    tree = ast.parse(textwrap.dedent(inspect.getsource(siata._run_siata)))
+    encontrados: list[list[str]] = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            continue
+        if node.func.attr != "on_conflict_do_nothing":
+            continue
+        for kw in node.keywords:
+            if kw.arg == "index_elements" and isinstance(kw.value, ast.List):
+                encontrados.append([e.value for e in kw.value.elts if isinstance(e, ast.Constant)])
+
+    assert encontrados, "no se encontró ningún on_conflict_do_nothing en _run_siata"
+    for elems in encontrados:
+        assert elems == columnas, (
+            f"el ON CONFLICT usa {elems} pero el índice único es {columnas}: "
+            "Postgres abortaría con InvalidColumnReferenceError"
+        )
+
+
+def test_siata_usa_una_sola_constante_de_fuente() -> None:
+    """`"siata"` estaba repetido en cuatro sitios (log, JSONB, ml_feature_exists
+    y el upsert). Si divergen, el ON CONFLICT deja de casar con el índice."""
+    import inspect
+
+    import scraper.siata as siata
+
+    assert siata.SOURCE_KEY == "siata"
+    code = inspect.getsource(siata)
+    cuerpo = code.split("SOURCE_KEY = ", 1)[1].split("\n", 1)[1]
+    assert '"siata"' not in cuerpo, "queda un literal 'siata' fuera de SOURCE_KEY"
