@@ -1,0 +1,8 @@
+- [x] `ExplanationTree` + `render()` (verifies: `pytest tests/test_explain_render.py -q` — one node per fired rule + neural + confidence)
+- [x] Faithfulness check `is_faithful()` (verifies: rejects a source id with no matching node)
+- [x] Delete `_IS_LADERA`/`_NOMBRES` duplication in `risk_explanations.py`, replace with `domain/communes.py` lookups (verifies: `pytest tests/test_risk_explanations_communes.py -q` — corregimientos now correctly `is_ladera=True`)
+- [ ] SHAP wrapper with declared-weight fallback — not started (needs `shap` dependency, not yet added to `requirements.txt`)
+- [ ] Wire `generate_risk_explanation()` to accept a `Verdict`/`ExplanationTree` and reject non-faithful LLM factors at call time — `is_faithful()` exists but is not yet called from `agent/risk_explanations.py`; the LLM path there still narrates raw numbers rather than rephrasing a tree
+- [ ] Frontend derivation panel in `comuna-profile.tsx` — not started
+- [ ] `/eval-prompt` case for the rephrasing prompt — not started
+- [x] Full suite (verifies: `pytest tests -q` — 295 passed, 12 skipped, no regressions)

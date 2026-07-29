@@ -1,0 +1,9 @@
+- [x] `domain/rules/facts.py` — `TerritorySnapshot` (verifies: `pytest tests/test_rules_engine.py -q`)
+- [x] `domain/rules/engine.py` — `Rule`, effect types, `evaluate()` (verifies: purity test — same snapshot twice, same trace)
+- [x] `domain/quality.py` — pure predicates (`is_frozen_signal`, `is_implausibly_low_max`, `is_implausibly_high_daily`, `is_stale`, `DataQualityScore`) (verifies: `pytest tests/test_domain_quality.py -q`)
+- [ ] Wire `monitoring/scraper_validator.py` to import from `domain/quality.py` instead of its inline comparisons (verifies: existing validator tests still pass) — not yet done, predicates exist but validator still has its own inline checks
+- [x] `domain/rules/catalog.py` R-GEO-01..04 (verifies: fires/does-not-fire/not-evaluable per rule)
+- [x] `domain/rules/catalog.py` R-HIST-01, R-EXPO-01 (verifies: same)
+- [x] `domain/rules/catalog.py` R-SEIS-01, R-QUAL-01 veto (verifies: same, veto is highest priority in ordering test)
+- [x] ADR-0002 rule engine choice (verifies: doc reviewed)
+- [x] Full `domain/rules` test suite (verifies: `pytest tests/test_rules_engine.py tests/test_rules_catalog.py tests/test_domain_quality.py -q` — 32 passed; full repo suite 279 passed, 12 skipped, no regressions)

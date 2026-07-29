@@ -1,0 +1,8 @@
+- [ ] `Signal` + `Estimator` protocol (verifies: `pytest tests/test_estimators_base.py -q`)
+- [ ] Feature denylist in `feature_registry.py` (verifies: denylisted feature raises at registration)
+- [ ] `xgboost_estimator.py` retrained without denylisted features (verifies: `metrics.json` feature list excludes denylist)
+- [ ] Collapse guard in `train.py` (verifies: synthetic 0-positive dataset aborts + Slack alert fired)
+- [ ] `rainfall_estimator.py`, `seismic_estimator.py` wrapping existing modules (verifies: `Signal.uncertainty` always populated)
+- [ ] `scraper/terrain_features.py` SRTM/MODIS ingestion (verifies: `barrio_terrain` populated for ≥90% of barrios)
+- [ ] `terrain_estimator.py` (verifies: susceptibility coverage rises from 1/5 to 4/5 in `hazard_by_commune`)
+- [ ] Full suite (verifies: `pytest tests -q`)

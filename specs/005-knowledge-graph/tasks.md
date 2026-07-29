@@ -1,0 +1,7 @@
+- [ ] `db/models/critical_facility.py` + migration (verifies: local compose migration test)
+- [ ] Extend `alerts/evacuation.py` Overpass query for hospitals/clinics (verifies: `pytest tests` for evacuation module)
+- [ ] `kg/build.py` A-Box population (verifies: node/edge counts vs SQL counts)
+- [ ] Adjacency + drainage via shapely (verifies: no orphan territory test)
+- [ ] Three named SPARQL queries (verifies: typed results on fixture graph)
+- [ ] `kg/export_cypher.py` optional export (verifies: manual Neo4j Desktop import, not CI-gated)
+- [ ] Full suite (verifies: `pytest tests/test_kg_build.py -q`)

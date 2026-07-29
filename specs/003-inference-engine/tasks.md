@@ -1,0 +1,8 @@
+- [x] `Verdict` dataclass + `resolve_verdict()` neural-only path (verifies: `pytest tests/test_infer_neurosymbolic.py -q`)
+- [x] Conflict resolution logic + ADR-0003 (verifies: rule-override test, veto test — both pass)
+- [x] Per-commune per-run confidence function (verifies: monotonicity test passes — more coverage/fewer flags ⇒ higher confidence)
+- [x] `infer_all()` batch path (verifies: reuses `hazard_by_commune`'s batch contract, one call)
+- [x] Wire `application/predict_risk.py` to `infer_all()`, with fallback to the legacy classifier per commune on batch failure (verifies: `pytest tests/test_predict_risk_error_handling.py -q` unchanged, full suite 287 passed / 12 skipped)
+- [x] `GET /api/risk/derivation/{id}` + extend `/comuna/{id}/detalle` with `derivation` field (verifies: manual route review)
+- [x] Full suite (verifies: `pytest tests -q` — 287 passed, 12 skipped, no regressions)
+- [ ] Alembic migration for dedicated derivation columns — deliberately skipped: `risk_predictions.raw_output` (JSONB, already exists) stores `derivation`/`conflicts`/`priority` instead, avoiding a schema migration entirely. Revisit only if querying inside the JSON becomes a performance problem.

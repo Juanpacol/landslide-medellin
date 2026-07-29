@@ -1,0 +1,8 @@
+- [ ] ADR-0001: OWL + owlready2 vs Neo4j (verifies: doc reviewed)
+- [ ] Model T-Box classes in Protégé: Territory, TerrainFeature, HydroFeature, Trigger, Exposure, LandslideEvent, HazardAssessment, DataQualityFlag (verifies: owlready2 loads without error)
+- [ ] Object properties: locatedIn, adjacentTo, drainedBy, hasTerrainFeature, exposes, triggeredBy, hasHistoricalEvent, assessedBy (verifies: domain/range checked in Protégé reasoner)
+- [ ] Datatype properties matching DB columns exactly (verifies: name diff against `db/models/*.py` columns)
+- [ ] `generate_individuals.py` producing 21 individuals from `domain/communes.py` (verifies: count == len(COMMUNES))
+- [ ] SWRL axioms for SPEC-002 rule catalog (verifies: axiom-to-rule-id cross-check test, added once SPEC-002 catalog exists)
+- [ ] `infrastructure/ontology/loader.py` (verifies: `ontology_version()` returns a hash, `individuals_for_commune("8")` returns dict)
+- [ ] Consistency + coverage tests (verifies: `pytest tests/test_ontology.py -q`)
