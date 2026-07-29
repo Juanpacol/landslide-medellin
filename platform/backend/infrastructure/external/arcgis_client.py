@@ -8,13 +8,18 @@ oficial → id canónico se deriva de domain/communes.py, no se duplica.
 
 from __future__ import annotations
 
-import math
 import re
 from typing import Any
 
 import httpx
 
 from domain.communes import COMMUNES
+
+# Re-exportadas: `haversine_km` vivía aquí, pero es geometría PURA y ahora está
+# en `domain/geo.py`, para que la capa de dominio pueda usarla sin arrastrar
+# httpx. Se sigue exponiendo desde aquí porque varios módulos la importan de esta
+# ruta (`ml/seismic_features.py`, `alerts/evacuation.py`).
+from domain.geo import distance_km, haversine_km
 from scraper.common import with_retries
 
 COMUNA_QUERY_URL = (
@@ -93,10 +98,12 @@ def ring_centroid_lonlat(rings: list[list[list[float]]]) -> tuple[float, float]:
     return sx / n, sy / n
 
 
-def haversine_km(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
-    r = 6371.0
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlmb = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
-    return 2 * r * math.asin(min(1.0, math.sqrt(a)))
+__all__ = [
+    "COMUNA_QUERY_URL",
+    "distance_km",
+    "haversine_km",
+    "lookup_commune_for_point",
+    "official_to_ml_commune",
+    "parse_ml_commune_from_siata_field",
+    "ring_centroid_lonlat",
+]
