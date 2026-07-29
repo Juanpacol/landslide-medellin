@@ -1,7 +1,9 @@
-- [ ] `db/models/critical_facility.py` + migration (verifies: local compose migration test)
-- [ ] Extend `alerts/evacuation.py` Overpass query for hospitals/clinics (verifies: `pytest tests` for evacuation module)
-- [ ] `kg/build.py` A-Box population (verifies: node/edge counts vs SQL counts)
-- [ ] Adjacency + drainage via shapely (verifies: no orphan territory test)
-- [ ] Three named SPARQL queries (verifies: typed results on fixture graph)
-- [ ] `kg/export_cypher.py` optional export (verifies: manual Neo4j Desktop import, not CI-gated)
-- [ ] Full suite (verifies: `pytest tests/test_kg_build.py -q`)
+- [ ] `db/models/critical_facility.py` + migration — not started
+- [ ] Extend `alerts/evacuation.py` Overpass query for hospitals/clinics — not started
+- [x] `kg/build.py` static A-Box (territory nodes + centroid-proximity `adjacentTo`) (verifies: `pytest tests/test_kg_build.py -q` — node count matches commune count, no orphan territory)
+- [ ] Full Postgres A-Box population (barrio_terrain, barrio_hazard, safe_zones, seismic_events, non-synthetic landslide_events) — not started, needs AsyncSession integration
+- [ ] True polygon-based adjacency via shapely over the barrio/comuna polygon file — not started; current `adjacentTo` is a centroid-proximity (k=3 nearest) approximation, declared as such in `kg/build.py`'s docstring, not the real spatial adjacency the full spec calls for
+- [x] One named SPARQL query (`upslope_neighbours.sparql`) + `run_named_query()` (verifies: `pytest tests/test_kg_build.py -q` — typed results, bounded by ADJACENCY_K)
+- [ ] `exposed_facilities.sparql`, `shared_stream_recent_event.sparql` — not started (need the DB-backed A-Box first)
+- [ ] `kg/export_cypher.py` optional Neo4j export — not started
+- [x] Static-graph test suite (verifies: `pytest tests/test_kg_build.py -q` — 4 passed; full suite 307 passed, 12 skipped, no regressions)

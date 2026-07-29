@@ -1,0 +1,7 @@
+PREFIX teyva: <http://teyva.local/onto.owl#>
+
+SELECT ?neighbour ?nombre WHERE {
+  ?territory teyva:canonical_id ?commune_id .
+  ?territory teyva:adjacentTo ?neighbour .
+  ?neighbour teyva:nombre ?nombre .
+}
