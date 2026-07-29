@@ -26,6 +26,8 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from db.models.ml_feature import MLFeature  # noqa: E402
 from db.session import SyncSessionLocal, sync_engine  # noqa: E402
+from domain.communes import canonical_id  # noqa: E402
+from ml.feature_registry import FORCE_KEYS  # noqa: E402
 from ml.features import FeatureBuilder  # noqa: E402
 
 MODELS_DIR = Path(__file__).resolve().parent / "models"
@@ -82,15 +84,22 @@ def _parse_event_date(fecha: str | None) -> date | None:
 
 
 def _normalize_commune_id(value: Any) -> str | None:
+    """Id canónico ("1".."21") de un commune_id de la BD.
+
+    Delega en `domain.communes.canonical_id`, que TRADUCE los códigos oficiales
+    ("50".."90" de los corregimientos) al espacio canónico. La versión anterior
+    normalizaba a mano con `str(int(digits))`, así que un evento guardado con
+    `commune_id='70'` (código oficial de Altavista = id 19) quedaba como comuna
+    "70": un id que no existe en `domain/communes.py`, que nunca cruzaba con
+    ninguna fila de `ml_features` y que por tanto perdía su etiqueta en silencio.
+    Con solo 36 eventos geolocalizados, perder uno no es un detalle.
+    """
     if value is None:
         return None
     text = str(value).strip()
     if not text:
         return None
-    digits = "".join(ch for ch in text if ch.isdigit())
-    if digits:
-        return str(int(digits))
-    return text
+    return canonical_id(text) or None
 
 
 def _load_events_index(session: Session) -> dict[str, list[date]]:
@@ -109,23 +118,6 @@ def _load_events_index(session: Session) -> dict[str, list[date]]:
             continue
         by_commune.setdefault(cid, []).append(d)
     return by_commune
-
-
-def _collect_all_numeric_keys(session: Session, communes: list[str]) -> set[str]:
-    """Detecta TODAS las claves numéricas presentes en MLFeature.features
-    (incluyendo sismos, API) para forzar que entren al modelo."""
-    all_keys: set[str] = {"centroid_lat", "centroid_lon", "precip_acum_7d", "n_events_window"}
-    rows = session.scalars(select(MLFeature)).all()
-    for row in rows:
-        if row.features:
-            for k, v in row.features.items():
-                if k not in ["source", "nombre", "official_codigo", "station_codes", "barrios"]:
-                    try:
-                        float(str(v).replace(",", "."))
-                        all_keys.add(k)
-                    except (ValueError, TypeError):
-                        pass
-    return all_keys
 
 
 def _target_for_ref_day_future(
@@ -169,7 +161,8 @@ def _rows_until(commune_id: str, cutoff: datetime, all_rows: list[MLFeature]) ->
 
 def _build_supervised_matrix(
     session: Session,
-) -> tuple[np.ndarray, np.ndarray, list[str], list[dict[str, Any]], str]:
+) -> tuple[np.ndarray, np.ndarray, list[str], list[dict[str, Any]], str, dict[str, float]]:
+    """(X, y, feature_names, meta, target_strategy, feature_coverage)."""
     events_by_commune = _load_events_index(session)
     ml_rows = list(session.scalars(select(MLFeature)).all())
 
@@ -210,28 +203,38 @@ def _build_supervised_matrix(
         )
 
     if not raw_rows:
-        return np.zeros((0, 0)), np.array([]), [], [], "future_7d"
+        return np.zeros((0, 0)), np.array([]), [], [], "future_7d", {}
 
     keys = sorted({k for r in raw_rows for k in r.keys()})
 
-    # Force inclusion of new features (sismos, API, amenaza por barrio) even
-    # if sparse data. This ensures they train into the model when data
-    # becomes available, instead of being silently dropped by the sorted-keys
-    # union above if no row happens to have them yet.
-    force_keys = {
-        "seismic_recent_intensity",
-        "antecedent_precip_index",
-        "pct_barrios_alta_amenaza",
-        "soil_water_index_pct",
-        "seismic_x_swi",
-    }
-    keys = sorted(set(keys) | force_keys)
+    # Se fuerzan las claves declaradas en `ml/feature_registry.py` aunque
+    # ninguna fila las traiga todavía: sin esto la unión de claves observadas
+    # las descarta en silencio y la feature "existe" en el código pero nunca
+    # entrena. Es exactamente lo que le pasó a las 4 de ingeniería (ver el
+    # docstring del registro). La deny-list ya se aplicó en
+    # `features.py::_numeric_from_json`, así que `keys` no la contiene.
+    keys = sorted(set(keys) | set(FORCE_KEYS))
 
     matrix = np.zeros((len(raw_rows), len(keys)), dtype=float)
+    # Cobertura: fracción de filas donde la clave estaba PRESENTE de verdad,
+    # frente a rellenada con 0.0 aquí abajo. Es la métrica que juzga un backfill
+    # con independencia del AUC: si la cobertura sube y el AUC no se mueve, el
+    # backfill igual eliminó un defecto de imputación.
+    #
+    # OJO con el 0.0: es un valor CRUDO, así que tras escalar queda en ≈−2σ, no
+    # en un valor neutro. Para una clave con media grande eso no es "sin dato",
+    # es "valor extremadamente bajo" — y según la feature puede equivocarse en la
+    # dirección peligrosa. Una clave con cobertura baja es ruido con un
+    # desplazamiento de media, no una feature.
+    present_counts: dict[str, int] = dict.fromkeys(keys, 0)
     for i, r in enumerate(raw_rows):
         for j, k in enumerate(keys):
             if k in r:
                 matrix[i, j] = r[k]
+                present_counts[k] += 1
+
+    n_rows = len(raw_rows)
+    coverage = {k: round(present_counts[k] / n_rows, 4) for k in keys} if n_rows else {}
 
     col_medians = np.nanmedian(matrix, axis=0)
     inds = np.where(np.isnan(matrix))
@@ -239,10 +242,10 @@ def _build_supervised_matrix(
 
     y_future = np.array(targets_future, dtype=int)
     if int(np.sum(y_future)) > 0:
-        return matrix, y_future, keys, meta, "future_7d"
+        return matrix, y_future, keys, meta, "future_7d", coverage
 
     y_past = np.array(targets_past, dtype=int)
-    return matrix, y_past, keys, meta, "past_7d_fallback"
+    return matrix, y_past, keys, meta, "past_7d_fallback", coverage
 
 
 def _cv_splitter(y: np.ndarray) -> tuple[Any, str]:
@@ -323,11 +326,22 @@ def train() -> dict[str, Any]:
     provenance = _provenance()
 
     with SyncSessionLocal() as session:
-        X, y, feature_names, meta, target_strategy = _build_supervised_matrix(session)
+        X, y, feature_names, meta, target_strategy, coverage = _build_supervised_matrix(session)
 
     n_samples = int(X.shape[0])
     n_features = int(X.shape[1]) if n_samples else 0
     n_positive = int(np.sum(y)) if n_samples else 0
+
+    # Se incluye en TODOS los payloads (también los abortados): saber que una
+    # clave forzada tiene cobertura 0.0 es justo lo que explica un aborto.
+    coverage_payload: dict[str, Any] = {
+        "feature_coverage": coverage,
+        "feature_coverage_min": (
+            round(min((coverage[k] for k in feature_names if k in coverage), default=0.0), 4)
+            if feature_names
+            else None
+        ),
+    }
 
     if n_samples == 0 or n_features == 0:
         payload = {
@@ -339,6 +353,7 @@ def train() -> dict[str, Any]:
             "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "Sin filas válidas con reference_date para entrenar.",
+            **coverage_payload,
             **provenance,
         }
         _write_attempt(payload)
@@ -362,6 +377,7 @@ def train() -> dict[str, Any]:
             "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "La variable objetivo tiene una sola clase; no se entrena clasificador.",
+            **coverage_payload,
             **provenance,
         }
         _write_attempt(payload)
@@ -444,6 +460,7 @@ def train() -> dict[str, Any]:
             "target_strategy": target_strategy,
             "feature_names": feature_names,
             "error": "Ningún modelo pudo evaluarse con AUC-ROC.",
+            **coverage_payload,
             **provenance,
         }
         _write_attempt(payload)
@@ -488,6 +505,16 @@ def train() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         benchmark = {"benchmark_auc": None, "reason": f"error: {exc!r}"}
 
+    # Importancias: si una clave forzada sale en ~0 CON buena cobertura, eso es
+    # evidencia real de que la señal es débil a granularidad comuna-semana, y
+    # vale más escribirla que esconderla.
+    importances: dict[str, float] | None = None
+    raw_imp = getattr(best_model, "feature_importances_", None)
+    if raw_imp is not None and len(raw_imp) == len(feature_names):
+        importances = {
+            k: round(float(v), 6) for k, v in zip(feature_names, raw_imp, strict=True)
+        }
+
     model_version = "teyva-ml-1.0"
     payload = {
         "n_samples": n_samples,
@@ -496,6 +523,12 @@ def train() -> dict[str, Any]:
         "n_samples_after_smote": int(len(y_res)),
         "n_positive_after_smote": int(np.sum(y_res)),
         "best_model": best_name,
+        # OJO: `cv_mean_auc` se calcula sobre (X_res, y_res), es decir DESPUÉS
+        # de SMOTE, así que puntos sintéticos derivados de un positivo pueden
+        # caer en el fold de test junto a su padre. Está inflado por
+        # construcción y NO es comparable entre corridas cuyo balance de clases
+        # cambia. Para comparar antes/después usar `benchmark_auc` (conjunto de
+        # casos congelado) y `train_auc_temporal` (validación pasado→futuro).
         "cv_mean_auc": float(best_auc),
         "cv_strategy": cv_name,
         "target_strategy": target_strategy,
@@ -505,7 +538,9 @@ def train() -> dict[str, Any]:
         "train_recall_at_0_3": train_recall,
         "class_weight": class_weight_map,
         "feature_names": feature_names,
+        "feature_importances": importances,
         "model_version": model_version,
+        **coverage_payload,
         **temporal,
         **benchmark,
         **provenance,

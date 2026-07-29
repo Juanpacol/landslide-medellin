@@ -66,6 +66,60 @@ BY_ID: dict[str, CommuneInfo] = {c.id: c for c in COMMUNES}
 BY_OFFICIAL_CODE: dict[str, CommuneInfo] = {c.official_code: c for c in COMMUNES}
 
 
+# ── Centroides (lat, lon) ─────────────────────────────────────────────────────
+#
+# Extraídos UNA vez de la cartografía oficial de Medellín (capa 11 de
+# CartografiaBase, la misma que consulta `scraper/medellin_datos.py`) con
+# `ring_centroid_lonlat` sobre el anillo exterior de cada polígono.
+#
+# Por qué viven aquí y no solo en la BD: `ml/seismic_features.py` y
+# `alerts/evacuation.py` los leían EXCLUSIVAMENTE de
+# `ml_features.features["centroid_lat"/"centroid_lon"]`, que solo escribe
+# `scraper/medellin_datos.py` (cadencia 24 h). Si ese scraper no había corrido
+# en una base dada, el lookup devolvía `{}` y las 21 comunas caían al centro
+# del valle: la señal sísmica por comuna se degradaba a una CONSTANTE, en
+# silencio y sin alerta. Con estos valores como semilla eso es imposible.
+#
+# Los valores scrapeados SIEMPRE tienen prioridad sobre estos: vienen del mismo
+# origen pero pueden reflejar una actualización cartográfica posterior. Esto es
+# el piso, no la verdad.
+CENTROIDS: dict[str, tuple[float, float]] = {
+    "1": (6.291857, -75.542108),
+    "2": (6.297073, -75.553417),
+    "3": (6.273962, -75.539377),
+    "4": (6.283663, -75.558811),
+    "5": (6.294420, -75.570015),
+    "6": (6.301742, -75.583903),
+    "7": (6.282372, -75.599600),
+    "8": (6.244203, -75.537911),
+    "9": (6.229320, -75.542954),
+    "10": (6.244385, -75.564929),
+    "11": (6.254970, -75.596937),
+    "12": (6.261715, -75.605567),
+    "13": (6.257677, -75.619454),
+    "14": (6.197583, -75.554248),
+    "15": (6.205711, -75.592981),
+    "16": (6.218979, -75.608822),
+    "17": (6.335893, -75.695376),
+    "18": (6.285129, -75.611013),
+    "19": (6.224054, -75.614596),
+    "20": (6.196107, -75.669300),
+    "21": (6.240551, -75.533109),
+}
+
+# Centro aproximado del Valle de Aburrá. Último recurso para un id desconocido;
+# NO debería usarse para ninguna de las 21 comunas (hay test que lo verifica).
+VALLEY_CENTROID: tuple[float, float] = (6.2442, -75.5812)
+
+
+def centroid(value: str | int | None) -> tuple[float, float] | None:
+    """(lat, lon) del centroide de una comuna. Acepta id canónico u oficial."""
+    cid = canonical_id(value)
+    if cid is None:
+        return None
+    return CENTROIDS.get(cid)
+
+
 def canonical_id(value: str | int | None) -> str | None:
     """Normaliza cualquier id (canónico, oficial, con ceros) al canónico.
 

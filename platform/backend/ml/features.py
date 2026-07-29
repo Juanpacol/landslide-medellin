@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from db.models.ml_feature import MLFeature
+from ml.feature_registry import is_denied
 
 ML_DIR = Path(__file__).resolve().parent
 MODELS_DIR = ML_DIR / "models"
@@ -54,7 +55,7 @@ def _numeric_from_json(features: dict[str, Any] | None) -> dict[str, float]:
     if not features:
         return out
     for k, v in features.items():
-        if k in _SKIP_JSON_KEYS:
+        if k in _SKIP_JSON_KEYS or is_denied(k):
             continue
         fv = _coerce_float(v)
         if fv is not None:
@@ -63,10 +64,16 @@ def _numeric_from_json(features: dict[str, Any] | None) -> dict[str, float]:
 
 
 def row_to_numeric_parts(row: MLFeature) -> dict[str, float]:
+    """Claves numéricas de una fila, ya filtradas por la deny-list.
+
+    `precip_acum_7d` y `n_events_window` son columnas de la tabla, no del
+    JSONB, así que pasan por `is_denied` explícitamente: ambas están en
+    DENY_KEYS y no deben entrar al vector aunque se rellenen más adelante.
+    """
     parts = _numeric_from_json(row.features or {})
-    if row.precip_acum_7d is not None:
+    if row.precip_acum_7d is not None and not is_denied("precip_acum_7d"):
         parts["precip_acum_7d"] = float(row.precip_acum_7d)
-    if row.n_events_window is not None:
+    if row.n_events_window is not None and not is_denied("n_events_window"):
         parts["n_events_window"] = float(row.n_events_window)
     return parts
 

@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.ml_feature import MLFeature
 from db.models.safe_zone import SafeZone
+from domain.communes import centroid as commune_centroid
 from infrastructure.external.arcgis_client import haversine_km
 from scraper.common import httpx_client, with_retries
 
@@ -127,9 +128,14 @@ async def refresh_safe_zones(session: AsyncSession) -> int:
 
 
 async def _commune_centroid(session: AsyncSession, commune_id: str) -> tuple[float, float] | None:
-    """Centroide de la comuna, reusando `centroid_lat`/`centroid_lon` que ya
-    escribe `scraper/medellin_datos.py` en MLFeature.features — no se inventan
-    coordenadas nuevas."""
+    """Centroide de la comuna: lo scrapeado si existe, si no la semilla estática.
+
+    Mismo criterio que `ml/seismic_features.py::_centroids_by_commune` — las dos
+    rutas deben coincidir o una ruta de evacuación y la señal sísmica saldrían
+    de puntos distintos para la misma comuna. Antes esta función solo leía
+    `ml_features`, así que devolvía None (y no se calculaba ruta) en cualquier
+    base donde `scraper/medellin_datos.py` no hubiera corrido.
+    """
     stmt = (
         select(MLFeature.features)
         .where(MLFeature.commune_id == commune_id, MLFeature.features.isnot(None))
@@ -141,7 +147,7 @@ async def _commune_centroid(session: AsyncSession, commune_id: str) -> tuple[flo
         lat, lon = features.get("centroid_lat"), features.get("centroid_lon")
         if lat is not None and lon is not None:
             return float(lat), float(lon)
-    return None
+    return commune_centroid(commune_id)
 
 
 async def _osrm_walking_route(

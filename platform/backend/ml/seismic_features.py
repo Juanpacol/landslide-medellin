@@ -13,10 +13,11 @@ clásico de deslizamientos. La señal se resume en un escalar por comuna:
 - decaimiento temporal: 0.9^días — el efecto de un sismo sobre laderas
   inestables se disipa en días/semanas.
 
-Los centroides se reusan de `centroid_lat`/`centroid_lon` que ya escribe
-`scraper/medellin_datos.py` en MLFeature.features (mismo criterio que
-`alerts/evacuation.py::_commune_centroid`). Comuna sin centroide conocido →
-fallback al centro del valle (comportamiento anterior).
+Los centroides salen de `domain/communes.py::CENTROIDS` (las 21, extraídos de
+la cartografía oficial) y se sobreescriben con `centroid_lat`/`centroid_lon` de
+MLFeature.features cuando `scraper/medellin_datos.py` los haya escrito. Antes
+se leían SOLO de la BD, así que sin ese scraper las 21 comunas caían al centro
+del valle y la señal por comuna se volvía una constante en silencio.
 
 La clave viaja como `seismic_recent_intensity` en el JSON `features` de
 MLFeature (FeatureBuilder la recoge automáticamente al reentrenar).
@@ -31,13 +32,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.ml_feature import MLFeature
 from db.models.seismic_event import SeismicEvent
+from domain.communes import CENTROIDS, VALLEY_CENTROID
 from infrastructure.external.arcgis_client import haversine_km
 
 FEATURE_KEY = "seismic_recent_intensity"
 
-# Centro aproximado del Valle de Aburrá (fallback si la comuna no tiene centroide).
-VALLEY_LAT = 6.2442
-VALLEY_LON = -75.5812
+# Centro del Valle de Aburrá. Con CENTROIDS cubriendo las 21 comunas esto ya
+# solo aplica a un id desconocido, no a una comuna real.
+VALLEY_LAT, VALLEY_LON = VALLEY_CENTROID
 
 TIME_DECAY_PER_DAY = 0.9
 DISTANCE_SCALE_KM = 50.0
@@ -45,20 +47,33 @@ WINDOW_DAYS = 30
 
 
 async def _centroids_by_commune(session: AsyncSession) -> dict[str, tuple[float, float]]:
-    """(lat, lon) por comuna desde MLFeature.features, fila más reciente primero."""
+    """(lat, lon) por comuna: semilla estática + override de lo scrapeado.
+
+    La semilla es `domain.communes.CENTROIDS` (las 21, de la cartografía
+    oficial). Encima se aplica lo que haya en `MLFeature.features`, fila más
+    reciente primero.
+
+    Antes esta función SOLO leía de `ml_features`, así que en una base donde
+    `scraper/medellin_datos.py` no hubiera corrido devolvía `{}` y las 21
+    comunas caían al centro del valle — la señal sísmica por comuna se
+    convertía en una constante sin que nada lo avisara.
+    """
+    out: dict[str, tuple[float, float]] = dict(CENTROIDS)
+
     stmt = (
         select(MLFeature.commune_id, MLFeature.features)
         .where(MLFeature.features.isnot(None))
         .order_by(MLFeature.reference_date.desc().nulls_last())
     )
-    out: dict[str, tuple[float, float]] = {}
+    scraped: set[str] = set()
     for commune_id, features in (await session.execute(stmt)).all():
         cid = str(commune_id)
-        if cid in out or not isinstance(features, dict):
+        if cid in scraped or not isinstance(features, dict):
             continue
         lat, lon = features.get("centroid_lat"), features.get("centroid_lon")
         if lat is not None and lon is not None:
             out[cid] = (float(lat), float(lon))
+            scraped.add(cid)
     return out
 
 
