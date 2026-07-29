@@ -1,0 +1,129 @@
+name: Diagnóstico — payload real de SIATA
+
+# SOLO workflow_dispatch: es una herramienta de diagnóstico puntual, no un cron.
+#
+# Por qué existe: SIATA bloquea el acceso desde fuera de su red (timeout incluso
+# en la portada, con IP colombiana resuelta por DNS), pero los runners de GitHub
+# sí llegan — los crons descargan 228 estaciones en cada corrida.
+#
+# Qué hay que averiguar: `scraper/siata.py` lee el campo `valor` de
+# `Pluviometrica.json` y lo trata como lluvia acumulada en mm, pero los datos
+# guardados demuestran que NO es una medición en vivo: el valor es exactamente
+# 0.003 durante 41 snapshots seguidos de un mismo día, sin variar. Un valor
+# instantáneo variaría; uno acumulado crecería. Es una constante.
+#
+# Además `scraper/historical_backfill.py` usa ESE MISMO JSON solo como METADATOS
+# (`SIATA_PLUVIO_META`) y saca la lluvia de los TSV de /hidrologia/. Su suma
+# diaria llega a 92.202 mm, imposible, lo que apunta a que suma un contador
+# acumulado.
+#
+# No usa secretos ni toca la base de datos: solo descarga y describe.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Describir Pluviometrica.json (fuente del scraper en vivo)
+        run: |
+          python - <<'PY'
+          import json, urllib.request, collections
+          URL = "https://siata.gov.co/data/siata_app/Pluviometrica.json"
+          req = urllib.request.Request(URL, headers={
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/124.0.0.0 Safari/537.36 TEYVA-Scraper/1.0",
+              "Accept": "application/json"})
+          d = json.load(urllib.request.urlopen(req, timeout=60))
+
+          print("CLAVES RAIZ:", list(d.keys()))
+          for k, v in d.items():
+              if k != "estaciones":
+                  print(f"  {k} = {str(v)[:200]}")
+
+          est = d.get("estaciones") or []
+          print(f"\nESTACIONES: {len(est)}")
+          print("\n--- UNA ESTACION COMPLETA (esto es lo que necesito ver) ---")
+          print(json.dumps(est[0], indent=2, ensure_ascii=False))
+
+          print("\n--- TODOS LOS CAMPOS NUMERICOS, con su rango ---")
+          for key in est[0]:
+              vals = []
+              for s in est:
+                  try:
+                      vals.append(float(s.get(key)))
+                  except (TypeError, ValueError):
+                      pass
+              if len(vals) >= len(est) * 0.5:
+                  nz = [v for v in vals if v > 0]
+                  print(f"  {key:<22} n={len(vals):>4} min={min(vals):>12.4f} "
+                        f"max={max(vals):>12.4f} >0={len(nz):>4} suma={sum(vals):>14.3f}")
+
+          print("\n--- DISTRIBUCION DE 'valor' (el campo que lee el scraper) ---")
+          vals = []
+          for s in est:
+              try:
+                  vals.append(float(s.get("valor")))
+              except (TypeError, ValueError):
+                  pass
+          print("  mas frecuentes:", collections.Counter(vals).most_common(10))
+
+          print("\n--- CAMPOS DE TEXTO (para detectar unidades o fechas) ---")
+          for key, v in est[0].items():
+              if isinstance(v, str) and not v.replace(".", "").replace("-", "").isdigit():
+                  muestra = {str(s.get(key))[:40] for s in est[:60]}
+                  print(f"  {key:<22} ej: {list(muestra)[:4]}")
+          PY
+
+      - name: Describir los TSV de hidrología (fuente del scraper histórico)
+        run: |
+          python - <<'PY'
+          import urllib.request
+          BASE = "https://siata.gov.co/hidrologia/temperatura_agualluvia"
+          HDRS = {"User-Agent": "Mozilla/5.0 TEYVA-Scraper/1.0"}
+          for fname in ("7.txt", "20.txt"):
+              url = f"{BASE}/{fname}"
+              print(f"\n{'='*70}\n{url}")
+              try:
+                  txt = urllib.request.urlopen(
+                      urllib.request.Request(url, headers=HDRS), timeout=90
+                  ).read().decode("utf-8", "replace")
+              except Exception as exc:
+                  print("  ERROR:", repr(exc))
+                  continue
+              lines = txt.splitlines()
+              print(f"  bytes={len(txt)} lineas={len(lines)}")
+              print("  --- PRIMERAS 8 LINEAS (crudas) ---")
+              for ln in lines[:8]:
+                  print("   ", repr(ln[:160]))
+              print("  --- ULTIMAS 3 ---")
+              for ln in lines[-3:]:
+                  print("   ", repr(ln[:160]))
+              # ¿La 3a columna es acumulada (crece) o por intervalo?
+              col2 = []
+              for ln in lines[:400]:
+                  parts = ln.split("\t")
+                  if len(parts) >= 3:
+                      try:
+                          col2.append(float(parts[2]))
+                      except ValueError:
+                          pass
+              if col2:
+                  crece = sum(1 for a, b in zip(col2, col2[1:]) if b >= a)
+                  print(f"  col[2]: n={len(col2)} min={min(col2)} max={max(col2)} "
+                        f"suma={sum(col2):.2f}")
+                  print(f"  monotona creciente en {crece}/{len(col2)-1} pasos "
+                        f"-> {'ACUMULADA' if crece > len(col2)*0.9 else 'POR INTERVALO'}")
+          PY
