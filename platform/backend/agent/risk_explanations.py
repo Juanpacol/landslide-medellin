@@ -31,7 +31,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.ml_feature import MLFeature
 from db.models.risk_prediction import RiskPrediction
-from domain.communes import COMMUNES as _COMMUNES
+from domain.communes import BY_ID as _BY_ID
+from domain.communes import canonical_id as _canonical_id
+from domain.communes import display_name as _display_name
 
 logger = logging.getLogger(__name__)
 
@@ -46,33 +48,20 @@ def _get_anthropic_client():
     return get_anthropic_client()
 
 
-_NOMBRES: dict[str, str] = {c.id: c.nombre for c in _COMMUNES} | {
-    c.official_code: c.nombre for c in _COMMUNES
-}
+def _commune_name(commune_id: str) -> str:
+    """Reads `domain/communes.py`, the single source of territory data — this module used to
+    keep its own `_NOMBRES` dict, which drifted (see `_commune_is_ladera` docstring)."""
+    return _display_name(commune_id)
 
-_IS_LADERA: dict[str, bool] = {
-    "1": True,
-    "2": True,
-    "3": True,
-    "4": False,
-    "5": False,
-    "6": True,
-    "7": True,
-    "8": True,
-    "9": True,
-    "10": False,
-    "11": False,
-    "12": False,
-    "13": True,
-    "14": False,
-    "15": False,
-    "16": True,
-    "50": True,
-    "60": True,
-    "70": True,
-    "80": False,
-    "90": True,
-}
+
+def _commune_is_ladera(commune_id: str) -> bool:
+    """Was a hand-typed `_IS_LADERA` dict keyed on official codes ("50".."90"), so every
+    corregimiento — looked up by its canonical id ("17".."21") elsewhere in the system —
+    fell through to the `False` default and was reported as non-hillside. All five
+    corregimientos are hillside terrain (`domain/communes.py::CommuneInfo.is_ladera`)."""
+    cid = _canonical_id(commune_id)
+    commune = _BY_ID.get(cid) if cid else None
+    return commune.is_ladera if commune else False
 
 # ── Structured output schema (JSON mode, OpenAI-compatible) ────────────────────
 
@@ -562,8 +551,8 @@ async def generate_risk_explanation(
     structured es el dict {title, factors, urgency, recommended_action}
     del que `explanation_text` es derivado (vía `_render_narrative`).
     """
-    nombre = _NOMBRES.get(commune_id, f"Comuna {commune_id}")
-    is_ladera = _IS_LADERA.get(commune_id, False)
+    nombre = _commune_name(commune_id)
+    is_ladera = _commune_is_ladera(commune_id)
 
     api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
