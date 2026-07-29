@@ -1,0 +1,106 @@
+{
+  "prompt_module": "agent/risk_explanations_graded",
+  "total_tests": 10,
+  "passed": 10,
+  "failed": 0,
+  "accuracy": "100.0%",
+  "threshold": "90%",
+  "threshold_passed": true,
+  "average_score": 7.3,
+  "graded_count": 10,
+  "quality_threshold": 7.0,
+  "quality_threshold_passed": true,
+  "executed_at": "2026-07-29T10:44:26.362526",
+  "results": [
+    {
+      "test_id": "bajo_normal",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 4,
+      "grader_feedback": "Falta de detalle y urgencia clara para la categor\u00eda de riesgo bajo",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "bajo_high_precip",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Factores concretos y acci\u00f3n razonable, pero falta urgencia clara para la categor\u00eda de riesgo bajo",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "medio_normal",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Estructura clara, factores concretos y acci\u00f3n espec\u00edfica, aunque podr\u00eda ser m\u00e1s detallada",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "medio_boundary",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 6,
+      "grader_feedback": "Factores gen\u00e9ricos y acci\u00f3n poco clara",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "alto_normal",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Factores concretos y urgencia correcta para la categor\u00eda de alto riesgo, aunque falta acci\u00f3n espec\u00edfica y accionable",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "alto_critical_precip",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Factores concretos y urgencia correcta para la categor\u00eda de alto riesgo, pero falta acci\u00f3n espec\u00edfica y accionable",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "critico_normal",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Estructura clara, factores concretos y acci\u00f3n espec\u00edfica, aunque podr\u00eda ser m\u00e1s detallada",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "critico_extreme",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Estructura clara, factores concretos y acci\u00f3n espec\u00edfica, aunque podr\u00eda ser m\u00e1s detallada",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "no_events_no_precip",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Factores concretos y acci\u00f3n razonable, pero falta urgencia espec\u00edfica para la categor\u00eda de riesgo bajo",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "many_events_low_precip",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 7,
+      "grader_feedback": "Factores concretos, pero acci\u00f3n razonable y falta de urgencia espec\u00edfica para la categor\u00eda",
+      "grader_model": "ollama/llama3.2"
+    }
+  ]
+}

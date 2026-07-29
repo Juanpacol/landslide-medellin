@@ -1,0 +1,61 @@
+{
+  "prompt_module": "alerts/slack_graded",
+  "total_tests": 5,
+  "passed": 5,
+  "failed": 0,
+  "accuracy": "100.0%",
+  "threshold": "85%",
+  "threshold_passed": true,
+  "average_score": 5.4,
+  "graded_count": 5,
+  "quality_threshold": 6.5,
+  "quality_threshold_passed": false,
+  "executed_at": "2026-07-29T10:39:18.507200",
+  "results": [
+    {
+      "test_id": "critical_risk_structure",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 7,
+      "grader_feedback": "Formato correcto, pero falta claridad en la urgencia y contexto del riesgo cr\u00edtico",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "critical_risk_with_factors",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Mejorar\u00eda la claridad de la urgencia, podr\u00eda ser m\u00e1s espec\u00edfico",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "high_risk_alert",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 2,
+      "grader_feedback": "Falta de contexto y urgencia mal comunicada",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "rainfall_threshold_alert",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Informaci\u00f3n clara y precisa sobre el umbral de lluvia superado.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "no_blocks_empty",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 2,
+      "grader_feedback": "Falta de informaci\u00f3n relevante y contexto \u00fatil",
+      "grader_model": "ollama/llama3.2"
+    }
+  ]
+}

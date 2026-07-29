@@ -1,0 +1,94 @@
+{
+  "prompt_module": "agent/chat_rag",
+  "total_tests": 13,
+  "passed": 12,
+  "failed": 1,
+  "accuracy": "92.3%",
+  "threshold": "90%",
+  "threshold_passed": true,
+  "average_score": null,
+  "graded_count": 0,
+  "quality_threshold": null,
+  "quality_threshold_passed": null,
+  "executed_at": "2026-07-29T10:41:02.306405",
+  "results": [
+    {
+      "test_id": "in_scope_normal_1",
+      "passed": false,
+      "error": "Validation failed",
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "in_scope_normal_2",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "in_scope_events",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "variant_uppercase",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "variant_lowercase_typo",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "variant_accent",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "out_of_scope_geography",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "out_of_scope_recipe",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "out_of_scope_history",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "out_of_scope_movie",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "edge_case_complex_query",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "edge_case_multiple_communes",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "edge_case_temporal",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "prompt_module": "agent/chat_rag_graded",
+  "total_tests": 13,
+  "passed": 12,
+  "failed": 1,
+  "accuracy": "92.3%",
+  "threshold": "90%",
+  "threshold_passed": true,
+  "average_score": 8.31,
+  "graded_count": 13,
+  "quality_threshold": 7.0,
+  "quality_threshold_passed": true,
+  "executed_at": "2026-07-29T10:53:57.599653",
+  "results": [
+    {
+      "test_id": "in_scope_normal_1",
+      "passed": false,
+      "error": "Validation failed",
+      "duration_ms": 0.0,
+      "score": 8,
+      "grader_feedback": "Respuesta bien, pero falta precisi\u00f3n geogr\u00e1fica y ofrece ayuda adicional",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "in_scope_normal_2",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "La respuesta proporciona informaci\u00f3n precisa y detallada sobre el riesgo de deslizamientos en Medell\u00edn, incluyendo la cantidad de comunas en condici\u00f3n elevada de riesgo y la recomendaci\u00f3n para mantener vigilancia especial.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "in_scope_events",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta completa y precisa, aunque con una nota de advertencia sobre el historial de riesgo alto.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "variant_uppercase",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta precisa y completa, pero falta la opci\u00f3n de Villatina como respuesta por defecto.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "variant_lowercase_typo",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta precisa y completa, aunque podr\u00eda haber sido m\u00e1s directa.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "variant_accent",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta precisa y completa, aunque sugiere otra comuna como referencia.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "out_of_scope_geography",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 7,
+      "grader_feedback": "Respuesta incompleta y falta de informaci\u00f3n sobre la capital de Jap\u00f3n",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "out_of_scope_recipe",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 7,
+      "grader_feedback": "Respuesta breve y clara, pero falta informaci\u00f3n sobre el proceso de elaboraci\u00f3n del panettone.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "out_of_scope_history",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 7,
+      "grader_feedback": "Respuesta incompleta y vaga, no proporciona informaci\u00f3n sobre la Segunda Guerra Mundial",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "out_of_scope_movie",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 7,
+      "grader_feedback": "Falta de informaci\u00f3n espec\u00edfica sobre pel\u00edculas",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "edge_case_complex_query",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta detallada y precisa sobre el riesgo de deslizamientos en San Javier.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "edge_case_multiple_communes",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta detallada y precisa con datos espec\u00edficos y recomendaciones claras.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "edge_case_temporal",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta clara y precisa, aunque podr\u00eda haberse ofrecido la opci\u00f3n de buscar en el mapa para facilitar la b\u00fasqueda de la comuna.",
+      "grader_model": "ollama/llama3.2"
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "prompt_module": "agent/chat_rag_graded",
+  "total_tests": 13,
+  "passed": 12,
+  "failed": 1,
+  "accuracy": "92.3%",
+  "threshold": "90%",
+  "threshold_passed": true,
+  "average_score": 7.62,
+  "graded_count": 13,
+  "quality_threshold": 7.0,
+  "quality_threshold_passed": true,
+  "executed_at": "2026-07-29T10:38:41.272808",
+  "results": [
+    {
+      "test_id": "in_scope_normal_1",
+      "passed": false,
+      "error": "Validation failed",
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Falta de informaci\u00f3n espec\u00edfica sobre Villatina",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "in_scope_normal_2",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta clara y precisa con informaci\u00f3n relevante y completa.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "in_scope_events",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta precisa y completa con recomendaci\u00f3n de consultar el nivel de riesgo actual",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "variant_uppercase",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta precisa y completa, aunque no proporcion\u00f3 informaci\u00f3n espec\u00edfica sobre el riesgo de deslizamientos en Villatina.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "variant_lowercase_typo",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta precisa y completa, aunque podr\u00eda haber sido m\u00e1s directa.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "variant_accent",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta clara y precisa, aunque falta la menci\u00f3n de Villatina sin acento como referencia correcta.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "out_of_scope_geography",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 7,
+      "grader_feedback": "Respuesta incompleta y vaga, no proporciona informaci\u00f3n sobre la capital de Jap\u00f3n.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "out_of_scope_recipe",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 7,
+      "grader_feedback": "Respuesta breve y clara, pero falta informaci\u00f3n sobre el panettone",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "out_of_scope_history",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 2,
+      "grader_feedback": "Rechaza pregunta fuera de dominio",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "out_of_scope_movie",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 2,
+      "grader_feedback": "No est\u00e1 dentro del dominio de riesgo de deslizamientos o clima.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "edge_case_complex_query",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta detallada y precisa sobre el riesgo de deslizamientos en San Javier.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "edge_case_multiple_communes",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta detallada y precisa con datos relevantes y recomendaciones de emergencia.",
+      "grader_model": "ollama/llama3.2"
+    },
+    {
+      "test_id": "edge_case_temporal",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0,
+      "score": 9,
+      "grader_feedback": "Respuesta clara y precisa, pero falta la informaci\u00f3n espec\u00edfica sobre el riesgo de Villatina",
+      "grader_model": "ollama/llama3.2"
+    }
+  ]
+}
