@@ -1,0 +1,372 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:owl="http://www.w3.org/2002/07/owl#"
+         xml:base="http://teyva.local/onto.owl"
+         xmlns="http://teyva.local/onto.owl#">
+
+<owl:Ontology rdf:about="http://teyva.local/onto.owl"/>
+
+<owl:ObjectProperty rdf:about="#locatedIn">
+  <rdfs:domain rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+  <rdfs:range rdf:resource="#Territory"/>
+</owl:ObjectProperty>
+
+<owl:ObjectProperty rdf:about="#adjacentTo">
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="#Territory"/>
+</owl:ObjectProperty>
+
+<owl:ObjectProperty rdf:about="#drainedBy">
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="#Stream"/>
+</owl:ObjectProperty>
+
+<owl:ObjectProperty rdf:about="#hasTerrainFeature">
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="#TerrainFeature"/>
+</owl:ObjectProperty>
+
+<owl:ObjectProperty rdf:about="#exposes">
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="#Exposure"/>
+</owl:ObjectProperty>
+
+<owl:ObjectProperty rdf:about="#triggeredBy">
+  <rdfs:domain rdf:resource="#HazardAssessment"/>
+  <rdfs:range rdf:resource="#Trigger"/>
+</owl:ObjectProperty>
+
+<owl:ObjectProperty rdf:about="#hasHistoricalEvent">
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="#LandslideEvent"/>
+</owl:ObjectProperty>
+
+<owl:ObjectProperty rdf:about="#assessedBy">
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="#HazardAssessment"/>
+</owl:ObjectProperty>
+
+<owl:DatatypeProperty rdf:about="#canonical_id">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#official_code">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#nombre">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#is_ladera">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#Territory"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#boolean"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#slope_p90_deg">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#Slope"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#twi_p90">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#TWI"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#ndvi_min">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#NDVI"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#hazard_fraction">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#HazardAssessment"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#precip_mm">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#RainfallEvent"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#magnitude">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#SeismicEvent"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
+</owl:DatatypeProperty>
+
+<owl:Class rdf:about="#Territory">
+  <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Commune">
+  <rdfs:subClassOf rdf:resource="#Territory"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Corregimiento">
+  <rdfs:subClassOf rdf:resource="#Territory"/>
+</owl:Class>
+
+<owl:Class rdf:about="#TerrainFeature">
+  <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Slope">
+  <rdfs:subClassOf rdf:resource="#TerrainFeature"/>
+</owl:Class>
+
+<owl:Class rdf:about="#TWI">
+  <rdfs:subClassOf rdf:resource="#TerrainFeature"/>
+</owl:Class>
+
+<owl:Class rdf:about="#NDVI">
+  <rdfs:subClassOf rdf:resource="#TerrainFeature"/>
+</owl:Class>
+
+<owl:Class rdf:about="#SoilType">
+  <rdfs:subClassOf rdf:resource="#TerrainFeature"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Elevation">
+  <rdfs:subClassOf rdf:resource="#TerrainFeature"/>
+</owl:Class>
+
+<owl:Class rdf:about="#HydroFeature">
+  <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Stream">
+  <rdfs:subClassOf rdf:resource="#HydroFeature"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Trigger">
+  <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+</owl:Class>
+
+<owl:Class rdf:about="#RainfallEvent">
+  <rdfs:subClassOf rdf:resource="#Trigger"/>
+</owl:Class>
+
+<owl:Class rdf:about="#SeismicEvent">
+  <rdfs:subClassOf rdf:resource="#Trigger"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Exposure">
+  <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Dwelling">
+  <rdfs:subClassOf rdf:resource="#Exposure"/>
+</owl:Class>
+
+<owl:Class rdf:about="#CriticalFacility">
+  <rdfs:subClassOf rdf:resource="#Exposure"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Hospital">
+  <rdfs:subClassOf rdf:resource="#CriticalFacility"/>
+</owl:Class>
+
+<owl:Class rdf:about="#School">
+  <rdfs:subClassOf rdf:resource="#CriticalFacility"/>
+</owl:Class>
+
+<owl:Class rdf:about="#Shelter">
+  <rdfs:subClassOf rdf:resource="#CriticalFacility"/>
+</owl:Class>
+
+<owl:Class rdf:about="#LandslideEvent">
+  <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+</owl:Class>
+
+<owl:Class rdf:about="#HazardAssessment">
+  <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+</owl:Class>
+
+<owl:Class rdf:about="#DataQualityFlag">
+  <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+</owl:Class>
+
+<owl:NamedIndividual rdf:about="#territory_1">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">1</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">01</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Popular</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_2">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">2</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">02</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Santa Cruz</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_3">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">3</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">03</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Manrique</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_4">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">4</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">04</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Aranjuez</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">false</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_5">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">5</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">05</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Castilla</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">false</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_6">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">6</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">06</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Doce de Octubre</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_7">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">7</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">07</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Robledo</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_8">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">8</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">08</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Villa Hermosa</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_9">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">9</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">09</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Buenos Aires</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_10">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">10</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">10</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">La Candelaria</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">false</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_11">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">11</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">11</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Laureles-Estadio</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">false</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_12">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">12</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">12</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">La América</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">false</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_13">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">13</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">13</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">San Javier</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_14">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">14</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">14</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">El Poblado</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">false</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_15">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">15</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">15</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Guayabal</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">false</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_16">
+  <rdf:type rdf:resource="#Commune"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">16</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">16</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Belén</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_17">
+  <rdf:type rdf:resource="#Corregimiento"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">17</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">50</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Palmitas</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_18">
+  <rdf:type rdf:resource="#Corregimiento"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">18</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">60</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">San Cristóbal</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_19">
+  <rdf:type rdf:resource="#Corregimiento"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">19</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">70</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Altavista</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_20">
+  <rdf:type rdf:resource="#Corregimiento"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">20</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">80</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">San Antonio de Prado</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#territory_21">
+  <rdf:type rdf:resource="#Corregimiento"/>
+  <canonical_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">21</canonical_id>
+  <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">90</official_code>
+  <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Santa Elena</nombre>
+  <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+
+</rdf:RDF>

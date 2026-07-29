@@ -42,3 +42,8 @@ torch==2.12.1+cpu
 
 fastmcp
 anthropic
+
+# Neuro-symbolic ontology (specs/001-ontology/): owlready2 loads and reasons over
+# ontology/teyva.owl; rdflib is the SPARQL layer used by specs/005-knowledge-graph/.
+owlready2
+rdflib
