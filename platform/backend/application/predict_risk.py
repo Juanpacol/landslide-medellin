@@ -63,28 +63,61 @@ _predict_one_commune = handle_errors(
 
 
 async def run_predictions(db: AsyncSession) -> None:
-    """Predice, explica y persiste para las 21 comunas; luego dispara alertas."""
+    """Predicts, explains and persists for all 21 communes; then fires post-prediction alerts.
+
+    Risk score/level now come from the neuro-symbolic inference engine
+    (`application/neurosymbolic/infer.py`): the declared susceptibility × trigger index
+    (`ml/hazard.py`) combined with `domain/rules`, replacing the classifier that
+    `docs/research/audit-2026-07.md` showed has no valid training target (0 usable positives).
+    If the batch inference itself fails (e.g. a hazard-source query errors), each commune falls
+    back independently to the legacy classifier path via `_predict_one_commune`, so one failure
+    mode never blocks the other.
+    """
     from agent.risk_explanations import generate_risk_explanation
+    from application.neurosymbolic.infer import infer_all
     from ml.predict import _load_metrics
     from observability.predictions import log_prediction
 
     metrics = _load_metrics()
     model_version = str(metrics.get("model_version") or "teyva-ml-1.0")
 
+    try:
+        verdicts = await infer_all(db)
+    except Exception:  # noqa: BLE001
+        verdicts = {}
+
     for commune in COMMUNES:
         cid = commune.id
-        out = await _predict_one_commune(cid, db)
-        risk_score = float(out.get("risk_score") or 0.0)
-        risk_level = str(out.get("risk_level") or "bajo")
-        confidence = float(out.get("confidence") or 0.0)
-        features_used = out.get("features_used") or {}
+        verdict = verdicts.get(str(cid))
 
-        raw_output = {
-            "features_used": features_used,
-            "confidence": confidence,
-            "risk_level": risk_level,
-            "error": out.get("error"),
-        }
+        if verdict is not None:
+            risk_score = float(verdict.score or 0.0)
+            risk_level = verdict.level
+            confidence = verdict.confidence
+            features_used: dict = {}
+            raw_output = {
+                "features_used": features_used,
+                "confidence": confidence,
+                "risk_level": risk_level,
+                "error": None,
+                "derivation": verdict.derivation,
+                "conflicts": list(verdict.conflicts),
+                "priority": verdict.priority,
+                "source": "neurosymbolic",
+            }
+        else:
+            out = await _predict_one_commune(cid, db)
+            risk_score = float(out.get("risk_score") or 0.0)
+            risk_level = str(out.get("risk_level") or "bajo")
+            confidence = float(out.get("confidence") or 0.0)
+            features_used = out.get("features_used") or {}
+            raw_output = {
+                "features_used": features_used,
+                "confidence": confidence,
+                "risk_level": risk_level,
+                "error": out.get("error"),
+                "source": "classifier_fallback",
+            }
 
         # Explicación en lenguaje natural (LLM si hay API key, template si no).
         try:

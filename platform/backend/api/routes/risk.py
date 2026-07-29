@@ -367,6 +367,35 @@ async def get_comuna_detalle(
         "is_zona_ladera": is_ladera,
         "model_explanation": pred.explanation if pred and pred.explanation else "Sin datos",
         "predicted_at": pred.created_at.isoformat() if pred and pred.created_at else None,
+        "derivation": (pred.raw_output or {}).get("derivation") if pred else None,
+    }
+
+
+@router.get("/derivation/{commune_id}")
+async def get_derivation(commune_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+    """Neuro-symbolic derivation for a commune's latest prediction: fired rules, conflicts
+    between the neural score and the symbolic layer, and confidence — see
+    `application/neurosymbolic/infer.py` (specs/003-inference-engine/)."""
+    latest_pred_stmt = (
+        select(RiskPrediction)
+        .where(RiskPrediction.commune_id == commune_id)
+        .order_by(RiskPrediction.created_at.desc())
+        .limit(1)
+    )
+    pred = (await db.execute(latest_pred_stmt)).scalars().first()
+    if pred is None:
+        return {"commune_id": commune_id, "derivation": None, "conflicts": [], "priority": None}
+
+    raw = pred.raw_output or {}
+    return {
+        "commune_id": commune_id,
+        "risk_score": float(pred.risk_score) if pred.risk_score is not None else None,
+        "risk_category": pred.risk_category,
+        "predicted_at": pred.created_at.isoformat() if pred.created_at else None,
+        "derivation": raw.get("derivation"),
+        "conflicts": raw.get("conflicts") or [],
+        "priority": raw.get("priority"),
+        "source": raw.get("source", "unknown"),
     }
 
 
