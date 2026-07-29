@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Float, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,6 +31,18 @@ class MeshQuadrant(Base):
         String(64), nullable=True
     )  # peor grado entre sus barrios
     n_barrios_alta: Mapped[int] = mapped_column(Integer, default=0)
+
+    # ── Terreno agregado desde `barrio_terrain` (p90 entre sus barrios) ───────
+    # Esto es lo que le da a la malla su PROPIA señal: hasta ahora su riesgo era
+    # pura herencia del modelo a nivel comuna (ver el límite honesto arriba).
+    # Nullable: se pueblan con `scraper/terrain_features.py`, no por migración.
+    slope_p90_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    twi_p90: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ndvi_mean: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Índice compuesto de `domain/susceptibility.py`, con pesos DOCUMENTADOS
+    # (no aprendidos: con 26 positivos, aprender 5 pesos es ajustar ruido).
+    susceptibility_index: Mapped[float | None] = mapped_column(Float, nullable=True)
+    susceptibility_grade: Mapped[str | None] = mapped_column(String(32), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

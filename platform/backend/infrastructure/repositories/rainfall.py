@@ -24,7 +24,22 @@ async def thresholds_by_commune(session: AsyncSession) -> dict[str, float]:
 
 
 async def accumulated_since_by_commune(session: AsyncSession, since: datetime) -> dict[str, float]:
-    """Lluvia acumulada por comuna desde `since` (típicamente medianoche local)."""
+    """Lluvia acumulada por comuna desde `since` (típicamente medianoche local).
+
+    Suma TODAS las fuentes de `rainfall_timeseries` sin filtrar, y eso es correcto
+    solo porque se apoya en dos invariantes que se garantizan al ESCRIBIR:
+
+    1. El pronóstico nunca entra en esta tabla (vive en `rainfall_forecast`). Si
+       entrara, esta suma inflaría el acumulado del día y dispararía alertas
+       Slack rojas falsas — este resultado alimenta `alerts_after_rain_ingest`.
+    2. `owm_observed` solo se escribe para un (comuna, día) que NO tenga ya filas
+       de SIATA. Sin esa compuerta, un total diario de OWM se sumaría a los ~48
+       snapshots de SIATA del mismo día y contaría la lluvia dos veces.
+
+    Si algún día hace falta relajar el punto 2, esta función necesita un filtro
+    por `source` y una escalera de precedencia — que es justo lo que hace
+    `infrastructure/repositories/daily_rain.py` para el grano diario.
+    """
     result = await session.execute(
         select(RainfallTimeseries.commune_id, func.sum(RainfallTimeseries.precip_mm))
         .where(RainfallTimeseries.snapshot_at >= since)
