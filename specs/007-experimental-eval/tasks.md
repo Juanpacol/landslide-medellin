@@ -1,9 +1,10 @@
-- [ ] Four-arm harness skeleton (verifies: runs all 4 arms on frozen snapshot without error)
-- [ ] Surrogate metrics table, captioned (verifies: table includes circularity note)
-- [ ] Rule coverage + fire-rate metrics (verifies: matches `RuleTrace.not_evaluable` counts)
-- [ ] Explanation faithfulness metric (verifies: reuses SPEC-004 faithfulness check)
-- [ ] DAGRD rubric + Cohen's κ computation (verifies: `evaluation/rubric.md` filled with 20 cases)
-- [ ] Ablation study (ontology/rules/quality) (verifies: delta reported for each primary metric)
-- [ ] Inference latency p50/p95 (verifies: ML-only vs neuro-symbolic comparison)
-- [ ] `docs/research/paper.md` (verifies: all sections present, reviewed)
-- [ ] CI workflow `neurosymbolic-eval.yml` (verifies: green run, results written to `evaluation/results/`)
+- [ ] Four-arm harness skeleton (ML-only, rules-only, neurosymbolic, declared index) — not started
+- [ ] Surrogate metrics table on synthetic labels, captioned — not started
+- [x] Rule coverage + fire-rate metrics (`evaluation/primary_metrics.py::rule_coverage`) (verifies: `pytest tests/test_evaluation_primary_metrics.py -q` — per-rule fire rate and not-evaluable rate computed from `RuleTrace`, no real labels needed)
+- [x] Explanation faithfulness metric (`explanation_faithfulness`) (verifies: same file — reuses `application/neurosymbolic/explain.py::is_faithful`, aggregates a faithfulness rate across a batch of statements)
+- [ ] DAGRD rubric + Cohen's κ computation — not started
+- [ ] Ablation study (ontology/rules/quality) — not started
+- [ ] Inference latency p50/p95 — not started
+- [ ] `docs/research/paper.md` — not started
+- [ ] CI workflow `neurosymbolic-eval.yml` — not started
+- [x] Primary-metrics test suite (verifies: `pytest tests/test_evaluation_primary_metrics.py -q` — 4 passed; full suite 311 passed, 12 skipped, no regressions)
