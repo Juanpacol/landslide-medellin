@@ -43,6 +43,44 @@ def _write_attempt(payload: dict[str, Any]) -> None:
     LAST_ATTEMPT_PATH.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
 
+def _alert_label_collapse(n_samples: int, n_positive: int) -> None:
+    """Slack alert when training aborts because the positive class collapsed to <2 unique
+    values in `y` — the exact silent failure the audit documented
+    (docs/research/audit-2026-07.md §3): the `is_synthetic` filter was applied correctly,
+    positives disappeared, and nothing notified anyone. `train.py`'s artifact governance
+    already protects production (an aborted run never overwrites `best_model.pkl`), but
+    protecting production silently is not the same as someone finding out.
+
+    Posts directly via `requests`, independent of the DB-backed alert pipeline in
+    `alerts/slack.py` (which needs an AsyncSession this sync script doesn't have) — same
+    "notify even if something else is broken" philosophy as
+    `.github/actions/notify-failure`. Best-effort: a failed notification must never fail
+    the training run itself.
+    """
+    import os
+
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL", "").strip()
+    if not webhook_url:
+        return
+    try:
+        import requests
+
+        requests.post(
+            webhook_url,
+            json={
+                "text": (
+                    ":rotating_light: TEYVA ml.train: entrenamiento abortado — la clase "
+                    "positiva colapsó "
+                    f"(n_samples={n_samples}, n_positive={n_positive}). "
+                    "best_model.pkl NO se sobrescribió. Ver last_train_attempt.json."
+                )
+            },
+            timeout=10,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _provenance() -> dict[str, Any]:
     """Sello de procedencia para metrics.json: permite detectar drift entre
     artefactos (¿este metrics.json corresponde a este best_model.pkl?)."""
@@ -381,6 +419,7 @@ def train() -> dict[str, Any]:
             **provenance,
         }
         _write_attempt(payload)
+        _alert_label_collapse(n_samples, n_positive)
         return payload
 
     sm = SMOTE(random_state=42)
