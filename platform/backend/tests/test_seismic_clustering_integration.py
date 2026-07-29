@@ -51,42 +51,75 @@ def _rows() -> list[dict]:
         # Tiempos, magnitudes y epicentros distintos: la dedup vieja por
         # (event_local_at, epicenter_label) no habría colapsado ninguno.
         dict(
-            source_row_id="EST1_2026-07-20", source="siata_sismos", station_code="EST1",
-            station_name="Estación 1", event_local_at=T0 + timedelta(seconds=38),
-            magnitude=4.0, depth_km=22.0, epicenter_lat=6.34, epicenter_lon=-75.55,
+            source_row_id="EST1_2026-07-20",
+            source="siata_sismos",
+            station_code="EST1",
+            station_name="Estación 1",
+            event_local_at=T0 + timedelta(seconds=38),
+            magnitude=4.0,
+            depth_km=22.0,
+            epicenter_lat=6.34,
+            epicenter_lon=-75.55,
             epicenter_label="Sismo en Medellín - Antioquia",
         ),
         dict(
-            source_row_id="EST2_2026-07-20", source="siata_sismos", station_code="EST2",
-            station_name="Estación 2", event_local_at=T0 + timedelta(seconds=41),
-            magnitude=3.9, depth_km=21.0, epicenter_lat=6.34, epicenter_lon=-75.55,
+            source_row_id="EST2_2026-07-20",
+            source="siata_sismos",
+            station_code="EST2",
+            station_name="Estación 2",
+            event_local_at=T0 + timedelta(seconds=41),
+            magnitude=3.9,
+            depth_km=21.0,
+            epicenter_lat=6.34,
+            epicenter_lon=-75.55,
             epicenter_label="Sismo en Medellín - Antioquia",
         ),
         # USGS y SGC no tienen estación → prueba que las columnas son nullable y
         # que insert_events normaliza claves heterogéneas.
         dict(
-            source_row_id="usgs:us7000zzzz", source="usgs", event_local_at=T0,
-            magnitude=4.2, depth_km=20.0, epicenter_lat=6.30, epicenter_lon=-75.60,
+            source_row_id="usgs:us7000zzzz",
+            source="usgs",
+            event_local_at=T0,
+            magnitude=4.2,
+            depth_km=20.0,
+            epicenter_lat=6.30,
+            epicenter_lon=-75.60,
             epicenter_label="12 km NE of Betulia, Colombia",
         ),
         dict(
-            source_row_id="sgc:sgc-991", source="sgc",
-            event_local_at=T0 - timedelta(seconds=3), magnitude=4.4, depth_km=19.0,
-            epicenter_lat=6.28, epicenter_lon=-75.63, epicenter_label="Betulia, Antioquia",
+            source_row_id="sgc:sgc-991",
+            source="sgc",
+            event_local_at=T0 - timedelta(seconds=3),
+            magnitude=4.4,
+            depth_km=19.0,
+            epicenter_lat=6.28,
+            epicenter_lon=-75.63,
+            epicenter_label="Betulia, Antioquia",
         ),
         # ── Sismo profundo del Nido de Bucaramanga, ~300 km ───────────────────
         # A solo 90 s del anterior: si la ventana temporal mandara sola, se
         # fusionarían. La distancia lo impide.
         dict(
-            source_row_id="usgs:us7000yyyy", source="usgs",
-            event_local_at=T0 + timedelta(seconds=90), magnitude=4.1, depth_km=150.0,
-            epicenter_lat=7.80, epicenter_lon=-73.10, epicenter_label="Los Santos, Colombia",
+            source_row_id="usgs:us7000yyyy",
+            source="usgs",
+            event_local_at=T0 + timedelta(seconds=90),
+            magnitude=4.1,
+            depth_km=150.0,
+            epicenter_lat=7.80,
+            epicenter_lon=-73.10,
+            epicenter_label="Los Santos, Colombia",
         ),
         # ── Sismo local pequeño que solo ve SIATA ─────────────────────────────
         dict(
-            source_row_id="EST1_2026-07-20b", source="siata_sismos", station_code="EST1",
-            station_name="Estación 1", event_local_at=T0 + timedelta(minutes=10),
-            magnitude=1.9, depth_km=5.0, epicenter_lat=6.25, epicenter_lon=-75.57,
+            source_row_id="EST1_2026-07-20b",
+            source="siata_sismos",
+            station_code="EST1",
+            station_name="Estación 1",
+            event_local_at=T0 + timedelta(minutes=10),
+            magnitude=1.9,
+            depth_km=5.0,
+            epicenter_lat=6.25,
+            epicenter_lon=-75.57,
             epicenter_label="Sismo local",
         ),
     ]
@@ -124,10 +157,14 @@ async def test_clustering_multifuente(db_session) -> None:
         await _cluster_all(db_session)
 
         clusters = (
-            await db_session.execute(
-                select(SeismicEventCluster).order_by(SeismicEventCluster.event_at)
+            (
+                await db_session.execute(
+                    select(SeismicEventCluster).order_by(SeismicEventCluster.event_at)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         # 6 reportes → 3 sismos físicos.
         assert len(clusters) == 3
@@ -154,10 +191,14 @@ async def test_clustering_multifuente(db_session) -> None:
 
         # Ningún reporte queda huérfano.
         huerfanos = (
-            await db_session.execute(
-                select(SeismicEvent).where(SeismicEvent.cluster_id.is_(None))
+            (
+                await db_session.execute(
+                    select(SeismicEvent).where(SeismicEvent.cluster_id.is_(None))
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert huerfanos == []
 
         # Re-agrupar es un no-op: no aparecen clústeres nuevos.
@@ -177,19 +218,29 @@ async def test_recent_clusters_filtra_ventana_y_magnitud_nula(db_session) -> Non
             [
                 # Sin magnitud: no aporta a una Σ de magnitud², así que se excluye.
                 dict(
-                    source_row_id="usgs:sin-mag", source="usgs", event_local_at=T0,
-                    magnitude=None, epicenter_lat=6.3, epicenter_lon=-75.6,
+                    source_row_id="usgs:sin-mag",
+                    source="usgs",
+                    event_local_at=T0,
+                    magnitude=None,
+                    epicenter_lat=6.3,
+                    epicenter_lon=-75.6,
                 ),
                 dict(
-                    source_row_id="usgs:con-mag", source="usgs",
-                    event_local_at=T0 + timedelta(hours=2), magnitude=3.3,
-                    epicenter_lat=6.9, epicenter_lon=-74.2,
+                    source_row_id="usgs:con-mag",
+                    source="usgs",
+                    event_local_at=T0 + timedelta(hours=2),
+                    magnitude=3.3,
+                    epicenter_lat=6.9,
+                    epicenter_lon=-74.2,
                 ),
                 # Muy antiguo: fuera de la ventana.
                 dict(
-                    source_row_id="usgs:viejo", source="usgs",
-                    event_local_at=T0 - timedelta(days=120), magnitude=5.0,
-                    epicenter_lat=6.3, epicenter_lon=-75.6,
+                    source_row_id="usgs:viejo",
+                    source="usgs",
+                    event_local_at=T0 - timedelta(days=120),
+                    magnitude=5.0,
+                    epicenter_lat=6.3,
+                    epicenter_lon=-75.6,
                 ),
             ],
         )

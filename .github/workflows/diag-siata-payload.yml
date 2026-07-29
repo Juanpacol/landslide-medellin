@@ -39,14 +39,30 @@ jobs:
       - name: Describir Pluviometrica.json (fuente del scraper en vivo)
         run: |
           python - <<'PY'
-          import json, urllib.request, collections
+          import json, urllib.request, collections, time
           URL = "https://siata.gov.co/data/siata_app/Pluviometrica.json"
-          req = urllib.request.Request(URL, headers={
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                            "AppleWebKit/537.36 (KHTML, like Gecko) "
-                            "Chrome/124.0.0.0 Safari/537.36 TEYVA-Scraper/1.0",
-              "Accept": "application/json"})
-          d = json.load(urllib.request.urlopen(req, timeout=60))
+          HDRS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                "Chrome/124.0.0.0 Safari/537.36 TEYVA-Scraper/1.0",
+                  "Accept": "application/json"}
+
+          # Mismos reintentos que scraper/common.py::with_retries (3 intentos,
+          # backoff exponencial desde 1 s). SIATA es lento e intermitente: una
+          # corrida anterior de este diagnóstico falló con UN solo intento
+          # mientras el cron —que sí reintenta— venía funcionando.
+          def fetch(url, timeout=90, attempts=3):
+              delay = 1.0
+              for i in range(1, attempts + 1):
+                  try:
+                      return urllib.request.urlopen(
+                          urllib.request.Request(url, headers=HDRS), timeout=timeout)
+                  except Exception as exc:
+                      print(f"  intento {i}/{attempts} falló: {exc!r}", flush=True)
+                      if i == attempts:
+                          raise
+                      time.sleep(delay); delay *= 2
+
+          d = json.load(fetch(URL))
 
           print("CLAVES RAIZ:", list(d.keys()))
           for k, v in d.items():
@@ -87,19 +103,34 @@ jobs:
                   print(f"  {key:<22} ej: {list(muestra)[:4]}")
           PY
 
+      # continue-on-error: los dos pasos son independientes. Si el JSON se
+      # describió bien, un fallo aquí no debe borrar ese resultado del run.
       - name: Describir los TSV de hidrología (fuente del scraper histórico)
+        continue-on-error: true
         run: |
           python - <<'PY'
-          import urllib.request
+          import urllib.request, time
           BASE = "https://siata.gov.co/hidrologia/temperatura_agualluvia"
           HDRS = {"User-Agent": "Mozilla/5.0 TEYVA-Scraper/1.0"}
+
+          def fetch_text(url, timeout=120, attempts=3):
+              delay = 1.0
+              for i in range(1, attempts + 1):
+                  try:
+                      return urllib.request.urlopen(
+                          urllib.request.Request(url, headers=HDRS), timeout=timeout
+                      ).read().decode("utf-8", "replace")
+                  except Exception as exc:
+                      print(f"  intento {i}/{attempts} falló: {exc!r}", flush=True)
+                      if i == attempts:
+                          raise
+                      time.sleep(delay); delay *= 2
+
           for fname in ("7.txt", "20.txt"):
               url = f"{BASE}/{fname}"
               print(f"\n{'='*70}\n{url}")
               try:
-                  txt = urllib.request.urlopen(
-                      urllib.request.Request(url, headers=HDRS), timeout=90
-                  ).read().decode("utf-8", "replace")
+                  txt = fetch_text(url)
               except Exception as exc:
                   print("  ERROR:", repr(exc))
                   continue

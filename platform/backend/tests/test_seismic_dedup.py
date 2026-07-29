@@ -70,12 +70,20 @@ def test_la_dedup_anterior_habria_fallado_con_estos_datos() -> None:
     """Documenta POR QUÉ hacía falta esto: la clave vieja era
     (event_local_at.isoformat(), epicenter_label), y aquí difieren ambas."""
     usgs = EventKey(
-        event_at=T0, source="usgs", magnitude=4.2, lat=6.30, lon=-75.60,
+        event_at=T0,
+        source="usgs",
+        magnitude=4.2,
+        lat=6.30,
+        lon=-75.60,
         label="12 km NE of Betulia, Colombia",
     )
     siata = EventKey(
-        event_at=T0 + timedelta(seconds=38), source="siata_sismos", magnitude=4.0,
-        lat=6.34, lon=-75.55, label="Sismo en Medellín - Antioquia",
+        event_at=T0 + timedelta(seconds=38),
+        source="siata_sismos",
+        magnitude=4.0,
+        lat=6.34,
+        lon=-75.55,
+        label="Sismo en Medellín - Antioquia",
     )
     clave_vieja_usgs = (usgs.event_at.isoformat(), usgs.label)
     clave_vieja_siata = (siata.event_at.isoformat(), siata.label)

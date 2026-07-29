@@ -34,9 +34,7 @@ from domain.seismic_dedup import (
 )
 
 
-async def existing_source_row_ids(
-    session: AsyncSession, source_row_ids: Iterable[str]
-) -> set[str]:
+async def existing_source_row_ids(session: AsyncSession, source_row_ids: Iterable[str]) -> set[str]:
     """Cuáles de estos `source_row_id` ya están en la BD. UNA sola consulta."""
     ids = [i for i in source_row_ids if i]
     if not ids:
@@ -90,9 +88,7 @@ def _to_key(row: SeismicEvent | SeismicEventCluster) -> EventKey:
     )
 
 
-async def _candidate_clusters(
-    session: AsyncSession, at: datetime
-) -> list[SeismicEventCluster]:
+async def _candidate_clusters(session: AsyncSession, at: datetime) -> list[SeismicEventCluster]:
     """Clústeres dentro de la ventana temporal de coincidencia (índice sobre
     `event_at`, así que son un puñado de filas)."""
     margin = timedelta(seconds=MATCH_TIME_WINDOW_S)

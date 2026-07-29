@@ -511,9 +511,7 @@ def train() -> dict[str, Any]:
     importances: dict[str, float] | None = None
     raw_imp = getattr(best_model, "feature_importances_", None)
     if raw_imp is not None and len(raw_imp) == len(feature_names):
-        importances = {
-            k: round(float(v), 6) for k, v in zip(feature_names, raw_imp, strict=True)
-        }
+        importances = {k: round(float(v), 6) for k, v in zip(feature_names, raw_imp, strict=True)}
 
     model_version = "teyva-ml-1.0"
     payload = {

@@ -121,7 +121,10 @@ def test_normalize_prior_events_negativo_no_rompe() -> None:
 
 def test_con_todos_los_componentes_los_pesos_suman_uno() -> None:
     b = susceptibility_breakdown(
-        slope_p90_deg=27.5, twi_p90=9.0, ndvi_min=0.45, hazard_grade="Media",
+        slope_p90_deg=27.5,
+        twi_p90=9.0,
+        ndvi_min=0.45,
+        hazard_grade="Media",
         prior_event_count=4,
     )
     assert sum(b.weights_used.values()) == pytest.approx(1.0)
@@ -149,7 +152,10 @@ def test_componente_ausente_no_arrastra_el_indice_a_la_baja() -> None:
 def test_coverage_distingue_medicion_de_conjetura() -> None:
     parcial = susceptibility_breakdown(hazard_grade="Alta")
     completo = susceptibility_breakdown(
-        slope_p90_deg=40.0, twi_p90=12.0, ndvi_min=0.2, hazard_grade="Alta",
+        slope_p90_deg=40.0,
+        twi_p90=12.0,
+        ndvi_min=0.2,
+        hazard_grade="Alta",
         prior_event_count=3,
     )
     assert parcial.coverage < completo.coverage == pytest.approx(1.0)
@@ -169,9 +175,7 @@ def test_el_desglose_expone_los_componentes_para_auditar() -> None:
     assert b.components["twi"] is None
     # Pesos efectivos proporcionales a los declarados (se reportan redondeados
     # a 4 decimales, de ahí la tolerancia absoluta).
-    assert b.weights_used["slope"] == pytest.approx(
-        W_SLOPE / (W_SLOPE + W_HAZARD), abs=1e-4
-    )
+    assert b.weights_used["slope"] == pytest.approx(W_SLOPE / (W_SLOPE + W_HAZARD), abs=1e-4)
     assert sum(b.weights_used.values()) == pytest.approx(1.0, abs=1e-4)
 
 

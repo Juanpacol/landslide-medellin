@@ -33,6 +33,8 @@ class RainfallTimeseries(Base):
         # `snapshot_at` con una de SIATA se la tragaría en silencio el
         # `on_conflict_do_nothing` de `scraper/siata.py`: sin error, sin
         # excepción y sin contarla como descartada.
-        Index("ix_rainfall_ts_commune_snap_src", "commune_id", "snapshot_at", "source", unique=True),
+        Index(
+            "ix_rainfall_ts_commune_snap_src", "commune_id", "snapshot_at", "source", unique=True
+        ),
         Index("ix_rainfall_ts_source", "source"),
     )
