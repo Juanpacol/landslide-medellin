@@ -1,4 +1,4 @@
-- [ ] Four-arm harness skeleton (ML-only, rules-only, neurosymbolic, declared index) — not started
+- [x] Four-arm harness skeleton (`evaluation/run.py`) (verifies: `pytest tests/test_evaluation_run.py -q` — arms genuinely disagree on the motivating case: low neural score + geotechnical rule fires → ml_only says "bajo", neurosymbolic says "alto"). Scope: pure comparison given a score + snapshot; does not itself run the classifier or reconstruct `ml/benchmark.py`'s frozen snapshot against Postgres.
 - [ ] Surrogate metrics table on synthetic labels, captioned — not started
 - [x] Rule coverage + fire-rate metrics (`evaluation/primary_metrics.py::rule_coverage`) (verifies: `pytest tests/test_evaluation_primary_metrics.py -q` — per-rule fire rate and not-evaluable rate computed from `RuleTrace`, no real labels needed)
 - [x] Explanation faithfulness metric (`explanation_faithfulness`) (verifies: same file — reuses `application/neurosymbolic/explain.py::is_faithful`, aggregates a faithfulness rate across a batch of statements)
