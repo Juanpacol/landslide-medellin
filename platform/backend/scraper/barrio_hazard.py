@@ -1,15 +1,15 @@
 """
-Amenaza por movimientos en masa a nivel de BARRIO (script puntual, no cron).
+Mass-movement hazard at BARRIO level (a one-off script, not a cron).
 
-Muestrea el centroide de cada uno de los ~401 barrios de
-`platform/frontend/lib/barrios-medellin.json` contra la capa oficial de
-ordenamiento territorial VM_05_Amenazas_Movimientos_Masa (la misma que
-scraper/medellin_datos.py ya consulta, pero solo en los 21 centroides de
-comuna). El resultado (`grado_amenaza` por barrio) se upserta en la tabla
-`barrio_hazard` que sirve `GET /api/risk/barrios-hazard` para colorear la
-capa de barrios del mapa.
+Samples the centroid of each of the ~401 barrios in
+`platform/frontend/lib/barrios-medellin.json` against the official land-use
+planning layer VM_05_Amenazas_Movimientos_Masa (the same one
+scraper/medellin_datos.py already queries, but only at the 21 commune
+centroids). The result (`grado_amenaza` per barrio) is upserted into the
+`barrio_hazard` table, which serves `GET /api/risk/barrios-hazard` to color
+the map's barrio layer.
 
-La cartografía cambia en meses/años: correr a mano cuando haga falta:
+Cartography changes over months/years: run by hand when needed:
 
     cd platform/backend && PYTHONPATH=. python -m scraper.barrio_hazard
 """
@@ -32,8 +32,8 @@ from scraper.medellin_datos import VM05_BASE, _query_point_layer
 
 logger = logging.getLogger(__name__)
 
-# El GeoJSON vive en el frontend (lo consume el mapa); este script se corre
-# desde el repo, así que se resuelve por ruta relativa (override por env var).
+# The GeoJSON lives in the frontend (the map consumes it); this script runs
+# from the repo, so it's resolved by relative path (overridable via env var).
 _DEFAULT_GEOJSON = (
     Path(__file__).resolve().parents[2] / "frontend" / "lib" / "barrios-medellin.json"
 )
@@ -43,7 +43,7 @@ _CONCURRENCY = 8
 
 
 def _centroid_lonlat(geometry: dict[str, Any]) -> tuple[float, float] | None:
-    """Centroide simple (promedio del anillo exterior) de Polygon/MultiPolygon GeoJSON."""
+    """Simple centroid (average of the outer ring) of a GeoJSON Polygon/MultiPolygon."""
     gtype = geometry.get("type")
     coords = geometry.get("coordinates")
     if not coords:
@@ -66,7 +66,7 @@ async def _hazard_for_point(client, sem: asyncio.Semaphore, lon: float, lat: flo
         try:
             feats = await _query_point_layer(client, VM05_BASE, 2, lon, lat)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Consulta VM05 falló para (%.4f, %.4f): %s", lon, lat, exc)
+            logger.warning("VM05 query failed for (%.4f, %.4f): %s", lon, lat, exc)
             return None
     if not feats:
         return None
@@ -84,7 +84,7 @@ async def run_barrio_hazard() -> int:
         try:
             data = json.loads(BARRIOS_GEOJSON.read_text(encoding="utf-8"))
             features = data.get("features") or []
-            logger.info("Barrios en el GeoJSON: %d", len(features))
+            logger.info("Barrios in the GeoJSON: %d", len(features))
 
             sem = asyncio.Semaphore(_CONCURRENCY)
             async with httpx_client() as client:
@@ -132,7 +132,7 @@ async def run_barrio_hazard() -> int:
             await session.commit()
             status = "ok"
             detail = f"barrios={processed} con_amenaza={with_hazard}"
-            logger.info("Barrio hazard listo: %s", detail)
+            logger.info("Barrio hazard done: %s", detail)
         except Exception as exc:  # noqa: BLE001
             detail = repr(exc)
             await session.rollback()

@@ -1,23 +1,24 @@
 """
-Scraper de sismos del Servicio Geológico Colombiano.
+Colombian Geological Survey (SGC) earthquake scraper.
 
-Sustituye a SIATA como fuente sísmica PRIMARIA. Motivos medidos el 2026-07-29:
+Replaces SIATA as the PRIMARY seismic source. Reasons measured on 2026-07-29:
 
-- El feed de SIATA lleva sin producir eventos nuevos desde el 2026-03-01 —150
-  días— mientras el scraper reporta `ok` en cada corrida, porque
-  `records_valid=0` significa "sin eventos nuevos" y es indistinguible de "el
-  parser dejó de encajar". `monitoring/scraper_validator.py` ahora lo detecta.
-- En 7 días el SGC publicó **35 sismos** dentro del bounding box del Valle de
-  Aburrá. SIATA, cero.
-- USGS no sirve como primario: en julio 2026 completo y sin umbral de magnitud
-  devolvió **0 eventos** en ese mismo bbox.
+- The SIATA feed hasn't produced a new event since 2026-03-01 — 150 days —
+  while the scraper reports `ok` on every run, because `records_valid=0`
+  means "no new events" and is indistinguishable from "the parser stopped
+  matching". `monitoring/scraper_validator.py` now detects this.
+- Over 7 days SGC published **35 earthquakes** within the Valle de Aburrá
+  bounding box. SIATA: zero.
+- USGS doesn't work as primary: over all of July 2026, with no magnitude
+  threshold, it returned **0 events** in that same bbox.
 
-Cada fila se agrupa en un evento canónico (`seismic_event_clusters`) nada más
-insertarse, dentro de la misma transacción. Sin eso, el mismo sismo reportado por
-SIATA, USGS y el SGC contaría tres veces en la Σ de magnitud² de
-`ml/seismic_features.py`, con inflado cuadrático y en silencio.
+Each row is grouped into a canonical event (`seismic_event_clusters`) right
+after insertion, within the same transaction. Without that, the same
+earthquake reported by SIATA, USGS and SGC would count three times in
+`ml/seismic_features.py`'s Σ of magnitude², inflating it quadratically and
+silently.
 
-Entrypoint para GitHub Actions:
+GitHub Actions entrypoint:
 
     cd platform/backend && PYTHONPATH=. python -m scraper.sgc_sismos
 """
@@ -44,24 +45,25 @@ logger = logging.getLogger(__name__)
 
 SOURCE_KEY = sgc_client.SOURCE_KEY
 
-# Ventana de consulta por corrida. Con el job cada 15 min, 2 días dan un margen
-# amplio: cubre un cron caído varias horas y las revisiones que el SGC publica
-# tarde (un evento pasa de `automatic` a `manual` y cambia de magnitud).
+# Query window per run. With the job every 15 min, 2 days gives a wide
+# margin: covers a cron down for several hours and the late revisions SGC
+# publishes (an event moves from `automatic` to `manual` and its magnitude
+# changes).
 LOOKBACK_DAYS = 2
 
-# Solo los sismos que merecen un aviso en Slack. El feed trae decenas de eventos
-# de M0.7-1.5 por semana; postearlos todos ahogaría el canal, que es justo lo que
-# la regla anti-ruido de CLAUDE.md quiere evitar.
+# Only earthquakes worth a Slack alert. The feed carries dozens of M0.7-1.5
+# events per week; posting all of them would drown the channel, exactly
+# what CLAUDE.md's anti-noise rule wants to avoid.
 DIGEST_MIN_MAGNITUDE = 3.0
 
 
 async def _collect() -> tuple[list[dict[str, Any]], str | None]:
-    """Descarga y parsea. Devuelve (filas, detalle)."""
+    """Downloads and parses. Returns (rows, detail)."""
     end = datetime.now(timezone.utc).date()
     start = end - timedelta(days=LOOKBACK_DAYS)
     async with httpx_client() as client:
         rows = await sgc_client.fetch_events(client, start=start, end=end + timedelta(days=1))
-    return rows, f"ventana={start}..{end} en_bbox={len(rows)}"
+    return rows, f"window={start}..{end} in_bbox={len(rows)}"
 
 
 async def _run_sgc_sismos(session: AsyncSession) -> int:
@@ -77,7 +79,7 @@ async def _run_sgc_sismos(session: AsyncSession) -> int:
         rows, detail = await _collect()
         downloaded = len(rows)
 
-        # Una sola consulta para todo el lote, en vez de un SELECT por fila.
+        # One single query for the whole batch, instead of a SELECT per row.
         known = await existing_source_row_ids(session, [r["source_row_id"] for r in rows])
         fresh = [r for r in rows if r["source_row_id"] not in known]
         discarded = downloaded - len(fresh)
@@ -85,8 +87,8 @@ async def _run_sgc_sismos(session: AsyncSession) -> int:
         if fresh:
             inserted = await insert_events(session, fresh)
 
-            # Agrupar en eventos canónicos DENTRO de la misma transacción, para
-            # que no queden filas sin clúster si algo falla después.
+            # Group into canonical events WITHIN the same transaction, so no
+            # rows are left without a cluster if something fails afterward.
             from sqlalchemy import select
 
             from db.models.seismic_event import SeismicEvent
@@ -111,7 +113,7 @@ async def _run_sgc_sismos(session: AsyncSession) -> int:
 
         await session.commit()
         status = "ok"
-        logger.info("SGC sismos: %d nuevos de %d en la ventana", inserted, downloaded)
+        logger.info("SGC earthquakes: %d new of %d in the window", inserted, downloaded)
     except Exception as exc:  # noqa: BLE001
         detail = (detail + " | " if detail else "") + repr(exc)
         await session.rollback()

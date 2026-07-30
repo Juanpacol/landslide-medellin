@@ -1,13 +1,13 @@
 """
-Scraper de sismos SIATA — red de sismógrafos y acelerógrafos del Valle de Aburrá.
+SIATA earthquake scraper — Valle de Aburrá's seismograph and accelerograph network.
 
-Fuente: los GeoJSON del geoportal de ingeniería sísmica de SIATA. Cada archivo
-trae las estaciones como Features; cada estación publica hasta 3 eventos
-recientes (`evento_1..3`) con magnitud, profundidad, epicentro y coordenadas.
-Los archivos pesan 4-10 KB y solo cambian cuando hay un sismo nuevo, así que
-el polling de 30 min sobra.
+Source: SIATA's seismic engineering geoportal GeoJSON files. Each file
+carries stations as Features; each station publishes up to 3 recent events
+(`evento_1..3`) with magnitude, depth, epicenter and coordinates. The files
+weigh 4-10 KB and only change when there's a new earthquake, so 30-min
+polling is plenty.
 
-Formato real de un evento (confirmado contra el feed en producción):
+Real event format (confirmed against the production feed):
     "informacion": {
         "fecha_local": "2026-02-19 19:33:50",
         "magnitud": "1.6",
@@ -16,7 +16,7 @@ Formato real de un evento (confirmado contra el feed en producción):
         "profundidad": "13 km",
         "epicentro": "Sismo en Medellín - Antioquia"
     }
-Los números vienen como strings con unidad/símbolo — se parsean tolerantes.
+Numbers come as strings with a unit/symbol — parsed tolerantly.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ FEED_URLS = [
 
 
 def _parse_number(raw: Any) -> float | None:
-    """'1.6' / '-75.67°' / '172 km' → float. None si no hay número."""
+    """'1.6' / '-75.67°' / '172 km' → float. None if there's no number."""
     if raw is None:
         return None
     if isinstance(raw, (int, float)):
@@ -70,7 +70,7 @@ def _parse_local_dt(raw: Any) -> datetime | None:
 
 
 def _extract_events(feature: dict[str, Any]) -> list[dict[str, Any]]:
-    """Aplana los `evento_N` de una estación en registros individuales."""
+    """Flattens a station's `evento_N` entries into individual records."""
     props = feature.get("properties") or {}
     station_code = str(props.get("codigo") or props.get("estacion") or "desconocida")
     station_name = str(props.get("nombre") or station_code)

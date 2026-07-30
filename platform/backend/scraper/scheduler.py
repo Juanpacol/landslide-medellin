@@ -16,11 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 async def run_scraper_watchdog() -> None:
-    """Vigila la salud de las fuentes y alerta por Slack si alguna está caída.
+    """Watches the sources' health and alerts via Slack if any is down.
 
-    Cubre tanto fallos consecutivos como silencio total (fuente que dejó de
-    reportar — p. ej. GitHub Actions deshabilitado). Sin SLACK_WEBHOOK_URL
-    configurado es un no-op silencioso.
+    Covers both consecutive failures and total silence (a source that
+    stopped reporting — e.g. GitHub Actions disabled). A silent no-op
+    without SLACK_WEBHOOK_URL configured.
     """
     from application.fire_alerts import alerts_scraper_watchdog
     from db.session import AsyncSessionLocal
@@ -29,18 +29,18 @@ async def run_scraper_watchdog() -> None:
         async with AsyncSessionLocal() as session:
             alerted = await alerts_scraper_watchdog(session)
             if alerted:
-                logger.warning("Watchdog: alertas Slack enviadas para %s", alerted)
+                logger.warning("Watchdog: Slack alerts sent for %s", alerted)
     except Exception:
-        logger.exception("Watchdog de scrapers falló")
+        logger.exception("Scraper watchdog failed")
 
 
 def build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
 
-    # next_run_time cercano a "ahora": sin esto, un job de intervalo N espera N
-    # completo antes del primer disparo. En entornos que se reinician seguido
-    # (Docker local, laptops) las fuentes de 6h/24h no llegaban a correr nunca.
-    # Se escalonan unos segundos para no golpear la BD/red al mismo tiempo.
+    # next_run_time close to "now": without this, an interval-N job waits a
+    # full N before its first firing. In environments that restart often
+    # (local Docker, laptops), the 6h/24h sources never got to run. Staggered
+    # by a few seconds so they don't hit the DB/network all at once.
     now = datetime.now(timezone.utc)
     scheduler.add_job(
         run_siata_scraper,
@@ -82,8 +82,8 @@ def build_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
         next_run_time=now + timedelta(seconds=65),
     )
-    # Watchdog: alerta por Slack si alguna fuente lleva demasiado sin datos.
-    # Arranca a los 5 min (les da tiempo a los scrapers iniciales de poblar logs).
+    # Watchdog: alerts via Slack if any source has gone too long without data.
+    # Starts at 5 min (gives the initial scrapers time to populate logs).
     scheduler.add_job(
         run_scraper_watchdog,
         "interval",

@@ -1,1 +1,1 @@
-"""Scrapers TEYVA: SIATA, DAGRD, IDEAM (Socrata), datos abiertos Medellín y planificador."""
+"""TEYVA scrapers: SIATA, DAGRD, IDEAM (Socrata), Medellín open data, and scheduler."""

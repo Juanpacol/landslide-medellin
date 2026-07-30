@@ -67,9 +67,9 @@ async def log_scrape_run(
     detail: str | None = None,
     new_items_summary: list[dict] | None = None,
 ) -> None:
-    """Registra la corrida en scraping_logs. Si además trae registros NUEVOS
-    (`new_items_summary`: lista de dicts con titulo/detalle/fecha), publica el
-    digest en lenguaje plano a Slack. Ese envío nunca tumba al scraper."""
+    """Logs the run in scraping_logs. If it also brings NEW records
+    (`new_items_summary`: a list of dicts with title/detail/date), posts the
+    plain-language digest to Slack. That send never takes down the scraper."""
     log = ScrapingLog(
         source=source,
         status=status,
