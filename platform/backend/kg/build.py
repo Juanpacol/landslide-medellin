@@ -55,11 +55,18 @@ def _territory_uri(commune_id: str) -> URIRef:
     return TEYVA[f"territory_{commune_id}"]
 
 
-def build_static_graph() -> Graph:
-    """Territories + centroid-proximity adjacency. No network, no DB access — pulls from
-    `domain/communes.py` directly, so it can build (and be tested) offline. Does NOT include
-    critical facilities: use `add_critical_facilities()` for that, separately, since it needs
-    the network (Overpass API)."""
+def build_static_graph(*, use_polygon_adjacency: bool = True) -> Graph:
+    """Territories + adjacency. No network, no DB access — pulls from `domain/communes.py`
+    (and, for adjacency, the checked-in barrio polygon GeoJSON) directly, so it can build (and
+    be tested) offline. Does NOT include critical facilities: use `add_critical_facilities()`
+    for that, separately, since it needs the network (Overpass API).
+
+    Adjacency: TRUE polygon adjacency (`kg/polygon_adjacency.py`, shapely over
+    `barrios-medellin.json`) for the 16 urban comunas that file covers, falling back to
+    centroid-proximity (k nearest) for the 5 corregimientos it doesn't. Pass
+    `use_polygon_adjacency=False` to get the old pure centroid-proximity graph for all 21
+    (useful for comparison, or if the polygon file becomes unavailable).
+    """
     from domain.communes import COMMUNES
 
     g = Graph()
@@ -76,7 +83,24 @@ def build_static_graph() -> Graph:
 
     from domain.communes import CENTROIDS
 
+    polygon_adj: dict[str, frozenset[str]] = {}
+    if use_polygon_adjacency:
+        try:
+            from kg.polygon_adjacency import polygon_adjacency
+
+            polygon_adj = polygon_adjacency()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Polygon adjacency unavailable, falling back to centroid-proximity for all communes: %s", exc)
+
     for cid, centroid in CENTROIDS.items():
+        if cid in polygon_adj:
+            for other_id in polygon_adj[cid]:
+                g.add((_territory_uri(cid), TEYVA.adjacentTo, _territory_uri(other_id)))
+            continue
+
+        # Centroid-proximity fallback: the 5 corregimientos (no barrio polygon coverage in
+        # barrios-medellin.json — see kg/polygon_adjacency.py's module docstring), or all 21
+        # if use_polygon_adjacency=False.
         distances = sorted(
             ((other_id, _haversine_km(centroid, other_centroid)) for other_id, other_centroid in CENTROIDS.items() if other_id != cid),
             key=lambda x: x[1],

@@ -1,7 +1,9 @@
 """Tests for kg/build.py — the knowledge-graph skeleton (specs/005-knowledge-graph/).
 
-Scope: the static, DB-free path only (territory nodes + centroid-proximity adjacency). Full
-Postgres A-Box population is not implemented yet — see specs/005-knowledge-graph/tasks.md.
+Scope: the static, DB-free path only (territory nodes + adjacency: true polygon adjacency for
+the 16 urban comunas via kg/polygon_adjacency.py, centroid-proximity fallback for the 5
+corregimientos). Full Postgres A-Box population is not implemented yet — see
+specs/005-knowledge-graph/tasks.md.
 """
 
 from __future__ import annotations
@@ -33,10 +35,28 @@ def test_no_orphan_territory_every_commune_has_at_least_one_adjacency():
         assert len(result) >= 1, f"commune {c.id} has no adjacency edges"
 
 
-def test_adjacency_is_bounded_by_k():
+def test_corregimiento_adjacency_is_bounded_by_k():
+    # Corregimientos (17-21) have no polygon coverage in barrios-medellin.json, so they
+    # still use the centroid-proximity fallback, bounded by ADJACENCY_K.
     g = build_static_graph()
-    result = run_named_query(g, "upslope_neighbours", commune_id="8")
+    result = run_named_query(g, "upslope_neighbours", commune_id="17")  # Palmitas
     assert len(result) <= ADJACENCY_K
+
+
+def test_urban_comuna_uses_true_polygon_adjacency_not_capped_at_k():
+    # Commune 10 (La Candelaria, downtown) has 10 real polygon neighbors per
+    # kg/polygon_adjacency.py — more than ADJACENCY_K=3, proving this isn't the old
+    # centroid-proximity fallback for communes the polygon file covers.
+    g = build_static_graph()
+    result = run_named_query(g, "upslope_neighbours", commune_id="10")
+    assert len(result) > ADJACENCY_K
+
+
+def test_use_polygon_adjacency_false_falls_back_to_centroid_proximity_for_all():
+    g = build_static_graph(use_polygon_adjacency=False)
+    for cid in ("1", "10", "17"):
+        result = run_named_query(g, "upslope_neighbours", commune_id=cid)
+        assert len(result) <= ADJACENCY_K
 
 
 def test_named_query_returns_typed_results_with_names():
