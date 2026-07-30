@@ -3,7 +3,7 @@
 - [x] Rule coverage + fire-rate metrics (`evaluation/primary_metrics.py::rule_coverage`) (verifies: `pytest tests/test_evaluation_primary_metrics.py -q` — per-rule fire rate and not-evaluable rate computed from `RuleTrace`, no real labels needed)
 - [x] Explanation faithfulness metric (`explanation_faithfulness`) (verifies: same file — reuses `application/neurosymbolic/explain.py::is_faithful`, aggregates a faithfulness rate across a batch of statements)
 - [ ] DAGRD rubric + Cohen's κ computation — not started
-- [ ] Ablation study (ontology/rules/quality) — not started
+- [x] Ablation study (rules/quality) (`evaluation/ablation.py`, verifies: `pytest tests/test_evaluation_ablation.py -q` — rules ablation flips a floored level back to the neural-only level, quality ablation shifts confidence without changing level). "Remove ontology" has no runtime ablation to run and is documented as such: SWRL isn't executed at inference time (ADR-0002), so there's nothing to switch off — an honest asymmetry, not an oversight.
 - [ ] Inference latency p50/p95 — not started
 - [ ] `docs/research/paper.md` — not started
 - [ ] CI workflow `neurosymbolic-eval.yml` — not started
