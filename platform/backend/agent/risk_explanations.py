@@ -610,3 +610,48 @@ async def generate_risk_explanation(
         is_ladera,
     )
     return _render_narrative(structured), "template", structured
+
+
+# ── Derivation-grounded explanation (SPEC-004) ──────────────────────────────
+#
+# Everything above narrates numbers: the LLM (or the template) picks which
+# facts to mention. This path instead renders `Verdict.derivation`
+# (application/neurosymbolic/infer.py) through
+# application/neurosymbolic/explain.py::render() and turns THAT into the
+# structured explanation — every factor is a derivation node's text
+# verbatim, so faithfulness holds by construction, not by hoping the LLM
+# stays grounded. No API key needed and no LLM call: this is deterministic.
+
+_RECOMMENDED_ACTION_BY_LEVEL: dict[str, str] = {
+    "critico": "Activar protocolo de emergencia, evaluar evacuación inmediata y notificar al DAGRD.",
+    "alto": "Realizar inspección de campo hoy e informar al comité local de gestión del riesgo.",
+    "medio": "Revisar canales de drenaje y mantener informada a la comunidad.",
+    "bajo": "Continuar monitoreo rutinario.",
+}
+
+
+def generate_explanation_from_verdict(verdict: Any) -> tuple[str, str, dict[str, Any]]:
+    """Builds a structured explanation directly from a neuro-symbolic
+    `Verdict`, with no LLM call. Returns (explanation_text, generated_by,
+    structured) — same shape as `generate_risk_explanation`, so callers
+    don't need to branch on which path produced it. `generated_by` is
+    `"derivation"`, distinct from `"template"`/the Anthropic model id.
+    """
+    from application.neurosymbolic.explain import render
+
+    nombre = _commune_name(verdict.commune_id)
+    level = verdict.level
+    score_pct = round((verdict.score or 0.0) * 100, 1)
+
+    tree = render(verdict)
+    factors = [n.text for n in tree.nodes if n.kind in ("rule", "conflict")]
+    if not factors:
+        factors = [n.text for n in tree.nodes if n.kind == "neural"]
+
+    structured = {
+        "title": f"{nombre} — nivel {level.upper()} ({score_pct}%)",
+        "factors": factors,
+        "urgency": level,
+        "recommended_action": _RECOMMENDED_ACTION_BY_LEVEL.get(level, "Continuar monitoreo rutinario."),
+    }
+    return _render_narrative(structured), "derivation", structured

@@ -118,27 +118,35 @@ async def run_predictions(db: AsyncSession) -> None:
                 "source": "classifier_fallback",
             }
 
-        # Natural-language explanation (LLM if an API key is set, template otherwise).
+        # Explanation: derivation-grounded (no LLM call, faithful by construction)
+        # when a neuro-symbolic Verdict exists; legacy LLM/template path otherwise.
         try:
-            precip_mm = float(
-                features_used.get("precip_sum_mm_day")
-                or features_used.get("mean_precip_mm_snapshot")
-                or 0.0
-            )
-            n_events = int(features_used.get("n_events_window") or 0)
-            (
-                explanation_text,
-                generated_by,
-                explanation_structured,
-            ) = await generate_risk_explanation(
-                commune_id=str(cid),
-                risk_score=risk_score,
-                risk_category=risk_level,
-                precip_acum_mm=precip_mm,
-                threshold_mm=35.0,
-                n_events_7d=n_events,
-                db=db,
-            )
+            if verdict is not None:
+                from agent.risk_explanations import generate_explanation_from_verdict
+
+                explanation_text, generated_by, explanation_structured = (
+                    generate_explanation_from_verdict(verdict)
+                )
+            else:
+                precip_mm = float(
+                    features_used.get("precip_sum_mm_day")
+                    or features_used.get("mean_precip_mm_snapshot")
+                    or 0.0
+                )
+                n_events = int(features_used.get("n_events_window") or 0)
+                (
+                    explanation_text,
+                    generated_by,
+                    explanation_structured,
+                ) = await generate_risk_explanation(
+                    commune_id=str(cid),
+                    risk_score=risk_score,
+                    risk_category=risk_level,
+                    precip_acum_mm=precip_mm,
+                    threshold_mm=35.0,
+                    n_events_7d=n_events,
+                    db=db,
+                )
         except Exception:  # noqa: BLE001
             explanation_text = (
                 f"Probabilidad estimada de evento en 7 días: {risk_score:.3f} (nivel {risk_level})."
