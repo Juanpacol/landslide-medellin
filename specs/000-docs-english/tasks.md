@@ -7,8 +7,10 @@
 - [x] Translate `ml/` docstrings and comments (verifies: `pytest tests/test_feature_registry.py -q` — full suite 323 passed, 12 skipped, no regressions). Left in Spanish: the Slack alert text in `train.py::_alert_label_collapse` (a Slack message, per the language rule) and error/reason strings that could reach the API/dashboard.
 - [x] Translate `infrastructure/` docstrings and comments (verifies: `pytest tests/test_ddl_url.py -q` — full suite 323 passed, 12 skipped, no regressions). `infrastructure/migrations/ddl_url.py`'s `_HELP` message kept its exact shell commands (asserted on by `test_ddl_url.py`).
 - [x] Translate `api/` docstrings and comments (verifies: `pytest tests/test_rate_limit.py -q` — full suite 323 passed, 12 skipped, no regressions). `api/routes/scraper.py` and `api/routes/rain.py` were already English. Left in Spanish: every string an API client/dashboard could see (HTTPException details, audit summaries, `risk_category`/trend values, "Sin datos" fallbacks).
-- [ ] Translate `scraper/` docstrings and comments (verifies: `pytest tests/test_seismic_dedup.py -q`)
-- [ ] Full suite green (verifies: `pytest platform/backend/tests -q`, including `test_examples_in_prompts.py`, `test_slack_payloads.py`)
+- [x] Translate `scraper/` docstrings and comments (verifies: `pytest tests/test_seismic_dedup.py -q` — full suite 323 passed, 12 skipped, no regressions). `historical_backfill.py` and `historical_incremental.py` needed no changes (no comments, only data literals). Left in Spanish: Slack digest content, external API field names, stored/user-facing event strings.
+- [x] Full suite green (verifies: `pytest platform/backend/tests -q` — 323 passed, 12 skipped, including `test_examples_in_prompts.py`, `test_slack_payloads.py`)
+
+**SPEC-000 complete.** Every pre-existing Spanish-language module is now English (code/docstrings/comments), with user-facing output (Slack, LLM prompts, frontend copy, DB-stored labels) deliberately left in Spanish per CLAUDE.md's language rule.
 
 Note: new modules written during SPEC-001..007 (domain/rules/, domain/quality.py,
 application/neurosymbolic/, ml/estimators/, kg/, evaluation/, infrastructure/ontology/) were
