@@ -1,0 +1,394 @@
+{
+  "generated_at": "2026-07-30T05:39:25.730041+00:00",
+  "scope": "single-point-in-time spot-check using alternate real data sources (live SRTM slope + historical_ideam rain) instead of the corrupted live rainfall feed",
+  "excluded_source": "historical_siata (confirmed corrupted: max 92202mm/day observed, matches docs/research/audit-2026-07.md unfixed)",
+  "n_communes": 21,
+  "n_slope_available_live_srtm": 21,
+  "n_real_historical_rain_available": 2,
+  "communes_with_real_rain": [
+    "15",
+    "21"
+  ],
+  "n_arms_disagree": 0,
+  "rule_coverage": {
+    "pct_any_fired": 0.4762,
+    "fire_rate_by_rule": {
+      "R-GEO-01": 0.0,
+      "R-GEO-02": 0.0,
+      "R-GEO-03": 0.0,
+      "R-GEO-04": 0.0,
+      "R-HIST-01": 0.47619047619047616,
+      "R-EXPO-01": 0.0,
+      "R-SEIS-01": 0.0,
+      "R-QUAL-01": 0.0
+    },
+    "evaluable_rate_by_rule": {
+      "R-GEO-01": 0.09523809523809523,
+      "R-GEO-02": 0.09523809523809523,
+      "R-GEO-03": 0.0,
+      "R-GEO-04": 0.0,
+      "R-HIST-01": 1.0,
+      "R-EXPO-01": 0.0,
+      "R-SEIS-01": 0.09523809523809523,
+      "R-QUAL-01": 1.0
+    }
+  },
+  "per_commune": [
+    {
+      "commune_id": "1",
+      "nombre": "Popular",
+      "slope_p90_deg": 20.06,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "2",
+      "nombre": "Santa Cruz",
+      "slope_p90_deg": 11.0,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "3",
+      "nombre": "Manrique",
+      "slope_p90_deg": 12.83,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "4",
+      "nombre": "Aranjuez",
+      "slope_p90_deg": 6.03,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "5",
+      "nombre": "Castilla",
+      "slope_p90_deg": 6.09,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "6",
+      "nombre": "Doce de Octubre",
+      "slope_p90_deg": 16.07,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "7",
+      "nombre": "Robledo",
+      "slope_p90_deg": 10.33,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "8",
+      "nombre": "Villa Hermosa",
+      "slope_p90_deg": 22.26,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "9",
+      "nombre": "Buenos Aires",
+      "slope_p90_deg": 8.91,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "10",
+      "nombre": "La Candelaria",
+      "slope_p90_deg": 1.86,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "11",
+      "nombre": "Laureles-Estadio",
+      "slope_p90_deg": 2.32,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "12",
+      "nombre": "La América",
+      "slope_p90_deg": 6.74,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "13",
+      "nombre": "San Javier",
+      "slope_p90_deg": 6.06,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "14",
+      "nombre": "El Poblado",
+      "slope_p90_deg": 10.7,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "15",
+      "nombre": "Guayabal",
+      "slope_p90_deg": 2.88,
+      "rain_source": "historical_ideam, as_of=2026-07-04 (26d stale)",
+      "swi_pct": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.69
+    },
+    {
+      "commune_id": "16",
+      "nombre": "Belén",
+      "slope_p90_deg": 6.25,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "17",
+      "nombre": "Palmitas",
+      "slope_p90_deg": 14.17,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "18",
+      "nombre": "San Cristóbal",
+      "slope_p90_deg": 10.84,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "19",
+      "nombre": "Altavista",
+      "slope_p90_deg": 19.14,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "20",
+      "nombre": "San Antonio de Prado",
+      "slope_p90_deg": 10.92,
+      "rain_source": "none (no usable historical data; live feed excluded as corrupted)",
+      "swi_pct": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.255
+    },
+    {
+      "commune_id": "21",
+      "nombre": "Santa Elena",
+      "slope_p90_deg": 26.39,
+      "rain_source": "historical_ideam, as_of=2026-07-04 (26d stale)",
+      "swi_pct": 6.46,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.69
+    }
+  ]
+}

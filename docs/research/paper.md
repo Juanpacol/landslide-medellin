@@ -298,6 +298,31 @@ frozen-signal predicate `monitoring/scraper_validator.py` already uses and feedi
 (0.53 → 0.42) — but a rule that vetoes specifically on a quality flag, not just on absence, is a
 recommended follow-up this paper does not implement.
 
+### 5.8 Alternate-source validation: is the rainfall/terrain gap the real reason geotechnical rules never fire?
+
+§5.7 left an open question: R-GEO-01, R-GEO-02, and R-SEIS-01 never fired on real data, but that
+run had 0/21 communes with terrain (slope) data and 20/21 with a frozen rainfall reading — so it
+couldn't distinguish "the rules are miscalibrated" from "the rules were never given real inputs to
+evaluate." This validation (`evaluation/validate_with_alternate_sources.py`, full report in
+`docs/research/alternate_sources_validation_2026-07-30.md`) swaps in two alternate real sources
+that don't share those specific defects: live SRTM slope (Open Topo Data, all 21 communes) and
+historical rain from `ml_features` where `source='historical_ideam'` — checked before use and
+confirmed clean (max 104.4mm/day, real day-to-day variation), unlike `source='historical_siata'`
+which is still corrupted (max 92,202mm/day, the same unfixed bug §5.7 and the audit both
+document) and was excluded.
+
+Slope is now available for all 21 communes (max 26.4°, Santa Elena); rain-derived SWI is only
+available for 2 (communes 15 and 21 — the only ones with recent, non-stale `historical_ideam`
+coverage). With both a real slope above R-GEO-02's 25° threshold and a real SWI value available
+simultaneously for the first time (Santa Elena: 26.4° slope, 6.5% SWI), **the rule correctly does
+not fire** — 6.5% is far from the 80% saturation threshold it checks for, even after a real
+22.1mm rain event days earlier. This is the first time a geotechnical rule's condition has been
+evaluated against a real (slope, rain) pair rather than a synthetic one, and the result is a
+substantive non-fire — real Medellín slope and rain data, at this coarse centroid-level
+granularity, genuinely don't cross the thresholds — not a data-availability artifact. Whether
+barrio-level slope (finer than a commune centroid) would cross that threshold in specific
+known-hazard barrios remains open, since `barrio_terrain` is still unpopulated in production.
+
 ## 6. Limitations
 
 - No real, georeferenced landslide event dataset exists (36 usable events, 0 positives under the
@@ -321,10 +346,15 @@ recommended follow-up this paper does not implement.
   and domain judgment, not fit against outcomes — consistent with the declared-index design
   throughout, but genuinely uncalibrated.
 - §5.2–5.5's numbers are computed on synthetic snapshots constructed to match today's known
-  data-coverage rates, not on live production data pulled from Supabase — this session had no
-  database credentials available. The terrain-slope ingestion (`scraper/terrain_features.py`)
-  was live-smoke-tested against the real SRTM API but its database write was not verified against
-  production.
+  data-coverage rates, not on live production data — §5.7 and §5.8 are the two real-data
+  exceptions, and each is explicitly scoped as a single point-in-time spot-check (n=21, no
+  statistical power), not a replacement. `scraper/terrain_features.py`'s database write itself
+  (as opposed to reading its pure helpers directly, as §5.8 does) is still not verified against
+  production — `barrio_terrain` remains empty there.
+- §5.8's real-slope, real-rain-derived-SWI evaluation of R-GEO-02 only has both signals available
+  simultaneously for 1 of 21 communes (Santa Elena) — a single non-fire is evidence the mechanism
+  responds correctly to real inputs, not evidence the threshold is well-calibrated across
+  Medellín's full terrain diversity.
 - Expert agreement (§5.6) is unconducted; the measurement infrastructure (κ computation, rubric
   methodology) exists and is tested, but no DAGRD-affiliated experts have used it yet.
 - The ontology (§3.2) is a formal specification, not yet cross-checked against the rule catalog
@@ -337,7 +367,7 @@ by a single script committed alongside this paper:
 
 ```bash
 cd platform/backend && export PYTHONPATH=.
-pytest tests -q                             # 381 passed, 12 skipped at time of writing
+pytest tests -q                             # 385 passed, 12 skipped at time of writing
 python -m evaluation.reproduce_paper        # prints every §5.2/§5.3/§5.5 number, fixed seed=42
 ```
 
@@ -346,14 +376,15 @@ entire evaluation runs on pure Python functions over synthetic `TerritorySnapsho
 external dependency exercised in this project (not in this evaluation) is Open Topo Data's public
 SRTM API for terrain ingestion (`scraper/terrain_features.py`), which needs no key.
 
-§5.7's real-data spot check is the one exception: it requires read access to the production
-database and is not reproducible without those credentials, by design — it is meant to be run
-again whenever someone with that access wants a fresh point-in-time read, not to be part of the
-credential-free reproduction path:
+§5.7 and §5.8 are the two exceptions: both require read access to the production database (§5.8
+also needs outbound network access to Open Topo Data) and are not reproducible without those
+credentials, by design — each is meant to be run again whenever someone with that access wants a
+fresh point-in-time read, not to be part of the credential-free reproduction path:
 
 ```bash
 cd platform/backend && export PYTHONPATH=.
 python -m evaluation.validate_against_production --json-out docs/research/production_validation_<date>.json
+python -m evaluation.validate_with_alternate_sources --json-out docs/research/alternate_sources_validation_<date>.json
 ```
 
 ## 8. Conclusion
