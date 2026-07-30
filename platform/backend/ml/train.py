@@ -33,9 +33,9 @@ from ml.features import FeatureBuilder  # noqa: E402
 MODELS_DIR = Path(__file__).resolve().parent / "models"
 METRICS_PATH = MODELS_DIR / "metrics.json"
 BEST_MODEL_PATH = MODELS_DIR / "best_model.pkl"
-# Resultado de la ÚLTIMA corrida (exitosa o no). metrics.json en cambio solo
-# se escribe cuando el entrenamiento completa: siempre describe al
-# best_model.pkl vigente, nunca a una corrida abortada.
+# Result of the LAST run (successful or not). metrics.json, in contrast, is
+# only written when training completes: it always describes the current
+# best_model.pkl, never an aborted run.
 LAST_ATTEMPT_PATH = MODELS_DIR / "last_train_attempt.json"
 
 
@@ -82,8 +82,8 @@ def _alert_label_collapse(n_samples: int, n_positive: int) -> None:
 
 
 def _provenance() -> dict[str, Any]:
-    """Sello de procedencia para metrics.json: permite detectar drift entre
-    artefactos (¿este metrics.json corresponde a este best_model.pkl?)."""
+    """Provenance stamp for metrics.json: lets you detect drift between
+    artifacts (does this metrics.json correspond to this best_model.pkl?)."""
     import subprocess
 
     sha: str | None = None
@@ -98,7 +98,7 @@ def _provenance() -> dict[str, Any]:
             ).stdout.strip()
             or None
         )
-    except Exception:  # noqa: BLE001 — sin .git (p.ej. imagen Docker) no es error
+    except Exception:  # noqa: BLE001 — no .git (e.g. Docker image) isn't an error
         sha = None
     return {
         "trained_at": datetime.now(timezone.utc).isoformat(),
@@ -122,15 +122,16 @@ def _parse_event_date(fecha: str | None) -> date | None:
 
 
 def _normalize_commune_id(value: Any) -> str | None:
-    """Id canónico ("1".."21") de un commune_id de la BD.
+    """Canonical id ("1".."21") from a DB commune_id.
 
-    Delega en `domain.communes.canonical_id`, que TRADUCE los códigos oficiales
-    ("50".."90" de los corregimientos) al espacio canónico. La versión anterior
-    normalizaba a mano con `str(int(digits))`, así que un evento guardado con
-    `commune_id='70'` (código oficial de Altavista = id 19) quedaba como comuna
-    "70": un id que no existe en `domain/communes.py`, que nunca cruzaba con
-    ninguna fila de `ml_features` y que por tanto perdía su etiqueta en silencio.
-    Con solo 36 eventos geolocalizados, perder uno no es un detalle.
+    Delegates to `domain.communes.canonical_id`, which TRANSLATES official
+    codes ("50".."90" for corregimientos) into canonical space. The
+    previous version normalized by hand with `str(int(digits))`, so an
+    event stored with `commune_id='70'` (Altavista's official code = id 19)
+    stayed as commune "70": an id that doesn't exist in
+    `domain/communes.py`, that never joined with any `ml_features` row, and
+    that therefore silently lost its label. With only 36 geolocated
+    events, losing one is not a detail.
     """
     if value is None:
         return None
@@ -141,9 +142,10 @@ def _normalize_commune_id(value: Any) -> str | None:
 
 
 def _load_events_index(session: Session) -> dict[str, list[date]]:
-    """Índice (commune_id → fechas) de eventos REALES. Los sintéticos
-    (is_synthetic=true, generados con Snake Line) se excluyen: entrenar con
-    ellos y validar con la misma heurística sería contaminación circular."""
+    """Index (commune_id → dates) of REAL events. Synthetic ones
+    (is_synthetic=true, generated with Snake Line) are excluded: training
+    with them and validating against the same heuristic would be circular
+    contamination."""
     from infrastructure.repositories.landslide_events import real_events_sync
 
     by_commune: dict[str, list[date]] = {}
@@ -200,7 +202,7 @@ def _rows_until(commune_id: str, cutoff: datetime, all_rows: list[MLFeature]) ->
 def _build_supervised_matrix(
     session: Session,
 ) -> tuple[np.ndarray, np.ndarray, list[str], list[dict[str, Any]], str, dict[str, float]]:
-    """(X, y, feature_names, meta, target_strategy, feature_coverage)."""
+    """Returns (X, y, feature_names, meta, target_strategy, feature_coverage)."""
     events_by_commune = _load_events_index(session)
     ml_rows = list(session.scalars(select(MLFeature)).all())
 
@@ -245,25 +247,25 @@ def _build_supervised_matrix(
 
     keys = sorted({k for r in raw_rows for k in r.keys()})
 
-    # Se fuerzan las claves declaradas en `ml/feature_registry.py` aunque
-    # ninguna fila las traiga todavía: sin esto la unión de claves observadas
-    # las descarta en silencio y la feature "existe" en el código pero nunca
-    # entrena. Es exactamente lo que le pasó a las 4 de ingeniería (ver el
-    # docstring del registro). La deny-list ya se aplicó en
-    # `features.py::_numeric_from_json`, así que `keys` no la contiene.
+    # Keys declared in `ml/feature_registry.py` are forced in even if no row
+    # has them yet: without this, the union of observed keys silently drops
+    # them and the feature "exists" in code but never trains. That's
+    # exactly what happened to the 4 engineered ones (see the registry's
+    # docstring). The deny-list was already applied in
+    # `features.py::_numeric_from_json`, so `keys` doesn't contain it.
     keys = sorted(set(keys) | set(FORCE_KEYS))
 
     matrix = np.zeros((len(raw_rows), len(keys)), dtype=float)
-    # Cobertura: fracción de filas donde la clave estaba PRESENTE de verdad,
-    # frente a rellenada con 0.0 aquí abajo. Es la métrica que juzga un backfill
-    # con independencia del AUC: si la cobertura sube y el AUC no se mueve, el
-    # backfill igual eliminó un defecto de imputación.
+    # Coverage: fraction of rows where the key was ACTUALLY present, versus
+    # filled with 0.0 below. This is the metric that judges a backfill
+    # independent of AUC: if coverage goes up and AUC doesn't move, the
+    # backfill still removed an imputation defect.
     #
-    # OJO con el 0.0: es un valor CRUDO, así que tras escalar queda en ≈−2σ, no
-    # en un valor neutro. Para una clave con media grande eso no es "sin dato",
-    # es "valor extremadamente bajo" — y según la feature puede equivocarse en la
-    # dirección peligrosa. Una clave con cobertura baja es ruido con un
-    # desplazamiento de media, no una feature.
+    # WATCH OUT for the 0.0: it's a RAW value, so after scaling it lands at
+    # ≈−2σ, not a neutral value. For a key with a large mean that isn't "no
+    # data", it's "extremely low value" — and depending on the feature it can
+    # be wrong in the dangerous direction. A low-coverage key is noise with
+    # a mean shift, not a feature.
     present_counts: dict[str, int] = dict.fromkeys(keys, 0)
     for i, r in enumerate(raw_rows):
         for j, k in enumerate(keys):
@@ -303,7 +305,7 @@ def _auc_scorer(model: Any, X: np.ndarray, y: np.ndarray, cv: Any) -> float:
     return float(np.mean(scores))
 
 
-_MIN_TEMPORAL_POSITIVES = 3  # mínimo de positivos a cada lado del corte
+_MIN_TEMPORAL_POSITIVES = 3  # minimum positives on each side of the cutoff
 
 
 def _temporal_validation(
@@ -312,13 +314,14 @@ def _temporal_validation(
     y: np.ndarray,
     meta: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """AUC entrenando con el pasado y validando con el futuro.
+    """AUC training on the past and validating on the future.
 
-    El CV aleatorio (shuffle) puede sobreestimar: mezcla días vecinos del
-    mismo episodio de lluvia entre train y test. Esta métrica corta por fecha
-    (percentil 80 de las fechas de los positivos) y responde la pregunta real
-    del producto: ¿el modelo anticipa eventos que aún no ha visto?
-    Si no hay suficientes positivos a ambos lados, reporta null con motivo.
+    Random (shuffled) CV can overestimate: it mixes neighboring days from
+    the same rain episode between train and test. This metric cuts by date
+    (80th percentile of positive dates) and answers the real product
+    question: does the model anticipate events it hasn't seen yet?
+    If there aren't enough positives on both sides, it reports null with a
+    reason.
     """
     from sklearn.base import clone
 
@@ -327,7 +330,7 @@ def _temporal_validation(
     if len(pos_days) < 2 * _MIN_TEMPORAL_POSITIVES:
         return {
             "train_auc_temporal": None,
-            "temporal_reason": f"solo {len(pos_days)} positivos; se requieren ≥{2 * _MIN_TEMPORAL_POSITIVES}",
+            "temporal_reason": f"only {len(pos_days)} positives; ≥{2 * _MIN_TEMPORAL_POSITIVES} required",
         }
 
     cutoff = pos_days[int(len(pos_days) * 0.8)]
@@ -341,7 +344,7 @@ def _temporal_validation(
     ):
         return {
             "train_auc_temporal": None,
-            "temporal_reason": f"corte {cutoff} no deja ambas clases (o <{_MIN_TEMPORAL_POSITIVES} positivos) en test",
+            "temporal_reason": f"cutoff {cutoff} leaves test without both classes (or <{_MIN_TEMPORAL_POSITIVES} positives)",
         }
 
     try:
@@ -370,8 +373,8 @@ def train() -> dict[str, Any]:
     n_features = int(X.shape[1]) if n_samples else 0
     n_positive = int(np.sum(y)) if n_samples else 0
 
-    # Se incluye en TODOS los payloads (también los abortados): saber que una
-    # clave forzada tiene cobertura 0.0 es justo lo que explica un aborto.
+    # Included in ALL payloads (aborted ones too): knowing a forced key has
+    # 0.0 coverage is exactly what explains an abort.
     coverage_payload: dict[str, Any] = {
         "feature_coverage": coverage,
         "feature_coverage_min": (
@@ -390,7 +393,7 @@ def train() -> dict[str, Any]:
             "cv_strategy": None,
             "target_strategy": target_strategy,
             "feature_names": feature_names,
-            "error": "Sin filas válidas con reference_date para entrenar.",
+            "error": "No valid rows with reference_date to train on.",
             **coverage_payload,
             **provenance,
         }
@@ -402,9 +405,10 @@ def train() -> dict[str, Any]:
     Xs = np.nan_to_num(Xs, nan=0.0, posinf=0.0, neginf=0.0)
 
     if len(np.unique(y)) < 2:
-        # Abortar ANTES de persistir scaler/feature_names: si se guardan aquí y
-        # el clasificador no se entrena, quedan artefactos inconsistentes con el
-        # best_model.pkl anterior (vector de features distinto → predict roto).
+        # Abort BEFORE persisting scaler/feature_names: if they were saved
+        # here and the classifier doesn't train, the artifacts end up
+        # inconsistent with the previous best_model.pkl (different feature
+        # vector → broken predict).
         payload = {
             "n_samples": n_samples,
             "n_positive": n_positive,
@@ -414,7 +418,7 @@ def train() -> dict[str, Any]:
             "cv_strategy": None,
             "target_strategy": target_strategy,
             "feature_names": feature_names,
-            "error": "La variable objetivo tiene una sola clase; no se entrena clasificador.",
+            "error": "The target variable has a single class; no classifier trained.",
             **coverage_payload,
             **provenance,
         }
@@ -498,7 +502,7 @@ def train() -> dict[str, Any]:
             "cv_strategy": cv_name,
             "target_strategy": target_strategy,
             "feature_names": feature_names,
-            "error": "Ningún modelo pudo evaluarse con AUC-ROC.",
+            "error": "No model could be evaluated with AUC-ROC.",
             **coverage_payload,
             **provenance,
         }
@@ -507,7 +511,7 @@ def train() -> dict[str, Any]:
 
     best_model.fit(X_res, y_res)
 
-    # Validación temporal: pasado→futuro sobre los datos SIN resamplear.
+    # Temporal validation: past→future on the data WITHOUT resampling.
     temporal = _temporal_validation(best_model, Xs, y, meta)
 
     try:
@@ -521,10 +525,10 @@ def train() -> dict[str, Any]:
         train_precision = float("nan")
         train_recall = float("nan")
 
-    # Persistir los 4 artefactos JUNTOS y solo tras entrenar con éxito.
-    # Si scaler/feature_names se guardaran antes del fit (como pasaba), un
-    # fallo a mitad de camino deja artefactos de corridas distintas mezclados
-    # → shape mismatch en predict (incidente del 2026-07-07).
+    # Persist the 4 artifacts TOGETHER, only after training succeeds. If
+    # scaler/feature_names were saved before the fit (as they used to be),
+    # a mid-way failure leaves artifacts from different runs mixed together
+    # → shape mismatch at predict time (the 2026-07-07 incident).
     builder = FeatureBuilder(MODELS_DIR)
     builder.save_scaler(scaler)
     builder.save_feature_names(feature_names)
@@ -535,7 +539,7 @@ def train() -> dict[str, Any]:
     }
     joblib.dump(artifact, BEST_MODEL_PATH)
 
-    # Benchmark fijo (ml/models/benchmark.json): AUC comparable entre corridas.
+    # Fixed benchmark (ml/models/benchmark.json): AUC comparable across runs.
     try:
         from ml.benchmark import evaluate_benchmark
 
@@ -544,9 +548,9 @@ def train() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         benchmark = {"benchmark_auc": None, "reason": f"error: {exc!r}"}
 
-    # Importancias: si una clave forzada sale en ~0 CON buena cobertura, eso es
-    # evidencia real de que la señal es débil a granularidad comuna-semana, y
-    # vale más escribirla que esconderla.
+    # Importances: if a forced key comes out at ~0 WITH good coverage, that's
+    # real evidence the signal is weak at commune-week granularity, and it's
+    # worth writing that down rather than hiding it.
     importances: dict[str, float] | None = None
     raw_imp = getattr(best_model, "feature_importances_", None)
     if raw_imp is not None and len(raw_imp) == len(feature_names):
@@ -560,12 +564,12 @@ def train() -> dict[str, Any]:
         "n_samples_after_smote": int(len(y_res)),
         "n_positive_after_smote": int(np.sum(y_res)),
         "best_model": best_name,
-        # OJO: `cv_mean_auc` se calcula sobre (X_res, y_res), es decir DESPUÉS
-        # de SMOTE, así que puntos sintéticos derivados de un positivo pueden
-        # caer en el fold de test junto a su padre. Está inflado por
-        # construcción y NO es comparable entre corridas cuyo balance de clases
-        # cambia. Para comparar antes/después usar `benchmark_auc` (conjunto de
-        # casos congelado) y `train_auc_temporal` (validación pasado→futuro).
+        # WATCH OUT: `cv_mean_auc` is computed on (X_res, y_res), i.e. AFTER
+        # SMOTE, so synthetic points derived from a positive can land in the
+        # test fold alongside their parent. It's inflated by construction
+        # and NOT comparable across runs whose class balance changes. To
+        # compare before/after use `benchmark_auc` (frozen case set) and
+        # `train_auc_temporal` (past→future validation).
         "cv_mean_auc": float(best_auc),
         "cv_strategy": cv_name,
         "target_strategy": target_strategy,

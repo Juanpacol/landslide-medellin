@@ -4,7 +4,7 @@
 - [x] Translate + trim audit article to `docs/research/audit-2026-07.md` (verifies: §3/4/8/9 kept, §6 replaced by pointer)
 - [x] Translate `domain/` docstrings and comments (verifies: `pytest tests/test_domain_validation.py test_susceptibility.py -q` — full suite 323 passed, 12 skipped, no regressions). User-facing Spanish strings kept as-is per the language rule: `_DISPLAY_LABELS`, `_ALERT_LEVEL`, `ALERT_STATE_ACTIONS`, `CALIBRATION_NOTE`, PII redaction markers, `ValidationError` messages, `_HAZARD_SCORES` keys (match GeoMedellín's source data verbatim).
 - [x] Translate `application/` docstrings and comments (verifies: `pytest tests/test_predict_risk_error_handling.py -q` — full suite 323 passed, 12 skipped, no regressions). Operational log strings in `orchestrator.py` translated too (internal ops text, not shown to citizens/stakeholders). Left in Spanish: the fallback explanation string in `predict_risk.py` (stored as a user-visible risk explanation).
-- [ ] Translate `ml/` docstrings and comments (verifies: `pytest tests/test_feature_registry.py -q`)
+- [x] Translate `ml/` docstrings and comments (verifies: `pytest tests/test_feature_registry.py -q` — full suite 323 passed, 12 skipped, no regressions). Left in Spanish: the Slack alert text in `train.py::_alert_label_collapse` (a Slack message, per the language rule) and error/reason strings that could reach the API/dashboard.
 - [ ] Translate `infrastructure/` docstrings and comments (verifies: `pytest tests/test_ddl_url.py -q`)
 - [ ] Translate `api/` docstrings and comments (verifies: `pytest tests/test_rate_limit.py -q`)
 - [ ] Translate `scraper/` docstrings and comments (verifies: `pytest tests/test_seismic_dedup.py -q`)
