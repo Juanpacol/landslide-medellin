@@ -10,7 +10,7 @@ See `docs/SPEC_PROCESS.md` for how specs work. Status: `draft` → `planned` →
 | [003](003-inference-engine/) | Inference engine | done (migration skipped, reused JSONB) | `tests/test_infer_neurosymbolic.py` |
 | [004](004-explanations/) | Explanations (XAI) | in-progress (renderer done, LLM wiring + frontend pending) | `tests/test_explain_render.py`, `tests/test_risk_explanations_communes.py` |
 | [005](005-knowledge-graph/) | Knowledge graph | in-progress (static territory graph done, Postgres A-Box pending) | `tests/test_kg_build.py` |
-| [006](006-neural-estimators/) | Neural estimators | in-progress (Signal protocol + 3 estimators done, XGBoost wrapping + terrain ingestion pending) | `tests/test_train_label_collapse_alert.py`, `tests/test_estimators.py` |
+| [006](006-neural-estimators/) | Neural estimators | in-progress (Signal protocol + 3 estimators + terrain slope ingestion done, XGBoost wrapping + TWI/NDVI pending) | `tests/test_train_label_collapse_alert.py`, `tests/test_estimators.py`, `tests/test_terrain_features.py` |
 | [007](007-experimental-eval/) | Experimental evaluation | in-progress (primary metrics + 4-arm harness done, paper/CI/rubric pending) | `tests/test_evaluation_primary_metrics.py`, `tests/test_evaluation_run.py` |
 
 Order: 000 first (touches everything). 001 → 002 → 003 → 004 sequential (each depends on the
