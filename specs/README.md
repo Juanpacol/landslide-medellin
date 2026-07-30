@@ -11,7 +11,7 @@ See `docs/SPEC_PROCESS.md` for how specs work. Status: `draft` → `planned` →
 | [004](004-explanations/) | Explanations (XAI) | done (backend + frontend panel); SHAP + LLM-rephrasing prose pending | `tests/test_explain_render.py`, `tests/test_generate_explanation_from_verdict.py` |
 | [005](005-knowledge-graph/) | Knowledge graph | in-progress (static territory graph + live critical-facility exposure done, Postgres A-Box pending) | `tests/test_kg_build.py` |
 | [006](006-neural-estimators/) | Neural estimators | done (TWI/NDVI ingestion pending — needs raster/satellite pipeline this project doesn't have) | `tests/test_train_label_collapse_alert.py`, `tests/test_estimators.py`, `tests/test_terrain_features.py` |
-| [007](007-experimental-eval/) | Experimental evaluation | in-progress (primary metrics + 4-arm harness + ablation + latency + paper + CI done; DAGRD expert rubric pending — needs human judges) | `tests/test_evaluation_primary_metrics.py`, `tests/test_evaluation_run.py`, `tests/test_evaluation_ablation.py`, `tests/test_evaluation_latency.py`, `tests/test_reproduce_paper.py` |
+| [007](007-experimental-eval/) | Experimental evaluation | done for everything achievable without human expert judges (rubric infrastructure ready, table unfilled) | `tests/test_evaluation_primary_metrics.py`, `tests/test_evaluation_run.py`, `tests/test_evaluation_ablation.py`, `tests/test_evaluation_latency.py`, `tests/test_reproduce_paper.py`, `tests/test_expert_agreement.py` |
 
 Order: 000 first (touches everything). 001 → 002 → 003 → 004 sequential (each depends on the
 previous). 005 and 006 in parallel after 002. 007 last. 006's terrain ingestion task can start
