@@ -4,7 +4,7 @@
 - [x] Explanation faithfulness metric (`explanation_faithfulness`) (verifies: same file — reuses `application/neurosymbolic/explain.py::is_faithful`, aggregates a faithfulness rate across a batch of statements)
 - [ ] DAGRD rubric + Cohen's κ computation — not started
 - [x] Ablation study (rules/quality) (`evaluation/ablation.py`, verifies: `pytest tests/test_evaluation_ablation.py -q` — rules ablation flips a floored level back to the neural-only level, quality ablation shifts confidence without changing level). "Remove ontology" has no runtime ablation to run and is documented as such: SWRL isn't executed at inference time (ADR-0002), so there's nothing to switch off — an honest asymmetry, not an oversight.
-- [ ] Inference latency p50/p95 — not started
+- [x] Inference latency p50/p95 (`evaluation/latency.py`, verifies: `pytest tests/test_evaluation_latency.py -q`). Measured on this machine, 21 synthetic communes × 50 repeats: `ml_only` p50=0.0001ms, `neurosymbolic` p50=0.0043ms — the symbolic layer adds ~4µs per commune, negligible next to the DB/network I/O that dominates real request latency (`ml/hazard.py`'s queries, not measured here — this isolates the pure computation only).
 - [ ] `docs/research/paper.md` — not started
 - [ ] CI workflow `neurosymbolic-eval.yml` — not started
 - [x] Primary-metrics test suite (verifies: `pytest tests/test_evaluation_primary_metrics.py -q` — 4 passed; full suite 311 passed, 12 skipped, no regressions)
