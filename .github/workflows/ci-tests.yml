@@ -9,20 +9,17 @@ on:
       - main
 
 jobs:
-  backend-tests:
-    name: Backend Tests & Lint
+  backend-unit-tests:
+    name: Backend Unit Tests & Lint
     runs-on: ubuntu-latest
     # db/session.py exige DATABASE_URL/DATABASE_URL_SYNC al importar (falla
-    # con RuntimeError si faltan) — sin esto pytest no colecciona ningún test,
-    # ni siquiera los que no tocan BD. No existe DB de staging separada
-    # (CLAUDE.md: "UNA sola fuente de verdad"), así que igual que los crons
-    # de scrapers ya en producción, esto corre contra el mismo Supabase vía
-    # el connection pooler.
+    # con RuntimeError si faltan) — dummies bastan porque tests/unit no abre
+    # conexión real, solo necesita que el import no reviente.
     env:
       PYTHONPATH: ./platform/backend
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
-      DB_SSL: "true"
+      DATABASE_URL: "postgresql+asyncpg://dummy:dummy@localhost:5432/dummy"
+      DATABASE_URL_SYNC: "postgresql://dummy:dummy@localhost:5432/dummy"
+      DB_SSL: "false"
 
     steps:
       - name: Checkout
@@ -52,10 +49,46 @@ jobs:
           cd platform/backend
           ruff format . --check
 
-      - name: Run pytest (unit + integration, skip if Ollama absent)
+      # Coverage gate solo sobre domain/ vía tests/unit: es el único código
+      # sin I/O, por eso es el único donde 85% es alcanzable sin tests
+      # triviales. tests/integration cubre el resto (scraper/ml/agent/alerts)
+      # contra servicios reales, sin gate de cobertura.
+      - name: Run unit tests with coverage gate
         run: |
           cd platform/backend
-          pytest tests/ -v --tb=short
+          pytest tests/unit -v --tb=short --cov=domain --cov-report=term-missing
+
+  backend-integration-tests:
+    name: Backend Integration Tests
+    runs-on: ubuntu-latest
+    # Igual que los crons de scrapers ya en producción: no existe DB de
+    # staging separada (CLAUDE.md: "UNA sola fuente de verdad"), así que esto
+    # corre contra el mismo Supabase vía el connection pooler.
+    env:
+      PYTHONPATH: ./platform/backend
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+      DB_SSL: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd platform/backend
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run integration tests (skip if Ollama absent)
+        run: |
+          cd platform/backend
+          pytest tests/integration -v --tb=short
 
   # Chequeo estático de la cadena de migraciones. Bloqueante y barato (~20s):
   # no abre conexión a la BD ni necesita secretos.
