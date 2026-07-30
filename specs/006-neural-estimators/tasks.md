@@ -1,7 +1,7 @@
 - [x] Feature denylist — already existed in `ml/feature_registry.py::DENY_KEYS` before this spec was written (`centroid_lat/lon`, `precip_records`, `station_count`), enforced via `is_denied()` and tested in `tests/test_feature_registry.py::test_las_columnas_identificadoras_estan_negadas`. Correction to the original spec: `densidadmax` is deliberately kept — the registry's own docstring argues it's a legitimate static vulnerability signal, not a commune identifier, which is a defensible call the spec didn't account for.
 - [x] Collapse guard in `train.py` (verifies: `pytest tests/test_train_label_collapse_alert.py -q`) — `train()` already aborted on `len(np.unique(y)) < 2` (writing to `last_train_attempt.json`, never touching production), but nothing notified anyone; that was the actual gap. Added `_alert_label_collapse()`, a best-effort direct Slack webhook post (independent of the async DB-backed alert pipeline, since `train.py` is fully synchronous) called at the exact abort point.
-- [ ] `Signal` + `Estimator` protocol (`ml/estimators/`) — not started
-- [ ] `xgboost_estimator.py`, `rainfall_estimator.py`, `seismic_estimator.py` wrapping existing modules — not started
-- [ ] `scraper/terrain_features.py` SRTM/MODIS ingestion into `barrio_terrain` — not started; still the single highest-value data gap (susceptibility coverage stuck at 1/5 components)
-- [ ] `terrain_estimator.py` — not started
-- [x] Full suite (verifies: `pytest tests -q` — 298 passed, 12 skipped, no regressions)
+- [x] `Signal` + `Estimator` protocol (`ml/estimators/base.py`) (verifies: `pytest tests/test_estimators.py -q`)
+- [x] `rainfall_estimator.py`, `seismic_estimator.py`, `terrain_estimator.py` wrapping existing declared normalizations from `domain/susceptibility.py` (verifies: same — `Signal.uncertainty`/`coverage` always populated, never a silent 0.0 when data is missing)
+- [ ] `xgboost_estimator.py` — not started; the classifier itself is not yet wrapped as one `Estimator` among several
+- [ ] `scraper/terrain_features.py` SRTM/MODIS ingestion into `barrio_terrain` — not started; still the single highest-value data gap. `test_terrain_uncertainty_reflects_coverage_gap` demonstrates the estimator already reports this gap honestly (higher uncertainty with only `hazard_fraction` populated) — it just has nothing better to report yet.
+- [x] Full suite (verifies: `pytest tests -q` — 323 passed, 12 skipped, no regressions)
