@@ -41,6 +41,16 @@ from db.models.rainfall_timeseries import RainfallTimeseries
 from db.models.seismic_event import SeismicEvent
 from db.session import AsyncSessionLocal
 from domain.communes import COMMUNES
+from domain.quality import (
+    MAX_PLAUSIBLE_DAILY_MM,
+    MIN_PLAUSIBLE_MAX_MM,
+    MIN_ROWS_FOR_DISTINCT_CHECK,
+    SEISMIC_STALE_DAYS,
+    is_frozen_signal,
+    is_implausibly_high_daily,
+    is_implausibly_low_max,
+    is_stale,
+)
 from monitoring.notify import fire_agent_alert, log_agent_run
 
 logger = logging.getLogger(__name__)
@@ -57,24 +67,14 @@ MAX_SEISMIC_MAG = 10.0
 # NINGUNA de las 21 comunas registra una lectura por encima de 1 mm no lo es: la
 # ciudad promedia ~4-5 mm/día. Es una cota deliberadamente baja para que solo
 # salte ante un fallo de campo o de unidad, no ante un periodo seco.
+#
+# MIN_PLAUSIBLE_MAX_MM, MIN_ROWS_FOR_DISTINCT_CHECK, MAX_PLAUSIBLE_DAILY_MM y
+# SEISMIC_STALE_DAYS vienen de domain/quality.py — antes estaban duplicados aquí
+# (mismos valores, dos sitios), lo que exactamente `domain/quality.py`'s
+# docstring advierte que puede divergir sin que nadie lo note.
 PLAUSIBILITY_WINDOW_DAYS = 14
-MIN_PLAUSIBLE_MAX_MM = 1.0
-# Un feed sano produce muchos valores distintos (distintas estaciones, distintas
-# horas). Dos o menos valores distintos en cientos de lecturas es la firma de una
-# constante congelada — el bug exacto de arriba.
-MIN_DISTINCT_VALUES = 3
-MIN_ROWS_FOR_DISTINCT_CHECK = 50
 
-# Lluvia diaria: el récord mundial son ~1.825 mm en 24 h. Cualquier cosa por
-# encima de 400 mm/día en Medellín es un error de unidad o un acumulado sumado
-# como si fuera diario.
-MAX_PLAUSIBLE_DAILY_MM = 400.0
 DAILY_RAIN_KEYS = ("precip_daily_mm", "precip_sum_mm_day")
-
-# Sismos: SIATA detecta eventos locales pequeños con frecuencia. Un mes entero
-# sin NINGÚN evento nuevo significa que el feed o el parser están rotos, no que
-# no haya temblado.
-SEISMIC_STALE_DAYS = 30
 
 
 async def validate_rainfall_data(session: AsyncSession) -> tuple[str, dict]:
@@ -114,7 +114,7 @@ async def validate_rainfall_data(session: AsyncSession) -> tuple[str, dict]:
     # distintos, no es meteorología: es un campo que no cambia.
     values = {round(r.precip_mm, 6) for r in rows}
     checks["distinct_values"] = len(values)
-    if len(rows) >= MIN_ROWS_FOR_DISTINCT_CHECK and len(values) < MIN_DISTINCT_VALUES:
+    if is_frozen_signal([r.precip_mm for r in rows], min_rows=MIN_ROWS_FOR_DISTINCT_CHECK):
         problems.append(
             f"solo {len(values)} valor(es) distinto(s) en {len(rows)} lecturas "
             f"({sorted(values)}): el campo parece congelado, no una medición"
@@ -136,7 +136,7 @@ async def validate_rainfall_data(session: AsyncSession) -> tuple[str, dict]:
     checks["window_rows"] = n_window
     checks["window_max_mm"] = round(float(max_mm), 4)
     checks["window_sum_mm"] = round(float(sum_mm), 4)
-    if n_window >= MIN_ROWS_FOR_DISTINCT_CHECK and max_mm < MIN_PLAUSIBLE_MAX_MM:
+    if is_implausibly_low_max(window_max_mm=max_mm, window_rows=n_window):
         problems.append(
             f"en {PLAUSIBILITY_WINDOW_DAYS} días la lectura MÁXIMA de todas las "
             f"comunas fue {max_mm:.4f} mm (suma {sum_mm:.2f} mm en {n_window} "
@@ -175,7 +175,7 @@ async def validate_daily_rain_features(session: AsyncSession) -> tuple[str, dict
             "max": round(float(max_v or 0.0), 3),
             "avg": round(float(avg_v or 0.0), 3),
         }
-        if max_v is not None and float(max_v) > MAX_PLAUSIBLE_DAILY_MM:
+        if max_v is not None and is_implausibly_high_daily(float(max_v)):
             problems.append(
                 f"{key}: máximo {float(max_v):.1f} mm/día en {n} filas "
                 f"(límite plausible {MAX_PLAUSIBLE_DAILY_MM}); "
@@ -220,7 +220,7 @@ async def validate_seismic_data(session: AsyncSession) -> tuple[str, dict]:
     if latest is not None:
         days = (datetime.now(timezone.utc) - latest).days
         checks["days_since_last_event"] = days
-        if days > SEISMIC_STALE_DAYS:
+        if is_stale(days, threshold_days=SEISMIC_STALE_DAYS):
             problems.append(
                 f"el sismo más reciente es de hace {days} días "
                 f"(umbral {SEISMIC_STALE_DAYS}): el feed o el parser parecen rotos"

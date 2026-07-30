@@ -1,7 +1,7 @@
 - [x] `domain/rules/facts.py` — `TerritorySnapshot` (verifies: `pytest tests/test_rules_engine.py -q`)
 - [x] `domain/rules/engine.py` — `Rule`, effect types, `evaluate()` (verifies: purity test — same snapshot twice, same trace)
 - [x] `domain/quality.py` — pure predicates (`is_frozen_signal`, `is_implausibly_low_max`, `is_implausibly_high_daily`, `is_stale`, `DataQualityScore`) (verifies: `pytest tests/test_domain_quality.py -q`)
-- [ ] Wire `monitoring/scraper_validator.py` to import from `domain/quality.py` instead of its inline comparisons (verifies: existing validator tests still pass) — not yet done, predicates exist but validator still has its own inline checks
+- [x] Wire `monitoring/scraper_validator.py` to import from `domain/quality.py` instead of its inline comparisons (verifies: `pytest tests/test_scraper_validator_quality_wiring.py -q` — reproduces the exact 2026-07-29 incident values: 7890 zeros + 851 copies of 0.003mm detected as frozen, 92.202mm/day correctly NOT flagged as implausible while 450mm/day is, 150-day seismic silence flagged as stale). No dedicated async test harness existed for the validator's DB-backed functions before this change (none in the repo), so this test verifies the wiring (constants imported by identity, not copied) and that the predicates reproduce the original inline logic exactly, rather than mocking an AsyncSession.
 - [x] `domain/rules/catalog.py` R-GEO-01..04 (verifies: fires/does-not-fire/not-evaluable per rule)
 - [x] `domain/rules/catalog.py` R-HIST-01, R-EXPO-01 (verifies: same)
 - [x] `domain/rules/catalog.py` R-SEIS-01, R-QUAL-01 veto (verifies: same, veto is highest priority in ordering test)
