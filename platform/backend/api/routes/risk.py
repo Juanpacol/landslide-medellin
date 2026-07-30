@@ -25,9 +25,9 @@ from db.models.rainfall_timeseries import RainfallTimeseries
 from db.models.risk_explanation import RiskExplanation
 from db.session import get_async_db
 
-# Territorio desde la fuente única (domain/communes.py), en id CANÓNICO —
-# el mismo que usan risk_predictions/ml_features. El código oficial (ArcGIS)
-# solo se usa al pedir polígonos (_load_real_commune_polygons).
+# Territory from the single source (domain/communes.py), in CANONICAL id —
+# the same one risk_predictions/ml_features use. The official code (ArcGIS)
+# is only used when requesting polygons (_load_real_commune_polygons).
 from domain.communes import BY_ID as _COMMUNES_BY_ID
 from domain.communes import COMMUNES as _DOMAIN_COMMUNES
 from domain.communes import canonical_id as _canonical_commune_id
@@ -43,9 +43,9 @@ _COMUNA_QUERY_URL = (
 )
 
 _POLYGON_CACHE: list[dict[str, Any]] | None = None
-# Cache en disco: los polígonos de comunas son datos de referencia estáticos.
-# Persistirlos evita reconstruir el cache con 21 llamadas HTTP a ArcGIS en cada
-# arranque del proceso (cold start de ~1-3s).
+# Disk cache: commune polygons are static reference data. Persisting them
+# avoids rebuilding the cache with 21 HTTP calls to ArcGIS on every process
+# startup (~1-3s cold start).
 _POLYGON_CACHE_FILE = Path(__file__).resolve().parent / "_commune_polygons_cache.json"
 
 
@@ -96,11 +96,11 @@ async def _fetch_single_commune_polygon(
 
 async def _load_real_commune_polygons() -> list[dict[str, Any]]:
     global _POLYGON_CACHE
-    # 1) Cache en memoria (proceso vivo).
+    # 1) In-memory cache (live process).
     if _POLYGON_CACHE is not None:
         return _POLYGON_CACHE
 
-    # 2) Cache en disco (sobrevive reinicios; polígonos son estáticos).
+    # 2) Disk cache (survives restarts; polygons are static).
     if _POLYGON_CACHE_FILE.exists():
         try:
             cached = json.loads(_POLYGON_CACHE_FILE.read_text(encoding="utf-8"))
@@ -112,10 +112,10 @@ async def _load_real_commune_polygons() -> list[dict[str, Any]]:
                 return _POLYGON_CACHE
         except Exception:
             logging.getLogger(__name__).warning(
-                "Cache de polígonos en disco corrupto; se regenerará desde ArcGIS."
+                "Corrupt on-disk polygon cache; regenerating from ArcGIS."
             )
 
-    # 3) Fetch desde ArcGIS (por código OFICIAL) y persiste a disco.
+    # 3) Fetch from ArcGIS (by OFFICIAL code) and persist to disk.
     async with httpx.AsyncClient(timeout=20.0) as client:
         tasks = [
             _fetch_single_commune_polygon(client, _COMMUNES_BY_ID[cid].official_code)
@@ -126,8 +126,8 @@ async def _load_real_commune_polygons() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for item in items:
         if isinstance(item, dict):
-            # ArcGIS responde con el código oficial → traducir al id canónico
-            # para que el frontend y las predicciones hablen el mismo idioma.
+            # ArcGIS responds with the official code → translate to the
+            # canonical id so the frontend and predictions speak the same language.
             item["commune_id"] = _canonical_commune_id(item.get("commune_id"))
             out.append(item)
     if out:
@@ -136,7 +136,7 @@ async def _load_real_commune_polygons() -> list[dict[str, Any]]:
             _POLYGON_CACHE_FILE.write_text(json.dumps(out), encoding="utf-8")
         except Exception:
             logging.getLogger(__name__).warning(
-                "No se pudo escribir el cache de polígonos a disco."
+                "Could not write the polygon cache to disk."
             )
     return out
 
@@ -188,8 +188,8 @@ async def latest_predictions(
 
 @router.get("/comunas")
 async def get_comunas(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
-    # Acota a predicciones recientes (las predicciones corren cada 6h, 7 días
-    # cubre de sobra) en vez de traer toda la tabla y quedarnos con la última.
+    # Bounded to recent predictions (predictions run every 6h, 7 days is
+    # plenty) instead of fetching the whole table and keeping the last one.
     from infrastructure.repositories.risk_predictions import latest_by_commune
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
@@ -265,11 +265,11 @@ async def get_comuna(commune_id: str, db: AsyncSession = Depends(get_async_db)) 
 async def _rain_by_day_for_commune(
     db: AsyncSession, commune_id: str, start_day: date, end_day: date
 ) -> dict[date, float]:
-    """Lluvia diaria real de una comuna: suma de snapshots SIATA agrupados por
-    día (`rainfall_timeseries`, la tabla que SIATA sí llena cada 30 min — mismo
-    patrón que `alerts/slack.py::_get_today_acum`). Los días sin telemetría se
-    rellenan con el total diario de IDEAM (`features.precip_sum_mm_day`) si
-    existe. NO leer `MLFeature.precip_acum_7d`: ningún scraper la llena."""
+    """A commune's real daily rain: sum of SIATA snapshots grouped by day
+    (`rainfall_timeseries`, the table SIATA does fill every 30 min — same
+    pattern as `alerts/slack.py::_get_today_acum`). Days with no telemetry
+    are backfilled with IDEAM's daily total (`features.precip_sum_mm_day`)
+    if it exists. Do NOT read `MLFeature.precip_acum_7d`: no scraper fills it."""
     start_dt = datetime.combine(start_day, time.min, tzinfo=timezone.utc)
     stmt = (
         select(
@@ -401,11 +401,11 @@ async def get_derivation(commune_id: str, db: AsyncSession = Depends(get_async_d
 
 @router.get("/barrios-hazard")
 async def get_barrios_hazard(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
-    """Grado de amenaza geomorfológica oficial por barrio (~401 polígonos).
+    """Official geomorphological hazard grade per barrio (~401 polygons).
 
-    Poblada por `scraper/barrio_hazard.py` (script puntual — la cartografía de
-    ordenamiento territorial cambia en meses/años). El frontend la une con
-    `barrios-medellin.json` por `codigo` para colorear la capa de barrios.
+    Populated by `scraper/barrio_hazard.py` (a one-off script — land-use
+    planning cartography changes over months/years). The frontend joins it
+    with `barrios-medellin.json` by `codigo` to color the barrio layer.
     """
     from db.models.barrio_hazard import BarrioHazard
 
@@ -428,11 +428,11 @@ async def get_seismic_events(
     days: int = 365,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, Any]:
-    """Sismos recientes registrados por la red SIATA (sismógrafos/acelerógrafos).
+    """Recent earthquakes recorded by the SIATA network (seismographs/accelerographs).
 
-    Un mismo sismo lo registran varias estaciones; se deduplica por
-    (fecha_evento, epicentro) devolviendo un registro por sismo con las
-    estaciones que lo captaron.
+    The same earthquake is recorded by several stations; deduplicated by
+    (event_date, epicenter), returning one record per earthquake with the
+    stations that captured it.
     """
     from db.models.seismic_event import SeismicEvent
 
@@ -474,8 +474,8 @@ async def get_seismic_events(
 
 
 async def _inherited_risk_for_communes(db: AsyncSession, commune_ids: list[str]) -> dict[str, Any]:
-    """Peor riesgo entre las comunas que intersecta una cuadrícula. No es una
-    predicción por cuadrícula — se hereda del modelo a nivel comuna."""
+    """Worst risk among the communes a grid cell intersects. Not a
+    per-cell prediction — inherited from the commune-level model."""
     worst_score: float | None = None
     worst_category: str | None = None
     for cid in commune_ids:
@@ -504,9 +504,9 @@ async def _inherited_risk_for_communes(db: AsyncSession, commune_ids: list[str])
 
 @router.get("/mesh-grid")
 async def get_mesh_grid(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
-    """Cuadrículas de ~1.5km (metodología JMA Mesh Maps). Generadas por
-    `scraper/mesh_grid.py`. El riesgo se hereda de la comuna (ver
-    `MeshQuadrant.__doc__`) — no es predicción por cuadrícula."""
+    """~1.5km grid cells (JMA Mesh Maps methodology). Generated by
+    `scraper/mesh_grid.py`. Risk is inherited from the commune (see
+    `MeshQuadrant.__doc__`) — not a per-cell prediction."""
     from db.models.mesh_quadrant import MeshQuadrant
 
     rows = (await db.execute(select(MeshQuadrant))).scalars().all()
@@ -552,8 +552,8 @@ async def get_mesh_quadrant_detail(
 async def get_snake_line(
     commune_id: str, db: AsyncSession = Depends(get_async_db)
 ) -> dict[str, Any]:
-    """Punto actual + historial 48h del gráfico Snake Line (SWI × lluvia
-    intensa), metodología JMA. Ver `alerts/snake_line.py`."""
+    """Current point + 48h history of the Snake Line chart (SWI × heavy
+    rain), JMA methodology. See `alerts/snake_line.py`."""
     from alerts.snake_line import get_snake_line_status
 
     return await get_snake_line_status(db, commune_id)
@@ -561,9 +561,9 @@ async def get_snake_line(
 
 @router.get("/soil-water-index")
 async def get_soil_water_index(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
-    """Saturación estimada del suelo (%) por comuna — metodología JMA (tanque
-    simplificado). Ver `ml/soil_water_index.py` para el detalle del modelo y
-    sus límites (MVP, drain_rate conservador sin calibrar)."""
+    """Estimated soil saturation (%) per commune — JMA methodology
+    (simplified tank). See `ml/soil_water_index.py` for the model's detail
+    and its limits (MVP, conservative uncalibrated drain_rate)."""
     from ml.soil_water_index import swi_for_all_communes
 
     today = datetime.now(timezone.utc).date()
@@ -632,9 +632,9 @@ async def _alert_state_for_commune(
 async def get_alert_state(
     commune_id: str, db: AsyncSession = Depends(get_async_db)
 ) -> dict[str, Any]:
-    """Estado operativo compuesto (Verde/Amarillo/Rojo) para una comuna: cruza
-    lluvia de hoy, índice de precipitación antecedente y categoría del modelo
-    ML. Reutiliza el mismo umbral por comuna que las alertas de Slack."""
+    """Composite operational state (Green/Yellow/Red) for a commune: crosses
+    today's rain, the antecedent precipitation index and the ML model's
+    category. Reuses the same per-commune threshold as Slack alerts."""
     from db.models.commune_threshold import CommuneThreshold
     from ml.precip_index import antecedent_indexes_for_all_communes
 
@@ -655,7 +655,7 @@ async def get_alert_state(
 
 @router.get("/alert-state")
 async def get_alert_state_all(db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
-    """Estado compuesto de las 21 comunas, para el dashboard."""
+    """Composite state for all 21 communes, for the dashboard."""
     from db.models.commune_threshold import CommuneThreshold
     from ml.precip_index import antecedent_indexes_for_all_communes
 
@@ -685,7 +685,7 @@ async def get_risk_explanation(
     commune_id: str,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, Any]:
-    """Explicación narrativa más reciente generada por el servicio de IA."""
+    """Most recent narrative explanation generated by the AI service."""
     stmt = (
         select(RiskExplanation)
         .where(RiskExplanation.commune_id == commune_id)
@@ -792,9 +792,9 @@ async def get_estadisticas(db: AsyncSession = Depends(get_async_db)) -> dict[str
     start_14 = today - timedelta(days=14)
     start_7 = today - timedelta(days=7)
 
-    # `fecha` es texto libre (formatos variados) → no se puede filtrar en SQL de
-    # forma confiable. Pre-filtramos por `ingested_at` para acotar el scan: un
-    # evento con fecha en los últimos 30 días no pudo ingestarse hace 30+ días.
+    # `fecha` is free text (varied formats) → can't be reliably filtered in
+    # SQL. Pre-filter by `ingested_at` to bound the scan: an event dated
+    # within the last 30 days couldn't have been ingested 30+ days ago.
     start_30_dt = datetime.now(timezone.utc) - timedelta(days=30)
     events_30 = (
         (await db.execute(select(LandslideEvent).where(LandslideEvent.ingested_at >= start_30_dt)))
@@ -838,10 +838,11 @@ async def get_estadisticas(db: AsyncSession = Depends(get_async_db)) -> dict[str
 
 @router.get("/alerts")
 async def get_alerts(db: AsyncSession = Depends(get_async_db)) -> list[dict[str, Any]]:
-    # Acota a predicciones recientes (evita el full table scan que traía TODA la
-    # tabla) y filtra con is_alert_category(), que es insensible a tildes y
-    # mayúsculas. Antes comparaba contra {"Alto","Crítico"} capitalizados
-    # mientras la BD guarda "alto"/"critico" → las alertas NUNCA aparecían.
+    # Bounded to recent predictions (avoids the full table scan that used
+    # to fetch the WHOLE table) and filters with is_alert_category(), which
+    # is accent- and case-insensitive. Used to compare against capitalized
+    # {"Alto","Crítico"} while the DB stores "alto"/"critico" → alerts
+    # NEVER showed up.
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
     stmt = (
         select(RiskPrediction)
@@ -856,7 +857,7 @@ async def get_alerts(db: AsyncSession = Depends(get_async_db)) -> list[dict[str,
     for r in rows:
         if r.commune_id in seen:
             continue
-        seen.add(r.commune_id)  # nos quedamos con la predicción más reciente por comuna
+        seen.add(r.commune_id)  # keep only the most recent prediction per commune
         if not is_alert_category(r.risk_category):
             continue
         alerts.append(
