@@ -1,7 +1,7 @@
-"""Scoring de urgencia 0-100 para alertas de Slack. Puro, sin I/O.
+"""Urgency scoring 0-100 for Slack alerts. Pure, no I/O.
 
-Explicable, no un número mágico: base por categoría de riesgo + modificador
-por tipo de alerta + boost si hace rato no se avisa nada de esto.
+Explainable, not a magic number: base by risk category + modifier by alert
+type + boost if nothing has been reported in a while.
 """
 
 from __future__ import annotations
@@ -25,13 +25,13 @@ def compute_urgency_score(
 ) -> int:
     """0-100. `alert_type` ∈ {critical_risk, rainfall, yellow, scraper}.
 
-    Para "scraper" no hay `risk_category` (no es una alerta de riesgo de
-    deslizamiento): la base depende de cuántos fallos consecutivos lleva.
-    Para el resto: base de la categoría de riesgo + modificador del tipo.
+    For "scraper" there's no `risk_category` (it's not a landslide-risk
+    alert): the base depends on how many consecutive failures it has. For
+    everything else: risk-category base + type modifier.
 
-    `hours_since_last_alert` None o >24h suma un boost: "hace rato no se
-    avisa nada de esto" es en sí mismo más urgente que un recordatorio
-    reciente — señal de que el problema lleva desatendido.
+    `hours_since_last_alert` being None or >24h adds a boost: "nothing has
+    been reported about this in a while" is itself more urgent than a recent
+    reminder — a signal that the problem has gone unattended.
     """
     if alert_type == "scraper":
         score = min(

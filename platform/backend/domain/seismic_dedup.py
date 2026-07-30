@@ -1,55 +1,59 @@
 """
-Cuándo dos reportes sísmicos son el MISMO sismo. Lógica pura, sin I/O.
+When two seismic reports are the SAME earthquake. Pure logic, no I/O.
 
-## El problema
+## The problem
 
-`seismic_events` guarda reportes, no sismos. Un único sismo físico produce:
+`seismic_events` stores reports, not earthquakes. A single physical
+earthquake produces:
 
-- K filas de SIATA — una por cada estación de la red que lo registró;
-- una fila de USGS, con su propia solución de tiempo y epicentro;
-- una fila del SGC, con otra.
+- K rows from SIATA — one per network station that recorded it;
+- one row from USGS, with its own time/epicenter solution;
+- one row from SGC, with another.
 
-La deduplicación anterior era por `(event_local_at.isoformat(), epicenter_label)`.
-Eso solo funciona dentro de SIATA, donde todas las filas de un sismo comparten
-tiempo y etiqueta calculados idénticos. Entre agencias **no colapsa ni un solo
-duplicado**: los tiempos de origen difieren en segundos y las etiquetas son
-textos distintos ("12 km NE of Betulia, Colombia" vs el municipio del SGC vs
-"Sismo en Medellín - Antioquia").
+The previous dedup was by `(event_local_at.isoformat(), epicenter_label)`.
+That only works within SIATA, where all rows for one earthquake share
+identical computed time and label. Across agencies **it collapses zero
+duplicates**: origin times differ by seconds and labels are different text
+("12 km NE of Betulia, Colombia" vs SGC's municipality vs "Sismo en Medellín
+- Antioquia").
 
-Y como `ml/seismic_features.py` calcula una **Σ de magnitud²**, cada sismo
-contaría 2-3 veces y la señal se inflaría de forma cuadrática, en silencio. Por
-eso esto es un prerrequisito de integrar USGS/SGC, no un pulido posterior.
+And since `ml/seismic_features.py` computes a **Σ of magnitude²**, each
+earthquake would count 2-3 times and the signal would inflate quadratically,
+silently. That's why this is a prerequisite for integrating USGS/SGC, not a
+later polish.
 
-## Por qué las tolerancias son estas
+## Why these tolerances
 
-No son números redondos elegidos al azar:
+Not round numbers picked at random:
 
-- **±120 s.** Las soluciones de tiempo de ORIGEN entre agencias concuerdan en
-  segundos. El margen es por SIATA, cuyo `fecha_local` por estación es un
-  timestamp de disparo/llegada: para un sismo regional a 200-400 km, la onda S
-  llega decenas de segundos después del origen. 120 s cubre eso y sigue muy por
-  debajo del espaciado real entre sismos sentidos en Colombia.
-- **60 km.** Las soluciones de epicentro entre agencias difieren de rutina 10-40
-  km, por distinta geometría de estaciones y distinto modelo de velocidades.
-  60 km captura eso sin fusionar dos sismos distintos en fallas diferentes.
-- **|ΔM| ≤ 1.0.** Las agencias reportan escalas distintas (ML, Mw, Mb) que
-  difieren 0.3-0.7 habitualmente. 1.0 es la cota honesta. Es una **guarda contra
-  fusiones absurdas**, no el discriminante principal.
-- **±45 s cuando falta lat/lon.** Sin geometría se aprieta el tiempo en vez de
-  fusionar con una ventana laxa.
+- **±120 s.** ORIGIN time solutions across agencies agree within seconds.
+  The margin is for SIATA, whose per-station `fecha_local` is a
+  trigger/arrival timestamp: for a regional earthquake at 200-400 km, the
+  S-wave arrives tens of seconds after origin. 120s covers that and stays
+  well below the real spacing between felt earthquakes in Colombia.
+- **60 km.** Epicenter solutions across agencies routinely differ by 10-40
+  km, due to different station geometry and velocity models. 60km captures
+  that without merging two distinct earthquakes on different faults.
+- **|ΔM| ≤ 1.0.** Agencies report different scales (ML, Mw, Mb) that
+  typically differ by 0.3-0.7. 1.0 is the honest bound. It's a **guard
+  against absurd merges**, not the primary discriminant.
+- **±45 s when lat/lon is missing.** Without geometry, tighten time instead
+  of merging with a loose window.
 
-## Precedencia SGC > USGS > SIATA
+## Precedence: SGC > USGS > SIATA
 
-Para los valores CANÓNICOS del sismo. El SGC es la autoridad sismológica
-nacional, así que tiene las mejores soluciones locales; USGS es de calidad global
-y rápido, pero sus epicentros en Colombia son más gruesos; SIATA es una red local
-densa, insustituible para detectar sismos pequeños que las otras dos no ven, pero
-su "epicentro" publicado por estación es el menos autoritativo. Esos sismos
-locales forman clústeres de una sola fuente, que es exactamente lo correcto.
+For the CANONICAL values of the earthquake. SGC is the national
+seismological authority, so it has the best local solutions; USGS is
+globally consistent and fast, but its epicenters in Colombia are coarser;
+SIATA is a dense local network, irreplaceable for detecting small
+earthquakes the other two miss, but its per-station published "epicenter" is
+the least authoritative. Those local earthquakes form single-source
+clusters, which is exactly correct.
 
-La magnitud de consenso es **la del ganador de precedencia**, no el máximo ni la
-media: el máximo sesga al alza (y la feature eleva al cuadrado, amplificándolo) y
-la media mezcla escalas incompatibles. Así queda trazable vía `canonical_source`.
+The consensus magnitude is **the precedence winner's**, not the max or the
+mean: the max biases upward (and the feature squares it, amplifying that)
+and the mean mixes incompatible scales. This stays traceable via
+`canonical_source`.
 """
 
 from __future__ import annotations
@@ -64,16 +68,16 @@ MATCH_DISTANCE_KM = 60.0
 MATCH_MAGNITUDE_DELTA = 1.0
 MATCH_TIME_ONLY_WINDOW_S = 45.0
 
-# Índice 0 = máxima autoridad. Una fuente desconocida queda por debajo de todas.
+# Index 0 = highest authority. An unknown source ranks below all of them.
 SOURCE_PRECEDENCE: tuple[str, ...] = ("sgc", "usgs", "siata_sismos")
 
 
 @dataclass(frozen=True)
 class EventKey:
-    """Lo mínimo para decidir si dos reportes son el mismo sismo.
+    """The minimum needed to decide whether two reports are the same earthquake.
 
-    Deliberadamente NO es un modelo de SQLAlchemy: así estas reglas se pueden
-    testear sin base de datos, que es la parte que se va a retocar con el tiempo.
+    Deliberately NOT a SQLAlchemy model: that way these rules can be tested
+    without a database, which is the part that will get tuned over time.
     """
 
     event_at: datetime
@@ -90,7 +94,7 @@ class EventKey:
 
 
 def source_rank(source: str | None) -> int:
-    """Posición en la precedencia; más bajo gana. Fuente desconocida va al final."""
+    """Position in the precedence order; lower wins. Unknown source goes last."""
     if not source:
         return len(SOURCE_PRECEDENCE)
     try:
@@ -104,17 +108,17 @@ def seconds_apart(a: EventKey, b: EventKey) -> float:
 
 
 def km_apart(a: EventKey, b: EventKey) -> float | None:
-    """Distancia entre epicentros, o None si a alguno le faltan coordenadas."""
+    """Distance between epicenters, or None if either is missing coordinates."""
     if not (a.has_coords and b.has_coords):
         return None
-    # Keyword-only a propósito: `haversine_km` es lon-primero y invertirlo
-    # devuelve una distancia equivocada pero plausible.
+    # Keyword-only on purpose: `haversine_km` is lon-first and swapping it
+    # returns a wrong but plausible distance.
     return distance_km(lat1=a.lat, lon1=a.lon, lat2=b.lat, lon2=b.lon)  # type: ignore[arg-type]
 
 
 def events_match(a: EventKey, b: EventKey) -> bool:
-    """¿Son `a` y `b` reportes del mismo sismo físico?"""
-    # La magnitud solo DESCARTA; nunca confirma por sí sola.
+    """Are `a` and `b` reports of the same physical earthquake?"""
+    # Magnitude only DISQUALIFIES; it never confirms on its own.
     if a.magnitude is not None and b.magnitude is not None:
         if abs(a.magnitude - b.magnitude) > MATCH_MAGNITUDE_DELTA:
             return False
@@ -122,27 +126,27 @@ def events_match(a: EventKey, b: EventKey) -> bool:
     dt = seconds_apart(a, b)
     d_km = km_apart(a, b)
     if d_km is None:
-        # Sin geometría en algún lado: se aprieta la ventana temporal.
+        # No geometry on one side: tighten the time window instead.
         return dt <= MATCH_TIME_ONLY_WINDOW_S
     return dt <= MATCH_TIME_WINDOW_S and d_km <= MATCH_DISTANCE_KM
 
 
 def pick_canonical(current: EventKey, candidate: EventKey) -> EventKey:
-    """Cuál de los dos aporta los valores canónicos del clúster.
+    """Which of the two contributes the cluster's canonical values.
 
-    Gana la fuente de mayor precedencia. A igualdad de fuente se conserva
-    `current`, para que reprocesar no cambie el resultado sin motivo.
+    The higher-precedence source wins. On a tie, `current` is kept, so
+    reprocessing doesn't change the result without reason.
     """
     return candidate if source_rank(candidate.source) < source_rank(current.source) else current
 
 
 def best_match(candidate: EventKey, clusters: list[EventKey]) -> int | None:
-    """Índice del clúster que mejor encaja con `candidate`, o None.
+    """Index of the cluster that best fits `candidate`, or None.
 
-    Enlace simple contra el representante de cada clúster (no cierre transitivo
-    sobre las filas crudas): así el agrupamiento no depende del orden de llegada.
-    Si varios encajan, gana el más cercano en tiempo; el desempate final es el
-    índice más bajo, para que sea determinista.
+    Simple matching against each cluster's representative (no transitive
+    closure over the raw rows): that way grouping doesn't depend on arrival
+    order. If several fit, the closest in time wins; the final tiebreak is
+    the lowest index, to keep it deterministic.
     """
     best_i: int | None = None
     best_dt = float("inf")
@@ -156,6 +160,6 @@ def best_match(candidate: EventKey, clusters: list[EventKey]) -> int | None:
 
 
 def merge_sources(existing: list[str], new_source: str) -> list[str]:
-    """Lista de fuentes del clúster, sin duplicados y en orden de precedencia."""
+    """The cluster's list of sources, deduplicated and in precedence order."""
     merged = set(existing) | {new_source}
     return sorted(merged, key=lambda s: (source_rank(s), s))

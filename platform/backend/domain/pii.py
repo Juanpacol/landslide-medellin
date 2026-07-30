@@ -1,18 +1,19 @@
-"""Redacción heurística de PII en texto libre. Puro, sin I/O.
+"""Heuristic PII redaction in free text. Pure, no I/O.
 
-Best-effort, NO exhaustivo: cubre los patrones más comunes en texto libre en
-español/Colombia (teléfonos, cédulas, emails). No reemplaza una revisión
-humana de datos sensibles reales.
+Best-effort, NOT exhaustive: covers the most common patterns in Spanish/
+Colombian free text (phone numbers, national IDs, emails). Does not replace
+a human review of genuinely sensitive data.
 """
 
 from __future__ import annotations
 
 import re
 
-# Teléfonos CO: celular (10 dígitos, empieza en 3) o fijo con indicativo,
-# con o sin separadores. Cédula: 6-10 dígitos consecutivos (sin separadores,
-# para no comerse números de teléfono ya cubiertos arriba — el orden de los
-# patrones importa, se aplican de más específico a más genérico).
+# Colombian phone numbers: mobile (10 digits, starts with 3) or landline with
+# area code, with or without separators. National ID (cédula): 6-10
+# consecutive digits (no separators, so it doesn't swallow phone numbers
+# already covered above — pattern order matters, applied most-specific to
+# most-generic).
 _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "[EMAIL REDACTADO]"),
     (re.compile(r"(?:\+57\s?)?3\d{2}[\s.-]?\d{3}[\s.-]?\d{4}\b"), "[TELÉFONO REDACTADO]"),
@@ -22,8 +23,8 @@ _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 
 
 def redact_pii(text: str) -> str:
-    """Reemplaza patrones de PII conocidos por marcadores. No modifica el
-    resto del texto ni su longitud de forma significativa."""
+    """Replaces known PII patterns with markers. Does not otherwise modify
+    the rest of the text or meaningfully change its length."""
     if not text:
         return text
     result = text

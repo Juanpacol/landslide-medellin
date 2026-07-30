@@ -1,25 +1,25 @@
 """
-Fuente ÚNICA de verdad para el territorio de Medellín (16 comunas + 5
+SINGLE source of truth for Medellín's territory (16 comunas + 5
 corregimientos).
 
-Antes existían 5+ copias divergentes (api/routes/risk.py::_COMUNAS_BASE,
+There used to be 5+ diverging copies (api/routes/risk.py::_COMUNAS_BASE,
 api/routes/rain.py::_COMUNAS, alerts/slack.py::_NAMES,
-agent/risk_explanations.py::_NOMBRES, agent/tools.py::COMMUNE_LABELS) y DOS
-esquemas de id conviviendo sin mapeo central:
+agent/risk_explanations.py::_NOMBRES, agent/tools.py::COMMUNE_LABELS) and TWO
+id schemes coexisting with no central mapping:
 
-- **id canónico** ("1".."21"): el que usan los DATOS — ml_features,
-  risk_predictions, rainfall_timeseries (los scrapers mapean corregimientos
-  a 17-21 vía infrastructure/external/arcgis_client.py).
-- **código oficial** ("01".."16", "50".."90"): el de la cartografía de
-  Medellín (ArcGIS) y documentos institucionales.
+- **canonical id** ("1".."21"): the one the DATA uses — ml_features,
+  risk_predictions, rainfall_timeseries (scrapers map corregimientos to
+  17-21 via infrastructure/external/arcgis_client.py).
+- **official code** ("01".."16", "50".."90"): Medellín's cartography
+  (ArcGIS) and institutional documents.
 
-La divergencia causaba bugs reales: los diccionarios de nombres solo tenían
-códigos oficiales, así que una alerta del corregimiento con datos bajo id
-"18" salía como "Comuna 18" en vez de "San Cristóbal", y los lookups de
-predicción por código oficial ("50") no encontraban nada nunca.
+The divergence caused real bugs: the name dictionaries only had official
+codes, so a corregimiento alert with data under id "18" came out as
+"Comuna 18" instead of "San Cristóbal", and prediction lookups by official
+code ("50") never found anything.
 
-Regla: TODO el código habla en id canónico; el código oficial solo se usa
-en el borde con ArcGIS/cartografía (vía `official_code`).
+Rule: ALL code speaks canonical id; the official code is only used at the
+boundary with ArcGIS/cartography (via `official_code`).
 """
 
 from __future__ import annotations
@@ -31,8 +31,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class CommuneInfo:
-    id: str  # id canónico — el de ml_features/risk_predictions
-    official_code: str  # código oficial de Medellín (cartografía/ArcGIS)
+    id: str  # canonical id — the one ml_features/risk_predictions use
+    official_code: str  # Medellín's official code (cartography/ArcGIS)
     nombre: str
     tipo: str  # "comuna" | "corregimiento"
     is_ladera: bool
@@ -66,23 +66,23 @@ BY_ID: dict[str, CommuneInfo] = {c.id: c for c in COMMUNES}
 BY_OFFICIAL_CODE: dict[str, CommuneInfo] = {c.official_code: c for c in COMMUNES}
 
 
-# ── Centroides (lat, lon) ─────────────────────────────────────────────────────
+# ── Centroids (lat, lon) ───────────────────────────────────────────────────────
 #
-# Extraídos UNA vez de la cartografía oficial de Medellín (capa 11 de
-# CartografiaBase, la misma que consulta `scraper/medellin_datos.py`) con
-# `ring_centroid_lonlat` sobre el anillo exterior de cada polígono.
+# Extracted ONCE from Medellín's official cartography (layer 11 of
+# CartografiaBase, the same one `scraper/medellin_datos.py` queries) via
+# `ring_centroid_lonlat` over each polygon's outer ring.
 #
-# Por qué viven aquí y no solo en la BD: `ml/seismic_features.py` y
-# `alerts/evacuation.py` los leían EXCLUSIVAMENTE de
-# `ml_features.features["centroid_lat"/"centroid_lon"]`, que solo escribe
-# `scraper/medellin_datos.py` (cadencia 24 h). Si ese scraper no había corrido
-# en una base dada, el lookup devolvía `{}` y las 21 comunas caían al centro
-# del valle: la señal sísmica por comuna se degradaba a una CONSTANTE, en
-# silencio y sin alerta. Con estos valores como semilla eso es imposible.
+# Why they live here and not only in the DB: `ml/seismic_features.py` and
+# `alerts/evacuation.py` read them EXCLUSIVELY from
+# `ml_features.features["centroid_lat"/"centroid_lon"]`, which only
+# `scraper/medellin_datos.py` writes (24h cadence). If that scraper hadn't run
+# on a given base, the lookup returned `{}` and all 21 communes fell back to
+# the valley's center: the per-commune seismic signal degraded to a CONSTANT,
+# silently, with no alert. With these values as a seed that's impossible.
 #
-# Los valores scrapeados SIEMPRE tienen prioridad sobre estos: vienen del mismo
-# origen pero pueden reflejar una actualización cartográfica posterior. Esto es
-# el piso, no la verdad.
+# Scraped values ALWAYS take priority over these: they come from the same
+# source but may reflect a later cartographic update. This is the floor, not
+# the ground truth.
 CENTROIDS: dict[str, tuple[float, float]] = {
     "1": (6.291857, -75.542108),
     "2": (6.297073, -75.553417),
@@ -107,13 +107,13 @@ CENTROIDS: dict[str, tuple[float, float]] = {
     "21": (6.240551, -75.533109),
 }
 
-# Centro aproximado del Valle de Aburrá. Último recurso para un id desconocido;
-# NO debería usarse para ninguna de las 21 comunas (hay test que lo verifica).
+# Approximate center of the Valle de Aburrá. Last resort for an unknown id;
+# should NOT be used for any of the 21 communes (there's a test verifying this).
 VALLEY_CENTROID: tuple[float, float] = (6.2442, -75.5812)
 
 
 def centroid(value: str | int | None) -> tuple[float, float] | None:
-    """(lat, lon) del centroide de una comuna. Acepta id canónico u oficial."""
+    """(lat, lon) of a commune's centroid. Accepts canonical id or official code."""
     cid = canonical_id(value)
     if cid is None:
         return None
@@ -121,11 +121,11 @@ def centroid(value: str | int | None) -> tuple[float, float] | None:
 
 
 def canonical_id(value: str | int | None) -> str | None:
-    """Normaliza cualquier id (canónico, oficial, con ceros) al canónico.
+    """Normalizes any id (canonical, official, zero-padded) to canonical.
 
     "18" → "18" · "60" → "18" · "05" → "5" · "m-7" → "7" · None → None.
-    Los códigos oficiales de corregimiento (50-90) se traducen; cualquier
-    otro número se limpia de ceros a la izquierda.
+    Official corregimiento codes (50-90) are translated; any other number
+    just gets its leading zeros stripped.
     """
     if value is None:
         return None
@@ -139,18 +139,18 @@ def canonical_id(value: str | int | None) -> str | None:
         return normalized
     if padded in BY_OFFICIAL_CODE:
         return BY_OFFICIAL_CODE[padded].id
-    return normalized  # id desconocido: se devuelve normalizado, no None
+    return normalized  # unknown id: returned normalized, not None
 
 
 def display_name(value: str | int | None) -> str:
-    """Nombre para mostrar. Acepta id canónico o código oficial."""
+    """Name to display. Accepts canonical id or official code."""
     cid = canonical_id(value)
     if cid and cid in BY_ID:
         return BY_ID[cid].nombre
     return f"Comuna {value}" if value is not None else "Sin datos"
 
 
-# ── Resolución por nombre (para el chat: "¿cómo está el Poblado?") ────────────
+# ── Resolution by name (for chat: "¿cómo está el Poblado?") ──────────────────
 
 
 def _normalize_token(s: str) -> str:
@@ -181,7 +181,7 @@ for _k, _v in _ALIASES_EXTRA.items():
 
 
 def resolve_commune_id(nombre_o_id: str) -> str | None:
-    """Nombre, alias, id canónico o código oficial → id canónico."""
+    """Name, alias, canonical id, or official code → canonical id."""
     raw = (nombre_o_id or "").strip()
     if not raw:
         return None
@@ -191,13 +191,13 @@ def resolve_commune_id(nombre_o_id: str) -> str | None:
 
 
 def find_communes_in_text(text: str) -> list[str]:
-    """commune_id únicos mencionados en el texto (orden aproximado de aparición).
+    """Unique commune_ids mentioned in the text (approximate order of appearance).
 
-    Vive aquí y no en agent/tools.py porque necesita `_ALIAS_TO_ID`, que es
-    parte de la fuente única del territorio. Estuvo rota justo por eso: el
-    refactor "PR1 — domain layer" movió el mapa de alias a este módulo y dejó
-    la función en agent/tools.py referenciando un nombre que ya no existía
-    allí, así que lanzaba NameError en cada llamada.
+    Lives here and not in agent/tools.py because it needs `_ALIAS_TO_ID`,
+    part of the single source of truth for the territory. It was broken for
+    exactly that reason: the "PR1 — domain layer" refactor moved the alias
+    map to this module and left the function in agent/tools.py referencing a
+    name that no longer existed there, so it raised NameError on every call.
     """
     tnorm = _normalize_token(text)
     hits: list[tuple[int, str]] = []
