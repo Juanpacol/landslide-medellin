@@ -1,21 +1,21 @@
 """
-Mesh Maps — cuadrículas de ~1.5km sobre Medellín (metodología JMA).
+Mesh Maps — ~1.5km grid cells over Medellín (JMA methodology).
 
-Script puntual (cartografía casi estática, se corre a mano cuando cambien
-los barrios o su amenaza — no es un cron):
+A one-off script (cartography is nearly static, run by hand when barrios
+or their hazard change — not a cron):
 
     cd platform/backend && PYTHONPATH=. python -m scraper.mesh_grid
 
-Divide el área cubierta por los 401 barrios de `barrios-medellin.json` en
-cuadrículas cuadradas de ~1.5km de lado (en vez de las 21 comunas, que diluyen
-el riesgo real de laderas específicas) y hereda para cada cuadrícula:
-- Las comunas y barrios que intersecta.
-- El peor `hazard_grade` (VM05) entre sus barrios.
+Divides the area covered by `barrios-medellin.json`'s 401 barrios into
+~1.5km-side square grid cells (instead of the 21 communes, which dilute the
+real risk of specific hillsides) and inherits for each cell:
+- The communes and barrios it intersects.
+- The worst `hazard_grade` (VM05) among its barrios.
 
-LÍMITE HONESTO: el riesgo de cada cuadrícula se hereda del modelo a nivel
-comuna (no hay sensores ni predicción por cuadrícula) — el valor de esta capa
-es visualización más precisa y evacuación dirigida, no predicción más
-granular. Se marca `risk_source: "inherited_from_commune"` en el endpoint.
+HONEST LIMIT: each cell's risk is inherited from the commune-level model
+(there are no sensors or per-cell prediction) — this layer's value is more
+precise visualization and targeted evacuation, not finer-grained
+prediction. Marked `risk_source: "inherited_from_commune"` in the endpoint.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ _DEFAULT_GEOJSON = (
 BARRIOS_GEOJSON = Path(os.getenv("BARRIOS_GEOJSON", str(_DEFAULT_GEOJSON)))
 
 GRID_SIZE_KM = 1.5
-MEDELLIN_LAT_REF = 6.24  # para convertir km -> grados de longitud
+MEDELLIN_LAT_REF = 6.24  # to convert km -> degrees of longitude
 
 _HAZARD_RANK: dict[str, int] = {"alta": 3, "media": 2, "baja": 1, "muy baja": 0}
 
@@ -58,7 +58,7 @@ def _worst_hazard(grades: list[str]) -> str | None:
 
 
 def _km_to_degrees(km: float, lat_ref: float) -> tuple[float, float]:
-    """(delta_lat_deg, delta_lon_deg) equivalentes a `km` en esa latitud."""
+    """(delta_lat_deg, delta_lon_deg) equivalent to `km` at that latitude."""
     lat_deg = km / 111.32
     lon_deg = km / (111.32 * math.cos(math.radians(lat_ref)))
     return lat_deg, lon_deg
@@ -67,7 +67,7 @@ def _km_to_degrees(km: float, lat_ref: float) -> tuple[float, float]:
 def _build_grid(
     bounds: tuple[float, float, float, float], grid_size_km: float
 ) -> list[dict[str, Any]]:
-    """bounds = (minx, miny, maxx, maxy) en lon/lat. Genera cuadrículas cuadradas."""
+    """bounds = (minx, miny, maxx, maxy) in lon/lat. Generates square grid cells."""
     minx, miny, maxx, maxy = bounds
     lat_step, lon_step = _km_to_degrees(grid_size_km, MEDELLIN_LAT_REF)
 
@@ -100,7 +100,7 @@ async def run_mesh_grid() -> int:
         try:
             data = json.loads(BARRIOS_GEOJSON.read_text(encoding="utf-8"))
             features = data.get("features") or []
-            logger.info("Barrios cargados para el grid: %d", len(features))
+            logger.info("Barrios loaded for the grid: %d", len(features))
 
             barrio_geoms: list[dict[str, Any]] = []
             all_bounds: list[tuple[float, float, float, float]] = []
@@ -121,7 +121,7 @@ async def run_mesh_grid() -> int:
                 all_bounds.append(geom.bounds)
 
             if not barrio_geoms:
-                raise ValueError("No se pudo cargar ningún polígono de barrio válido")
+                raise ValueError("Could not load any valid barrio polygon")
 
             minx = min(b[0] for b in all_bounds)
             miny = min(b[1] for b in all_bounds)
@@ -134,7 +134,7 @@ async def run_mesh_grid() -> int:
             }
 
             quads = _build_grid((minx, miny, maxx, maxy), GRID_SIZE_KM)
-            logger.info("Cuadrículas generadas: %d", len(quads))
+            logger.info("Grid cells generated: %d", len(quads))
 
             for quad in quads:
                 q_geom = quad["geometry"]
@@ -178,7 +178,7 @@ async def run_mesh_grid() -> int:
             await session.commit()
             status = "ok"
             detail = f"cuadriculas={processed} con_amenaza={with_hazard}"
-            logger.info("Mesh grid listo: %s", detail)
+            logger.info("Mesh grid done: %s", detail)
         except Exception as exc:  # noqa: BLE001
             detail = repr(exc)
             await session.rollback()

@@ -25,11 +25,12 @@ logger = logging.getLogger(__name__)
 SIATA_HOME = "https://www.siata.gov.co"
 PLUVIO_JSON = "https://siata.gov.co/data/siata_app/Pluviometrica.json"
 
-# Identificador de la fuente. Se usa en `scraping_logs.source`, en la clave
-# `source` del JSONB de `ml_features`, y —desde la migración b1c2d3e4f501— en
-# la columna `rainfall_timeseries.source`, que forma parte del índice único.
-# Una sola constante porque estaba repetido en cuatro sitios: si divergen, el
-# `ON CONFLICT` deja de casar con el índice y la ingesta entera se cae.
+# Source identifier. Used in `scraping_logs.source`, in `ml_features`'s
+# JSONB `source` key, and — since migration b1c2d3e4f501 — in the
+# `rainfall_timeseries.source` column, which is part of the unique index.
+# One single constant because it used to be repeated in four places: if
+# they diverge, `ON CONFLICT` stops matching the index and the whole
+# ingestion breaks.
 SOURCE_KEY = "siata"
 
 
@@ -123,28 +124,28 @@ async def _run_siata(session: AsyncSession) -> int:
     try:
         by_commune, meta, ref_dt, detail, downloaded = await _collect_siata_payload()
 
-        # Índice de precipitación antecedente por comuna (lluvia ponderada por
-        # recencia sobre rainfall_timeseries) — feature ML clave para el modelo.
+        # Antecedent precipitation index per commune (rain weighted by
+        # recency over rainfall_timeseries) — key ML feature for the model.
         from ml.precip_index import FEATURE_KEY as API_KEY, antecedent_indexes_for_all_communes
 
         try:
             api_by_commune = await antecedent_indexes_for_all_communes(session)
         except Exception as api_exc:  # noqa: BLE001
-            logger.warning("No se pudo calcular el índice antecedente: %s", api_exc)
+            logger.warning("Could not compute the antecedent index: %s", api_exc)
             api_by_commune = {}
 
-        # Intensidad sísmica reciente POR COMUNA (atenuación por distancia real
-        # comuna↔epicentro; clave "_default" = valle para comunas sin centroide).
+        # Recent seismic intensity PER COMMUNE (real commune↔epicenter
+        # distance attenuation; "_default" key = valley for communes with no centroid).
         from ml.seismic_features import FEATURE_KEY as SEISMIC_KEY, seismic_intensity_by_commune
 
         try:
             seismic_by_commune = await seismic_intensity_by_commune(session)
         except Exception as seis_exc:  # noqa: BLE001
-            logger.warning("No se pudo calcular la intensidad sísmica: %s", seis_exc)
+            logger.warning("Could not compute seismic intensity: %s", seis_exc)
             seismic_by_commune = {}
 
-        # % de barrios en amenaza "Alta" por comuna — puente estadístico entre
-        # la granularidad de barrio (VM05) y el modelo, que predice por comuna.
+        # % of barrios in "Alta" hazard per commune — statistical bridge
+        # between barrio granularity (VM05) and the model, which predicts per commune.
         from ml.barrio_hazard_features import (
             FEATURE_KEY as HAZARD_PCT_KEY,
             pct_barrios_alta_amenaza,
@@ -153,16 +154,16 @@ async def _run_siata(session: AsyncSession) -> int:
         try:
             hazard_pct_by_commune = await pct_barrios_alta_amenaza(session)
         except Exception as hazard_exc:  # noqa: BLE001
-            logger.warning("No se pudo calcular pct_barrios_alta_amenaza: %s", hazard_exc)
+            logger.warning("Could not compute pct_barrios_alta_amenaza: %s", hazard_exc)
             hazard_pct_by_commune = {}
 
-        # Soil Water Index (saturación estimada del suelo, metodología JMA).
+        # Soil Water Index (estimated soil saturation, JMA methodology).
         from ml.soil_water_index import FEATURE_KEY as SWI_KEY, swi_for_all_communes
 
         try:
             swi_by_commune = await swi_for_all_communes(session)
         except Exception as swi_exc:  # noqa: BLE001
-            logger.warning("No se pudo calcular el Soil Water Index: %s", swi_exc)
+            logger.warning("Could not compute the Soil Water Index: %s", swi_exc)
             swi_by_commune = {}
 
         for cid, values in by_commune.items():
@@ -176,9 +177,9 @@ async def _run_siata(session: AsyncSession) -> int:
             m = meta[cid]
             seismic_val = seismic_by_commune.get(cid, seismic_by_commune.get("_default"))
             swi_val = swi_by_commune.get(cid)
-            # Interacción sismo × saturación: un sismo sobre suelo saturado es
-            # el escenario de mayor riesgo real; como columnas separadas el
-            # modelo (árboles poco profundos) difícilmente aprende ese cruce.
+            # Seismic × saturation interaction: a quake on saturated soil is
+            # the highest real-risk scenario; as separate columns the model
+            # (shallow trees) is unlikely to learn that cross-term.
             seismic_x_swi = (
                 round(seismic_val * (swi_val / 100.0), 4)
                 if seismic_val is not None and swi_val is not None
@@ -210,10 +211,11 @@ async def _run_siata(session: AsyncSession) -> int:
             session.add(row)
 
             # Write to rainfall_timeseries for the live rain monitor (idempotent).
-            # `source` es OBLIGATORIO en el conflicto: el índice único es
-            # (commune_id, snapshot_at, source) desde la migración b1c2d3e4f501.
-            # Sin la tercera columna, Postgres no encuentra un índice que case y
-            # aborta con InvalidColumnReferenceError, tumbando toda la ingesta.
+            # `source` is MANDATORY in the conflict clause: the unique index
+            # has been (commune_id, snapshot_at, source) since migration
+            # b1c2d3e4f501. Without the third column, Postgres finds no
+            # matching index and aborts with InvalidColumnReferenceError,
+            # taking down the whole ingestion.
             stmt = (
                 pg_insert(RainfallTimeseries)
                 .values(
@@ -231,8 +233,8 @@ async def _run_siata(session: AsyncSession) -> int:
         await session.commit()
         status = "ok"
 
-        # Checks de alertas post-ingesta (umbral diario + Snake Line) — la
-        # composición vive en application/fire_alerts.py; nunca tumba la corrida.
+        # Post-ingestion alert checks (daily threshold + Snake Line) — the
+        # composition lives in application/fire_alerts.py; never takes down the run.
         from application.fire_alerts import alerts_after_rain_ingest
 
         await alerts_after_rain_ingest(session, list(by_commune.keys()))
