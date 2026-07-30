@@ -1,6 +1,14 @@
 # TEYVA MVP
 
+[![CI](https://img.shields.io/github/actions/workflow/status/Juanpacol/teyva/ci-tests.yml?branch=main&label=CI)](.github/workflows/ci-tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Plataforma para monitorear y estimar riesgo de deslizamientos en Medellin, integrando datos reales, modelo predictivo, API, dashboard web y asistente conversacional con Ollama.
+
+## Quick Start
+
+Para levantar el stack completo en menos de 5 minutos (Docker o manual), ver
+[`docs/quick-start.md`](docs/quick-start.md).
 
 ## Que resuelve
 
@@ -109,6 +117,19 @@ En inferencia:
 - Calcula `risk_score` (probabilidad) y lo traduce a nivel (`bajo`, `medio`, `alto`, `critico`).
 - Guarda resultados en `risk_predictions` (proceso masivo para comunas).
 
+## Metrics
+
+**El AUC-ROC 0.944 (recall 0.999) reportado historicamente para el clasificador no es una
+metrica valida.** Las 26 etiquetas positivas usadas para entrenarlo provenian de eventos
+sinteticos; al aplicar correctamente el filtro `is_synthetic`, no queda ningun positivo real —
+es decir, nunca hubo un objetivo supervisado real detras de esa metrica.
+
+El enfoque vigente reemplaza esa metrica por un indice declarado de **susceptibilidad x
+disparador** (`domain/susceptibility.py`, `ml/hazard.py`), combinado mediante inferencia
+neuro-simbolica en `application/predict_risk.py` / `application/neurosymbolic/infer.py`. El
+detalle completo de la auditoria que motivo este cambio esta en
+[`docs/research/audit-2026-07.md`](docs/research/audit-2026-07.md) — no se repite aqui.
+
 ## 5) API (`backend/api`)
 
 Archivo principal: `backend/api/main.py`
@@ -118,6 +139,10 @@ Routers:
 - `routes/risk.py`
 - `routes/chat.py`
 - `routes/scraper.py`
+
+Ver [`docs/api.md`](docs/api.md) para el listado completo de endpoints (metodo, proposito,
+autenticacion requerida y ejemplos curl), incluyendo los routers `routes/rain.py` y
+`routes/alerts.py` que no estan detallados abajo.
 
 Endpoints de riesgo mas usados:
 
