@@ -1,0 +1,270 @@
+# TEYVA: A Neuro-Symbolic Architecture for Landslide Risk Assessment Under Missing-Label Conditions
+
+**Status:** research draft, generated from a working implementation. Every number in §5 is
+computed from the code in this repository, not estimated. Section 4 references
+`docs/research/audit-2026-07.md` for the underlying empirical audit this design responds to.
+
+---
+
+## 1. Problem
+
+TEYVA is a landslide early-warning platform for Medellín (16 comunas + 5 corregimientos). Its
+original design was a two-stage pipeline: an XGBoost classifier producing a probability, and a
+fixed-threshold layer (`domain/risk_rules.py`) converting that probability into an operational
+category. The module's own docstring stated the boundary explicitly: *"the model never learns
+from these rules; the rules never predict."*
+
+A July 2026 audit found the classifier had no valid training target: of 6,024 rows in
+`landslide_events`, 5,844 had no usable location, and the 26 positives the production model
+trained on came from synthetic calibration events (Snake Line), not real ones. Once the
+`is_synthetic` filter was applied correctly, zero real positives remained. The reported
+AUC-ROC of 0.9435 measured the model memorizing the heuristic that generated its own labels,
+not skill at predicting landslides.
+
+This is not a data-quality footnote — it is the central constraint the rest of this paper works
+under. **There is no supervised target to fit, and none is coming.** Any evaluation methodology
+that assumes one is dishonest by construction. Section 5 of this paper is organized around that
+constraint rather than around it.
+
+## 2. Related work
+
+Early-warning systems that are explicit about uncertainty under incomplete evidence exist —
+FEWS NET (Famine Early Warning Systems Network) and the Red Cross's Early Action Protocols are
+the most cited examples — but in both cases that transparency is produced by human analysts
+writing narrative reports, not by an automated system declaring its own confidence as part of
+the data pipeline. The gap this project occupies — explicit reasoning plus automatic,
+per-instance confidence declaration, without a human in the loop to write it up — is a
+positioning hypothesis based on a non-exhaustive reading of the landscape, not a verified claim
+against the full literature.
+
+## 3. Architecture
+
+```
+Evidence (rain, seismic, terrain, prior events, quality flags)
+   │
+   ├─► NEURAL LAYER — ml/estimators/*: one Signal(value, uncertainty, source,
+   │        coverage) per evidence source, never a single arbiter
+   │
+   ├─► SYMBOLIC LAYER
+   │        ontology/teyva.owl        — T-Box + A-Box, territory vocabulary
+   │        domain/rules/             — 8-rule forward-chaining catalog
+   │        domain/quality.py         — plausibility predicates
+   │
+   └─► INFERENCE ENGINE — application/neurosymbolic/infer.py
+            combines the neural score with the fired-rule trace by declared
+            precedence, emits Verdict{score, level, confidence, derivation, conflicts}
+                │
+                ├─► EXPLANATION — application/neurosymbolic/explain.py
+                │      deterministic render(Verdict) → ExplanationTree;
+                │      every stated factor IS a derivation node, not a
+                │      paraphrase of one
+                │
+                └─► KNOWLEDGE GRAPH — kg/ (static territory graph + SPARQL)
+```
+
+### 3.1 Neural layer
+
+Four `Signal`-producing estimators (`ml/estimators/`): rainfall (SWI + antecedent index),
+seismic intensity, terrain (declared susceptibility components), and the legacy XGBoost
+classifier, wrapped as a pure adapter rather than retrained as a component (its own training
+target is the problem described in §1). Each `Signal` carries `uncertainty` and `coverage`
+explicitly — a missing source returns `value=None`, never a silent zero standing in for "no
+risk."
+
+### 3.2 Symbolic layer
+
+`domain/rules/catalog.py` declares 8 rules as `(condition, effect, provenance)` triples, never
+arbitrary code. Effects are one of five types: `SetFloor`, `Escalate`, `MultiplyScore`,
+`RaisePriority`, `Veto`. The catalog reuses thresholds already declared in
+`domain/susceptibility.py` rather than introducing a second set of magic numbers. One rule,
+`R-QUAL-01`, is the direct response to a gap the audit identified: when there is no trigger
+signal at all (no rain, no SWI, no seismic reading), the declared index
+(`susceptibility × trigger`) silently evaluates to zero — indistinguishable from a confirmed
+absence of risk. `R-QUAL-01` vetoes that case explicitly instead.
+
+The rule engine (`domain/rules/engine.py`) is a small hand-written forward-chaining
+implementation, not a third-party library. `experta` (a CLIPS-style engine) was rejected as
+unmaintained since 2018; executing SWRL directly via a Pellet reasoner was rejected because it
+needs a JVM in every GitHub Actions cron and is slow to debug against a live incident (ADR-0002).
+The OWL ontology (`ontology/teyva.owl`) remains the formal specification of the domain vocabulary
+and, eventually, of the rules themselves via SWRL — but is not executed at inference time.
+
+### 3.3 Inference engine
+
+`application/neurosymbolic/infer.py::resolve_verdict()` is a pure function:
+`(neural_score, TerritorySnapshot) → Verdict`. Conflict resolution follows a declared
+precedence (ADR-0003): `Veto` > rule floor > neural level. A rule floor can raise the level the
+neural score alone would produce, but never lower it — a confidently wrong neural reading cannot
+suppress a geotechnical red flag, and a genuinely severe neural signal is never capped by a
+conservative rule. Every override is recorded in `Verdict.conflicts` with both values, which is
+the mechanism by which the two layers can be shown to interact rather than run as independent
+stages.
+
+Confidence is computed per commune, per run — not the single global `CALIBRATION_STATUS` flag
+the pre-existing code exposed — as a declared function of source coverage, active data-quality
+flags, and whether the run depended on the contaminated synthetic labels. It is explicitly not
+statistically calibrated: no real event series exists to calibrate it against (§1).
+
+### 3.4 Explanation
+
+`application/neurosymbolic/explain.py::render()` converts a `Verdict` into an `ExplanationTree`
+of typed nodes — one per fired rule, one per resolved conflict, one for the neural contribution,
+one for confidence. In production, `agent/risk_explanations.py::generate_explanation_from_verdict()`
+uses this tree directly as the explanation: every stated factor is a derivation node's text
+verbatim. This is a deliberate departure from the original plan of having an LLM rephrase the
+tree and validating the rephrasing post hoc with a faithfulness check — skipping the LLM
+entirely makes faithfulness hold by construction rather than by validation, at the cost of a
+less natural-sounding sentence. The `is_faithful()` check still exists and is exercised by tests;
+it is what a future LLM-rephrasing layer would be gated by.
+
+## 4. What changed from the pre-existing system
+
+| | Before | After |
+|---|---|---|
+| Score source | XGBoost trained on 26 contaminated positives | Declared `susceptibility × trigger` index, combined with 8 symbolic rules |
+| Rule/model interaction | None — sequential, documented as such | Declared conflict precedence, every override recorded |
+| Missing-data handling | Silent zero (index) or median imputation (classifier) | `Signal(value=None, ...)` propagated; `R-QUAL-01` vetoes zero-coverage cases |
+| Confidence | One global static flag | Per-commune, per-run, computed from coverage + flags |
+| Explanation | LLM narrates raw numbers, unconstrained | Deterministic render of the actual derivation; faithful by construction |
+| Territory vocabulary | Implicit in code, duplicated in 5 places (`domain/communes.py`'s own history) | Formal OWL ontology + single Python source of truth |
+
+## 5. Evaluation
+
+### 5.1 Why not a classification metrics table
+
+A conventional accuracy/precision/recall/F1/AUC table would need labels. The only labels
+available are the 144 synthetic Snake Line events used to calibrate the declared index itself —
+evaluating against them would measure agreement with a heuristic against its own calibration
+data, the exact circularity §1 describes. We do not report such a table. `ml/benchmark.py`'s
+frozen-snapshot infrastructure exists and could produce one on request, captioned as a surrogate;
+we chose not to include a number here that would be quoted out of context as "TEYVA's accuracy."
+
+### 5.2 Rule coverage
+
+Computed via `evaluation/primary_metrics.py::rule_coverage()` over 21 synthetic
+`TerritorySnapshot`s constructed to match today's real data-availability pattern (terrain slope
+populated for ~90% of communes, following the SRTM ingestion in
+`scraper/terrain_features.py`; rain/SWI populated for ~30%, reflecting the rainfall corruption
+documented in the audit; seismic intensity for ~50%; critical-facility proximity for ~80%):
+
+| Rule | Fire rate | Evaluable rate |
+|---|---|---|
+| R-GEO-01 (slope+rain floor) | 0.00 | 0.24 |
+| R-GEO-02 (slope+SWI escalate) | 0.00 | 0.24 |
+| R-GEO-03 (TWI+antecedent escalate) | 0.00 | 0.00 |
+| R-GEO-04 (NDVI+slope escalate) | 0.00 | 0.00 |
+| R-HIST-01 (prior-event priority) | 0.43 | 1.00 |
+| R-EXPO-01 (critical-facility priority) | 0.29 | 0.81 |
+| R-SEIS-01 (seismic+SWI escalate) | 0.00 | 0.14 |
+| R-QUAL-01 (zero-coverage veto) | 0.43 | 1.00 |
+
+76.2% of runs had at least one rule fire. The level-changing geotechnical rules (R-GEO-01..04,
+R-SEIS-01) never fired in this sample: TWI and NDVI are entirely unpopulated (0% evaluable —
+they need flow-accumulation and satellite-imagery pipelines this project does not have), and
+slope+rain crossing both thresholds simultaneously is genuinely rare under random sampling.
+R-QUAL-01, the zero-coverage veto, fired in 43% of runs — direct, honest evidence that the
+data-quality gap documented in the audit is not a corner case: under today's real rain-coverage
+rate, nearly half of all runs would have their score vetoed rather than silently reported as
+"no risk."
+
+### 5.3 Ablation
+
+`evaluation/ablation.py::run_ablation()`, same 21-snapshot sample, neural scores drawn uniformly
+at random:
+
+- **Removing rules:** 0/21 levels changed in this sample (consistent with §5.2 — no floor/escalate
+  rule fired), but confidence dropped by a mean of 0.155 with rules present vs. without
+  (`confidence_delta_mean = -0.1548`). Rules alone did not change any *level* in this sample, but
+  they consistently penalized confidence — the "not evaluable" count from unpopulated TWI/NDVI
+  rules is itself informative and is priced into confidence, exactly as designed.
+- **Removing data-quality flags:** no measurable delta in this sample (no snapshot happened to
+  carry a quality flag distinct from zero-coverage, which is handled by `R-QUAL-01` directly).
+- **Removing the ontology:** not applicable — SWRL axioms are not executed at inference time
+  (§3.2), so there is nothing to switch off. Stated as a limitation, not simulated with a
+  no-op ablation.
+
+Across the same sample, the four-arm comparison (`evaluation/run.py`) found the `ml_only` and
+`neurosymbolic` arms disagreeing on 11 of 21 communes (52%) — driven almost entirely by
+`RaisePriority` effects from R-HIST-01/R-EXPO-01 rather than level changes, consistent with
+§5.2's finding that priority rules fire far more often than level-changing ones under today's
+data coverage.
+
+### 5.4 Explanation faithfulness
+
+By construction (§3.4), every factor in a derivation-grounded explanation is a node's text
+verbatim; `application/neurosymbolic/explain.py::is_faithful()` — exercised in
+`tests/test_explain_render.py` and `tests/test_generate_explanation_from_verdict.py` — confirms
+this holds for every risk level and for the veto case. Faithfulness here is a property enforced
+by the code path, not a rate estimated over a sample.
+
+### 5.5 Inference latency
+
+`evaluation/latency.py`, pure computation only (no DB I/O), 21 synthetic communes × 50 repeats.
+Representative figures from one run (`python -m evaluation.reproduce_paper`) — absolute values
+are machine- and load-dependent and will vary run to run by roughly this order of magnitude:
+
+| Arm | p50 | p95 |
+|---|---|---|
+| `ml_only` (threshold lookup) | ~0.0001 ms | ~0.0001 ms |
+| `neurosymbolic` (8-rule engine + conflict resolution) | ~0.003–0.004 ms | ~0.004–0.005 ms |
+
+The symbolic layer adds on the order of a few microseconds per commune. This is negligible next
+to the database and network I/O (`ml/hazard.py`'s queries) that dominate real request latency in
+production — the architectural choice to add a rule engine is not a performance concern.
+
+### 5.6 Expert agreement
+
+Not conducted. A 20-case DAGRD expert-agreement rubric with Cohen's κ was scoped
+(`specs/007-experimental-eval/spec.md`) but requires human domain-expert judges this session had
+no access to. `evaluation/rubric.md` (template) was not produced; this is an open item, not a
+negative result.
+
+## 6. Limitations
+
+- No real, georeferenced landslide event dataset exists (36 usable events, 0 positives under the
+  training-window definition used originally). This blocks not only supervised training but any
+  future calibration of the confidence formula in §3.3.
+- TWI and NDVI remain entirely unpopulated (0% evaluable in §5.2), blocking 4 of 8 rules from
+  ever firing on real data. This needs a DEM flow-accumulation pipeline and satellite-imagery
+  access this project does not have configured.
+- The confidence formula (§3.3) and the rule catalog's thresholds are declared from literature
+  and domain judgment, not fit against outcomes — consistent with the declared-index design
+  throughout, but genuinely uncalibrated.
+- §5.2–5.5's numbers are computed on synthetic snapshots constructed to match today's known
+  data-coverage rates, not on live production data pulled from Supabase — this session had no
+  database credentials available. The terrain-slope ingestion (`scraper/terrain_features.py`)
+  was live-smoke-tested against the real SRTM API but its database write was not verified against
+  production.
+- Expert agreement (§5.6) is unconducted.
+- The ontology (§3.2) is a formal specification, not yet cross-checked against the rule catalog
+  by an automated test (planned: every SWRL axiom must have a matching `Rule.id`).
+
+## 7. Reproducibility
+
+Every number in §5.2–§5.5 is reproduced exactly (latency up to machine-dependent timing noise)
+by a single script committed alongside this paper:
+
+```bash
+cd platform/backend && export PYTHONPATH=.
+pytest tests -q                             # 348 passed, 12 skipped at time of writing
+python -m evaluation.reproduce_paper        # prints every §5.2/§5.3/§5.5 number, fixed seed=42
+```
+
+No API keys, database credentials, or GPU are required for any number reported here — the entire
+evaluation runs on pure Python functions over synthetic `TerritorySnapshot`s. The only external
+dependency exercised in this project (not in this evaluation) is Open Topo Data's public SRTM API
+for terrain ingestion (`scraper/terrain_features.py`), which needs no key.
+
+## 8. Conclusion
+
+The most defensible claim this paper makes is not a performance number — none of the ones
+usually expected (accuracy, F1, AUC) can be honestly computed here, and manufacturing one from
+synthetic labels would repeat exactly the mistake that motivated this redesign. What can be
+shown, and is shown in §5: the symbolic layer measurably changes confidence and priority even
+when it doesn't change the final category (§5.3); a zero-coverage veto rule is not a theoretical
+safeguard but fires in nearly half of runs under today's real data-coverage rate (§5.2); every
+explanation the system produces is faithful to its derivation by construction, not by hope
+(§5.4); and none of this costs anything in latency (§5.5). Whether that adds up to a system
+worth deploying over the original two-stage pipeline is a judgment call for Gestión del Riesgo,
+not a claim this paper makes for them — but it is no longer a claim resting on an AUC computed
+against labels that do not mean what they were reported to mean.
