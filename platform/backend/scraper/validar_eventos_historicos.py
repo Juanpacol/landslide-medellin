@@ -1,21 +1,20 @@
 """
-Validar eventos históricos reales (`landslide_events`) contra lo que el
-Snake Line (SWI × lluvia) hubiera clasificado ese día, usando datos de lluvia
-ya backfilleados por `scraper/historical_backfill.py` (fuentes
-`historical_siata`/`historical_ideam` en `MLFeature.features`).
+Validates real historical events (`landslide_events`) against what Snake
+Line (SWI × rain) would have classified that day, using rain data already
+backfilled by `scraper/historical_backfill.py` (`historical_siata`/
+`historical_ideam` sources in `MLFeature.features`).
 
-Reutiliza directamente `ml.soil_water_index.compute_swi` y
-`alerts.snake_line.classify_point` — NO reimplementa la fórmula, para que
-cualquier ajuste de parámetros (drain_rate, slope, intercept) se refleje aquí
-sin duplicar lógica.
+Reuses `ml.soil_water_index.compute_swi` and `alerts.snake_line.classify_point`
+directly — does NOT reimplement the formula, so any parameter adjustment
+(drain_rate, slope, intercept) is reflected here without duplicating logic.
 
-Limitación honesta: el backfill histórico solo tiene lluvia DIARIA (suma del
-día), no la ventana de 60 minutos que usa Snake Line en producción. Se usa la
-lluvia del día del evento como proxy de "y" — más ruidoso que el dato en
-vivo, pero es lo único disponible para fechas pasadas. Se documenta en el
-output, no se presenta como equivalente al Snake Line en tiempo real.
+Honest limitation: the historical backfill only has DAILY rain (day's sum),
+not the 60-minute window Snake Line uses in production. The event day's
+rain is used as a proxy for "y" — noisier than the live data, but it's the
+only thing available for past dates. Documented in the output, not
+presented as equivalent to real-time Snake Line.
 
-Uso:
+Usage:
 
     cd platform/backend && PYTHONPATH=. python -m scraper.validar_eventos_historicos
 """
@@ -53,9 +52,9 @@ def _parse_event_date(fecha: str | None) -> date | None:
 
 
 async def _daily_rain_by_commune(session) -> dict[str, dict[date, float]]:
-    """Reconstruye lluvia diaria por comuna desde el backfill histórico
-    (`MLFeature.features->>'precip_sum_mm_day'`, fuentes historical_siata /
-    historical_ideam). Es la única fuente con cobertura para fechas pasadas."""
+    """Reconstructs daily rain per commune from the historical backfill
+    (`MLFeature.features->>'precip_sum_mm_day'`, historical_siata /
+    historical_ideam sources). The only source with coverage for past dates."""
     rows = (await session.execute(select(MLFeature))).scalars().all()
     out: dict[str, dict[date, float]] = defaultdict(dict)
     for row in rows:
@@ -79,40 +78,40 @@ async def main() -> None:
     async with AsyncSessionLocal() as session:
         events = (await session.execute(select(LandslideEvent))).scalars().all()
         if not events:
-            logger.error("Sin eventos en landslide_events. Ejecuta primero:")
+            logger.error("No events in landslide_events. Run first:")
             logger.error("  python -m scraper.historical_backfill")
             return
 
         daily_rain_by_commune = await _daily_rain_by_commune(session)
 
-    resultados = []
+    results = []
     for ev in events:
         d = _parse_event_date(ev.fecha)
         cid = str(ev.commune_id) if ev.commune_id is not None else None
 
         if d is None or cid is None:
-            resultados.append(
+            results.append(
                 {
                     "evento_id": ev.id,
                     "commune_id": cid,
                     "fecha": ev.fecha,
                     "fuente": ev.source_row_id,
                     "evaluable": False,
-                    "motivo": "sin fecha" if d is None else "sin commune_id",
+                    "motivo": "no date" if d is None else "no commune_id",
                 }
             )
             continue
 
         daily_rain = daily_rain_by_commune.get(cid)
         if not daily_rain:
-            resultados.append(
+            results.append(
                 {
                     "evento_id": ev.id,
                     "commune_id": cid,
                     "fecha": d.isoformat(),
                     "fuente": ev.source_row_id,
                     "evaluable": False,
-                    "motivo": "sin lluvia histórica para esa comuna",
+                    "motivo": "no historical rain for that commune",
                 }
             )
             continue
@@ -123,7 +122,7 @@ async def main() -> None:
         y_rain_day_proxy = daily_rain.get(d, 0.0)
         status = classify_point(swi, y_rain_day_proxy, cid)
 
-        resultados.append(
+        results.append(
             {
                 "evento_id": ev.id,
                 "commune_id": cid,
@@ -137,53 +136,53 @@ async def main() -> None:
             }
         )
 
-    df = pd.DataFrame(resultados)
-    evaluables = df[df["evaluable"]] if not df.empty else df
+    df = pd.DataFrame(results)
+    evaluable_rows = df[df["evaluable"]] if not df.empty else df
 
     logger.info("=" * 70)
-    logger.info("VALIDACIÓN: EVENTOS HISTÓRICOS vs SNAKE LINE")
+    logger.info("VALIDATION: HISTORICAL EVENTS vs SNAKE LINE")
     logger.info("=" * 70)
-    logger.info(f"Total eventos en landslide_events: {len(df)}")
-    logger.info(f"Evaluables (fecha + commune_id + lluvia histórica): {len(evaluables)}")
+    logger.info(f"Total events in landslide_events: {len(df)}")
+    logger.info(f"Evaluable (date + commune_id + historical rain): {len(evaluable_rows)}")
 
-    if len(evaluables) == 0:
-        logger.warning("\nNinguno evaluable todavía. Causas más comunes:")
+    if len(evaluable_rows) == 0:
+        logger.warning("\nNone evaluable yet. Most common causes:")
         if not df.empty:
             logger.warning(df["motivo"].value_counts().to_string())
         logger.warning(
-            "\nEjecuta en orden: historical_backfill.py → geocode_events.py → este script."
+            "\nRun in order: historical_backfill.py → geocode_events.py → this script."
         )
         return
 
-    aciertos = int(evaluables["hubiera_alertado"].sum())
-    total = len(evaluables)
-    tasa = aciertos / total * 100
+    hits = int(evaluable_rows["hubiera_alertado"].sum())
+    total = len(evaluable_rows)
+    rate = hits / total * 100
 
-    logger.info(f"\nHubiera alertado (AMARILLO/ROJO): {aciertos}/{total} ({tasa:.1f}%)")
-    logger.info("\nDistribución de status:")
-    logger.info(evaluables["snake_line_status"].value_counts().to_string())
+    logger.info(f"\nWould have alerted (AMARILLO/ROJO): {hits}/{total} ({rate:.1f}%)")
+    logger.info("\nStatus distribution:")
+    logger.info(evaluable_rows["snake_line_status"].value_counts().to_string())
 
     logger.info(
-        f"\nParámetros evaluados: drain_rate={DRAIN_RATE_DEFAULT}, línea crítica={CRITICAL_LINES['default']}"
+        f"\nParameters evaluated: drain_rate={DRAIN_RATE_DEFAULT}, critical line={CRITICAL_LINES['default']}"
     )
     logger.info(
-        "(y = lluvia del día del evento, proxy de la ventana de 60min que usa Snake Line en vivo)"
+        "(y = the event day's rain, a proxy for the 60min window live Snake Line uses)"
     )
 
-    if tasa < 60:
+    if rate < 60:
         logger.warning(
-            f"\n⚠️ Tasa baja ({tasa:.1f}%). Considerar: subir drain_rate o bajar intercept en alerts/snake_line.py"
+            f"\n⚠️ Low rate ({rate:.1f}%). Consider: raising drain_rate or lowering intercept in alerts/snake_line.py"
         )
-    elif tasa > 90:
+    elif rate > 90:
         logger.info(
-            f"\n✅ Tasa alta ({tasa:.1f}%) — revisar que no sea por proxy de lluvia diaria demasiado laxo."
+            f"\n✅ High rate ({rate:.1f}%) — check it isn't from too loose a daily-rain proxy."
         )
     else:
-        logger.info(f"\n🟡 Tasa razonable ({tasa:.1f}%).")
+        logger.info(f"\n🟡 Reasonable rate ({rate:.1f}%).")
 
     out_path = Path(__file__).resolve().parents[1] / "validacion_eventos.csv"
     df.to_csv(out_path, index=False)
-    logger.info(f"\nDetalle guardado en: {out_path}")
+    logger.info(f"\nDetail saved to: {out_path}")
 
 
 if __name__ == "__main__":
