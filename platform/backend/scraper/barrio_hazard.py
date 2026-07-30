@@ -23,6 +23,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+import httpx
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from db.models.barrio_hazard import BarrioHazard
@@ -61,7 +62,10 @@ def _centroid_lonlat(geometry: dict[str, Any]) -> tuple[float, float] | None:
     return lon, lat
 
 
-async def _hazard_for_point(client, sem: asyncio.Semaphore, lon: float, lat: float) -> str | None:
+async def _hazard_for_point(
+    client: "httpx.AsyncClient", sem: asyncio.Semaphore, lon: float, lat: float
+) -> str | None:
+    """Queries the VM05 hazard layer for one point, bounded by `sem`."""
     async with sem:
         try:
             feats = await _query_point_layer(client, VM05_BASE, 2, lon, lat)
@@ -74,6 +78,7 @@ async def _hazard_for_point(client, sem: asyncio.Semaphore, lon: float, lat: flo
 
 
 async def run_barrio_hazard() -> int:
+    """Samples hazard grade at every barrio centroid and upserts `barrio_hazard`."""
     started = utcnow()
     status = "error"
     processed = 0

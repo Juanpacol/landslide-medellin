@@ -14,7 +14,8 @@ ONTOLOGY_PATH = Path(__file__).resolve().parents[4] / "ontology" / "teyva.owl"
 
 
 @lru_cache(maxsize=1)
-def _load():
+def _load() -> Any:
+    """Loads and process-caches the ontology (owlready2 `Ontology`)."""
     from owlready2 import get_ontology
 
     onto = get_ontology(f"file://{ONTOLOGY_PATH}").load()
@@ -47,6 +48,7 @@ def individuals_for_commune(commune_id: str) -> dict[str, Any] | None:
 
 
 def all_territory_individuals() -> list[dict[str, Any]]:
+    """The ontology individual for every commune that has one, as plain dicts."""
     from domain.communes import COMMUNES
 
     out = []

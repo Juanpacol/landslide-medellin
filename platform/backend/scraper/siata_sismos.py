@@ -100,6 +100,7 @@ def _extract_events(feature: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 async def _collect_seismic_rows() -> tuple[list[dict[str, Any]], int, str]:
+    """Download SIATA seismic GeoJSON feeds and flatten their events into rows."""
     rows: list[dict[str, Any]] = []
     detail_parts: list[str] = []
     downloaded = 0
@@ -133,6 +134,7 @@ async def _event_exists(session: AsyncSession, source_row_id: str) -> bool:
 
 
 async def _run_siata_sismos(session: AsyncSession) -> int:
+    """Fetch new SIATA earthquake events, insert them, and log the run."""
     started = utcnow()
     status = "error"
     downloaded = 0
@@ -189,6 +191,7 @@ async def _run_siata_sismos(session: AsyncSession) -> int:
 
 
 async def run_siata_sismos_scraper(session: AsyncSession | None = None) -> int:
+    """Run the SIATA seismic scraper, opening a session if one isn't provided."""
     if session is None:
         async with AsyncSessionLocal() as s:
             return await _run_siata_sismos(s)
@@ -196,6 +199,7 @@ async def run_siata_sismos_scraper(session: AsyncSession | None = None) -> int:
 
 
 async def main() -> None:
+    """Run the SIATA seismic scraper and print the number of inserted events."""
     n = await run_siata_sismos_scraper()
     print("siata_sismos_inserted", n)
 

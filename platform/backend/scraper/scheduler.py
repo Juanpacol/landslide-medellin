@@ -35,6 +35,7 @@ async def run_scraper_watchdog() -> None:
 
 
 def build_scheduler() -> AsyncIOScheduler:
+    """Builds the APScheduler instance with all scraper and watchdog jobs registered."""
     scheduler = AsyncIOScheduler()
 
     # next_run_time close to "now": without this, an interval-N job waits a

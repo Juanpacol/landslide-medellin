@@ -33,6 +33,7 @@ def _strip_html(text: str) -> str:
 
 
 def _parse_commune_from_text(text: str) -> str | None:
+    """Extracts a commune id from a mention of "comuna N" or "corregimiento NN"."""
     m = re.search(r"comuna\s*(\d{1,2})\b", text, flags=re.IGNORECASE)
     if m:
         return str(int(m.group(1)))
@@ -56,9 +57,10 @@ def _event_date_from_wp(post: dict[str, Any]) -> str:
 
 
 async def _fetch_wp_posts(client: httpx.AsyncClient, term: str) -> list[dict[str, Any]]:
+    """Searches the DAGRD WordPress REST API for posts matching `term`."""
     params = {"search": term, "per_page": 20, "page": 1}
 
-    async def _call():
+    async def _call() -> Any:
         r = await client.get(WP_SEARCH_URL, params=params)
         r.raise_for_status()
         return r.json()
@@ -68,7 +70,9 @@ async def _fetch_wp_posts(client: httpx.AsyncClient, term: str) -> list[dict[str
 
 
 async def _fetch_dagrd_home(client: httpx.AsyncClient) -> str:
-    async def _call():
+    """Downloads the DAGRD portal home page HTML."""
+
+    async def _call() -> str:
         r = await client.get(DAGRD_PORTAL)
         r.raise_for_status()
         return r.text
@@ -77,6 +81,7 @@ async def _fetch_dagrd_home(client: httpx.AsyncClient) -> str:
 
 
 async def _collect_dagrd_events() -> tuple[list[dict[str, Any]], int, str | None]:
+    """Scrapes the DAGRD home page and WordPress search for landslide-related events."""
     detail_parts: list[str] = []
     posts: list[dict[str, Any]] = []
     async with httpx_client() as client:
@@ -131,6 +136,7 @@ async def _event_exists(
     commune_id: str | None,
     source_row_id: str | None,
 ) -> bool:
+    """Checks whether a `LandslideEvent` with this source id or date/commune already exists."""
     if source_row_id:
         stmt = (
             select(LandslideEvent.id).where(LandslideEvent.source_row_id == source_row_id).limit(1)
@@ -148,6 +154,7 @@ async def _event_exists(
 
 
 async def _run_dagrd(session: AsyncSession) -> int:
+    """Runs the DAGRD scrape end-to-end and logs the run."""
     started = utcnow()
     status = "error"
     downloaded = 0
@@ -210,13 +217,14 @@ async def _run_dagrd(session: AsyncSession) -> int:
 
 
 async def run_dagrd_scraper(session: AsyncSession | None = None) -> int:
+    """Entry point for the DAGRD scraper, opening a session if none is given."""
     if session is None:
         async with AsyncSessionLocal() as s:
             return await _run_dagrd(s)
     return await _run_dagrd(session)
 
 
-async def main():
+async def main() -> None:
     n = await run_dagrd_scraper()
     print("dagrd_inserted", n)
 

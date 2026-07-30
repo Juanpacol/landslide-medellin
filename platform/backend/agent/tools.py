@@ -19,6 +19,7 @@ from domain.communes import resolve_commune_id  # noqa: F401
 
 
 def _normalize_token(s: str) -> str:
+    """Lowercase and strip diacritics from a token for loose matching."""
     s = s.strip().lower()
     nkfd = unicodedata.normalize("NFD", s)
     return "".join(c for c in nkfd if unicodedata.category(c) != "Mn")
@@ -27,7 +28,8 @@ def _normalize_token(s: str) -> str:
 COMMUNE_LABELS: dict[str, str] = {c.id: c.nombre for c in _COMMUNES}
 
 
-def _latest_per_commune_subquery():
+def _latest_per_commune_subquery() -> Any:
+    """Build a subquery selecting each commune's most recent prediction timestamp."""
     return (
         select(
             RiskPrediction.commune_id.label("cid"),
@@ -39,6 +41,7 @@ def _latest_per_commune_subquery():
 
 
 async def get_risk_by_comuna(nombre_o_id: str, db: AsyncSession) -> dict[str, Any] | None:
+    """Fetch the latest risk prediction for a commune by name or id."""
     cid = resolve_commune_id(nombre_o_id)
     if cid is None:
         return None
@@ -95,6 +98,7 @@ async def get_historical_events(
 
 
 async def get_top_risk_comunas(n: int, db: AsyncSession) -> list[dict[str, Any]]:
+    """Return the top ``n`` communes by latest risk score, descending."""
     sub = _latest_per_commune_subquery()
     rp = RiskPrediction
     stmt = (
@@ -140,6 +144,7 @@ async def get_top_event_comunas(n: int, db: AsyncSession) -> list[dict[str, Any]
 
 
 async def compare_comunas(lista_comunas: list[str], db: AsyncSession) -> list[dict[str, Any]]:
+    """Resolve a list of commune names/ids and fetch each one's latest risk."""
     resolved: list[str] = []
     for item in lista_comunas:
         cid = resolve_commune_id(item)
@@ -164,6 +169,7 @@ _ALERT_LEVELS = (
 
 
 async def get_alert_status(db: AsyncSession) -> list[dict[str, Any]]:
+    """List communes currently at alert-level risk (alto/critico), sorted by score."""
     sub = _latest_per_commune_subquery()
     rp = RiskPrediction
     stmt = select(rp).join(sub, (rp.commune_id == sub.c.cid) & (rp.created_at == sub.c.max_ca))

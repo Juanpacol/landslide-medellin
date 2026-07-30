@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
 
 
-def _get_anthropic_client():
+def _get_anthropic_client() -> Any:
     from infrastructure.external.llm_client import get_anthropic_client
 
     return get_anthropic_client()

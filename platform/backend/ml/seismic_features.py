@@ -100,6 +100,7 @@ async def _recent_unique_events(session: AsyncSession) -> list[SeismicEvent]:
 
 
 def _intensity_at(lat: float, lon: float, events: list[SeismicEvent], now: datetime) -> float:
+    """Sums magnitude^2 x distance attenuation x time decay over `events` for one point."""
     total = 0.0
     for r in events:
         if r.epicenter_lat is not None and r.epicenter_lon is not None:

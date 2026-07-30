@@ -24,6 +24,7 @@ from ml.estimators.base import Signal
 
 
 def estimate_from_prediction(risk_score: float | None, confidence: float | None) -> Signal:
+    """Adapts an already-computed classifier `(risk_score, confidence)` into a `Signal`."""
     if risk_score is None:
         return Signal(value=None, uncertainty=1.0, source="xgboost", coverage=0.0)
     uncertainty = round(1.0 - confidence, 4) if confidence is not None else 1.0

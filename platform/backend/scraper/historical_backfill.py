@@ -58,6 +58,7 @@ def _parse_dt(s: str) -> datetime | None:
 
 
 def _commune_from_text(text: str) -> str | None:
+    """Extract the ML commune id from a comuna/corregimiento mention in free text."""
     m = re.search(r"comuna\s*(\d{1,2})\b", text, flags=re.IGNORECASE)
     if m:
         return str(int(m.group(1)))
@@ -73,6 +74,7 @@ async def _landslide_exists(session: AsyncSession, source_row_id: str) -> bool:
 
 
 async def ingest_historical_dagrd(session: AsyncSession) -> dict[str, Any]:
+    """Backfill historical landslide events scraped from DAGRD WordPress posts."""
     years = Counter()
     inserted = 0
     fetched = 0
@@ -82,7 +84,7 @@ async def ingest_historical_dagrd(session: AsyncSession) -> dict[str, Any]:
         while True:
             params = {"search": "deslizamiento", "per_page": 100, "page": page}
 
-            async def _call(params=params):
+            async def _call(params: dict[str, Any] = params) -> list[dict[str, Any]]:
                 r = await client.get(WP_POSTS_URL, params=params)
                 if r.status_code == 400:
                     return []
@@ -139,6 +141,7 @@ async def ingest_historical_dagrd(session: AsyncSession) -> dict[str, Any]:
 
 
 async def ingest_historical_ideam(session: AsyncSession) -> dict[str, Any]:
+    """Backfill historical IDEAM precipitation features aggregated per commune/day."""
     cache_commune: dict[tuple[float, float], str | None] = {}
     by_commune_day: dict[tuple[str, datetime], list[float]] = defaultdict(list)
     years = Counter()
@@ -159,7 +162,7 @@ async def ingest_historical_ideam(session: AsyncSession) -> dict[str, Any]:
                 "$offset": str(offset),
             }
 
-            async def _call(params=params):
+            async def _call(params: dict[str, Any] = params) -> Any:
                 r = await client.get(IDEAM_S54A_URL, params=params)
                 r.raise_for_status()
                 return r.json()
@@ -230,6 +233,7 @@ async def ingest_historical_ideam(session: AsyncSession) -> dict[str, Any]:
 
 
 async def ingest_historical_siata(session: AsyncSession) -> dict[str, Any]:
+    """Backfill historical SIATA precipitation features aggregated per commune/day."""
     years = Counter()
     fetched = 0
     inserted = 0
@@ -252,7 +256,7 @@ async def ingest_historical_siata(session: AsyncSession) -> dict[str, Any]:
         for fname in SIATA_FILES:
             url = f"{SIATA_HIST_BASE}/{fname}"
 
-            async def _dl(url=url):
+            async def _dl(url: str = url) -> str:
                 r = await client.get(url)
                 r.raise_for_status()
                 return r.text
@@ -339,6 +343,7 @@ async def ingest_historical_siata(session: AsyncSession) -> dict[str, Any]:
 
 
 async def ingest_historical_medata(session: AsyncSession) -> dict[str, Any]:
+    """Backfill historical landslide-risk alerts from the MEDATA/Salvavidas CSV."""
     years = Counter()
     fetched = 0
     inserted = 0
@@ -394,12 +399,14 @@ async def ingest_historical_medata(session: AsyncSession) -> dict[str, Any]:
 
 
 async def table_totals(session: AsyncSession) -> dict[str, int]:
+    """Return current row counts for the ml_features and landslide_events tables."""
     ml_total = await session.scalar(select(func.count()).select_from(MLFeature))
     le_total = await session.scalar(select(func.count()).select_from(LandslideEvent))
     return {"ml_features": int(ml_total or 0), "landslide_events": int(le_total or 0)}
 
 
 async def main(run_only: str | None) -> None:
+    """Run all (or one) historical backfill source and print aggregated results."""
     async with AsyncSessionLocal() as session:
         out = []
         if run_only in (None, "dagrd"):

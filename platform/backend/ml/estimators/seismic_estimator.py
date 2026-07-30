@@ -13,6 +13,7 @@ from ml.estimators.base import Signal
 
 
 def estimate_seismic(snapshot: TerritorySnapshot) -> Signal:
+    """Normalized seismic-intensity signal for a commune."""
     intensity = snapshot.seismic_intensity
     if intensity is None:
         return Signal(value=None, uncertainty=1.0, source="seismic", coverage=0.0)

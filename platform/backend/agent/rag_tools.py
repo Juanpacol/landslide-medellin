@@ -16,6 +16,7 @@ import asyncio
 import contextvars
 import json
 from datetime import datetime, timedelta, timezone
+from collections.abc import Awaitable, Callable
 from typing import Any, Optional
 
 from sqlalchemy import func, select
@@ -328,6 +329,7 @@ async def get_scraper_health() -> str:
 # Utilidad de fechas
 # ---------------------------------------------------------------------------
 def _humanize_age(value: Any) -> str:
+    """Formats a timestamp as a relative age string in Spanish (e.g. "hace 5 min")."""
     if not value:
         return "sin fecha"
     try:
@@ -359,6 +361,7 @@ _report_session_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar
 
 
 def set_report_session(session_id: str | None) -> None:
+    """Sets the citizen-report session id for the current request's contextvar."""
     _report_session_ctx.set(session_id)
 
 
@@ -448,7 +451,7 @@ async def get_evacuation_routes(commune: str) -> str:
 # ---------------------------------------------------------------------------
 # Esquemas de tools (formato OpenAI / Ollama) + dispatcher
 # ---------------------------------------------------------------------------
-TOOL_SCHEMAS: list[dict] = [
+TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
@@ -590,7 +593,7 @@ TOOL_SCHEMAS: list[dict] = [
 ]
 
 # Mapa nombre → función.
-_DISPATCH = {
+_DISPATCH: dict[str, Callable[..., Awaitable[str]]] = {
     "search_knowledge": search_knowledge,
     "get_risk_predictions": get_risk_predictions,
     "get_recent_events": get_recent_events,
@@ -602,7 +605,7 @@ _DISPATCH = {
 }
 
 
-async def call_tool(name: str, arguments: dict | str | None) -> str:
+async def call_tool(name: str, arguments: dict[str, Any] | str | None) -> str:
     """Ejecuta una tool por nombre con sus argumentos (dict o JSON string)."""
     fn = _DISPATCH.get(name)
     if fn is None:

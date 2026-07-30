@@ -63,6 +63,7 @@ class CommuneHazard:
     reason: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
+        """Serializes to a plain dict for API/JSON responses."""
         return {
             "score": self.score,
             "susceptibility": self.susceptibility,

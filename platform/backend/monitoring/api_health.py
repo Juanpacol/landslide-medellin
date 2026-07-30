@@ -21,6 +21,7 @@ import logging
 import os
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.session import AsyncSessionLocal
 from infrastructure.external.arcgis_client import COMUNA_QUERY_URL
@@ -105,7 +106,7 @@ async def check_slack() -> tuple[bool, str]:
         return False, f"Slack: {str(e)}"
 
 
-async def _recovered_since_last_run(session) -> bool:
+async def _recovered_since_last_run(session: AsyncSession) -> bool:
     """True si la corrida anterior NO estaba en ok (o sea: esto es una recuperación).
 
     Sin esto, tras una caída el servicio volvería en silencio y quien vio la

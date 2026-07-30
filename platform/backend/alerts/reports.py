@@ -20,6 +20,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
@@ -45,7 +46,8 @@ _SOURCE_LABELS: dict[str, str] = {
 }
 
 
-def _get_anthropic_client():
+def _get_anthropic_client() -> Any:
+    """Lazily imports and returns the shared Anthropic client."""
     from infrastructure.external.llm_client import get_anthropic_client
 
     return get_anthropic_client()

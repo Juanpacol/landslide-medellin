@@ -161,6 +161,7 @@ async def _record(dx: Diagnosis, *, preflight: bool) -> None:
 
 
 def _write_github_output(dx: Diagnosis) -> None:
+    """Append kind/safe_to_upgrade to $GITHUB_OUTPUT, if set."""
     path = os.getenv("GITHUB_OUTPUT")
     if not path:
         return
@@ -223,6 +224,7 @@ async def run(
 
 
 def main() -> int:
+    """CLI entrypoint: parses args and runs the guard."""
     parser = argparse.ArgumentParser(description="Guard de drift de migraciones alembic")
     parser.add_argument(
         "--offline", action="store_true", help="solo chequeos del repo, sin conectar a la BD"

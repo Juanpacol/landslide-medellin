@@ -33,4 +33,6 @@ class Signal:
 
 
 class Estimator(Protocol):
+    """Anything that turns a `TerritorySnapshot` into a normalized `Signal`."""
+
     def estimate(self, snapshot: TerritorySnapshot) -> Signal: ...

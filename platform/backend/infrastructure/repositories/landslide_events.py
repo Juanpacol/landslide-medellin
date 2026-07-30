@@ -22,6 +22,7 @@ def real_events_sync(session: Session) -> list[LandslideEvent]:
 
 
 async def real_events(session: AsyncSession) -> list[LandslideEvent]:
+    """REAL events (excludes synthetic). Async version for the API/application layer."""
     result = await session.execute(
         select(LandslideEvent).where(LandslideEvent.is_synthetic.is_(False))
     )

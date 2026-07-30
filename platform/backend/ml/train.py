@@ -40,6 +40,7 @@ LAST_ATTEMPT_PATH = MODELS_DIR / "last_train_attempt.json"
 
 
 def _write_attempt(payload: dict[str, Any]) -> None:
+    """Writes the result of the last train run (successful or aborted)."""
     LAST_ATTEMPT_PATH.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
 
@@ -107,12 +108,14 @@ def _provenance() -> dict[str, Any]:
 
 
 def _ref_to_date(ref: datetime) -> date:
+    """Converts a (possibly tz-aware) reference datetime to UTC date."""
     if ref.tzinfo is not None:
         return ref.astimezone(timezone.utc).date()
     return ref.date()
 
 
 def _parse_event_date(fecha: str | None) -> date | None:
+    """Parses an ISO date string, or None if missing/invalid."""
     if not fecha:
         return None
     try:
@@ -165,6 +168,7 @@ def _target_for_ref_day_future(
     ref_d: date,
     events_by_commune: dict[str, list[date]],
 ) -> int:
+    """1 if the commune has a real event in (ref_d, ref_d+7d], else 0."""
     end = ref_d + timedelta(days=7)
     for d in events_by_commune.get(commune_id, []):
         if ref_d < d <= end:
@@ -177,6 +181,7 @@ def _target_for_ref_day_past(
     ref_d: date,
     events_by_commune: dict[str, list[date]],
 ) -> int:
+    """1 if the commune has a real event in [ref_d-7d, ref_d], else 0 (fallback strategy)."""
     start = ref_d - timedelta(days=7)
     for d in events_by_commune.get(commune_id, []):
         if start <= d <= ref_d:
@@ -185,6 +190,7 @@ def _target_for_ref_day_past(
 
 
 def _rows_until(commune_id: str, cutoff: datetime, all_rows: list[MLFeature]) -> list[MLFeature]:
+    """Rows for `commune_id` at or before `cutoff`, most recent first."""
     out = [
         r
         for r in all_rows
@@ -289,6 +295,7 @@ def _build_supervised_matrix(
 
 
 def _cv_splitter(y: np.ndarray) -> tuple[Any, str]:
+    """Picks Leave-One-Out for small/imbalanced sets, else stratified 5-fold."""
     n = len(y)
     _, counts = np.unique(y, return_counts=True)
     min_class = int(counts.min()) if len(counts) else 0
@@ -298,6 +305,7 @@ def _cv_splitter(y: np.ndarray) -> tuple[Any, str]:
 
 
 def _auc_scorer(model: Any, X: np.ndarray, y: np.ndarray, cv: Any) -> float:
+    """Cross-validated AUC-ROC, using predict_proba aggregation for LOO."""
     if isinstance(cv, LeaveOneOut):
         proba = cross_val_predict(model, X, y, cv=cv, method="predict_proba", n_jobs=1)
         return float(roc_auc_score(y, proba[:, 1]))
@@ -363,6 +371,7 @@ def _temporal_validation(
 
 
 def train() -> dict[str, Any]:
+    """Runs the full training pipeline and returns/persists the metrics payload."""
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     provenance = _provenance()
 
@@ -592,6 +601,7 @@ def train() -> dict[str, Any]:
 
 
 def main() -> None:
+    """CLI entrypoint: runs training and prints the resulting metrics."""
     _ = sync_engine  # noqa: F841
     from application.train_model import run_training
 

@@ -16,6 +16,7 @@ SOCRATA_BASE = "https://www.datos.gov.co/resource/57sv-p2fu.json"
 
 
 def _parse_obs_dt(s: str | None) -> datetime | None:
+    """Parses an IDEAM observation timestamp, returning None on failure."""
     if not s:
         return None
     try:
@@ -25,6 +26,7 @@ def _parse_obs_dt(s: str | None) -> datetime | None:
 
 
 async def _collect_ideam_rows() -> tuple[list[dict[str, Any]], int]:
+    """Paginates the Socrata IDEAM precipitation dataset for Medellín stations."""
     where = "descripcionsensor like '%PRECIP%' and upper(municipio) like '%MEDELL%'"
     limit = 5000
     offset = 0
@@ -32,8 +34,8 @@ async def _collect_ideam_rows() -> tuple[list[dict[str, Any]], int]:
     async with httpx_client() as client:
         while True:
 
-            async def _page(off: int):
-                async def _call():
+            async def _page(off: int) -> Any:
+                async def _call() -> Any:
                     params = {"$where": where, "$limit": str(limit), "$offset": str(off)}
                     r = await client.get(SOCRATA_BASE, params=params)
                     r.raise_for_status()
@@ -56,6 +58,7 @@ async def _collect_ideam_rows() -> tuple[list[dict[str, Any]], int]:
 async def _aggregate_ideam(
     rows: list[dict[str, Any]],
 ) -> dict[tuple[str, datetime], tuple[list[float], list[str]]]:
+    """Aggregates raw IDEAM rows into daily precipitation totals per commune."""
     by_commune_day: dict[tuple[str, datetime], list[float]] = defaultdict(list)
     station_meta: dict[tuple[str, datetime], list[str]] = defaultdict(list)
     cache: dict[tuple[int, int], str | None] = {}
@@ -94,6 +97,7 @@ async def _aggregate_ideam(
 
 
 async def _run_ideam(session: AsyncSession) -> int:
+    """Runs the IDEAM scrape end-to-end and logs the run."""
     started = utcnow()
     status = "error"
     downloaded = 0
@@ -150,13 +154,14 @@ async def _run_ideam(session: AsyncSession) -> int:
 
 
 async def run_ideam_scraper(session: AsyncSession | None = None) -> int:
+    """Entry point for the IDEAM scraper, opening a session if none is given."""
     if session is None:
         async with AsyncSessionLocal() as s:
             return await _run_ideam(s)
     return await _run_ideam(session)
 
 
-async def main():
+async def main() -> None:
     n = await run_ideam_scraper()
     print("ideam_inserted", n)
 

@@ -14,6 +14,7 @@ from ml.estimators.base import Signal
 
 
 def estimate_terrain(snapshot: TerritorySnapshot) -> Signal:
+    """Normalized static-susceptibility signal (slope, TWI, NDVI, hazard grade) for a commune."""
     breakdown = _susceptibility_breakdown(
         slope_p90_deg=snapshot.slope_p90_deg,
         twi_p90=snapshot.twi_p90,

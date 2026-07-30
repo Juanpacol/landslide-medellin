@@ -29,6 +29,7 @@ from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from alerts.snake_line import CRITICAL_LINES, classify_point
 from db.models.landslide_event import LandslideEvent
@@ -51,7 +52,7 @@ def _parse_event_date(fecha: str | None) -> date | None:
         return None
 
 
-async def _daily_rain_by_commune(session) -> dict[str, dict[date, float]]:
+async def _daily_rain_by_commune(session: AsyncSession) -> dict[str, dict[date, float]]:
     """Reconstructs daily rain per commune from the historical backfill
     (`MLFeature.features->>'precip_sum_mm_day'`, historical_siata /
     historical_ideam sources). The only source with coverage for past dates."""
@@ -73,6 +74,7 @@ async def _daily_rain_by_commune(session) -> dict[str, dict[date, float]]:
 
 
 async def main() -> None:
+    """Validate historical landslide events against the Snake Line heuristic and report results."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     async with AsyncSessionLocal() as session:

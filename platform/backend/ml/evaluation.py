@@ -35,6 +35,7 @@ def _fmt(x: float | None) -> str:
 
 
 def generate_report() -> str:
+    """Builds and writes `report.md` with training and full-dataset metrics."""
     metrics: dict[str, Any] = {}
     if METRICS_PATH.exists():
         metrics = json.loads(METRICS_PATH.read_text(encoding="utf-8"))
@@ -104,6 +105,7 @@ def generate_report() -> str:
 
 
 def main() -> None:
+    """CLI entrypoint: generates and prints the evaluation report."""
     _ = sync_engine  # noqa: F841
     out = generate_report()
     print(out)

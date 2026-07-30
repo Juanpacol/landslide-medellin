@@ -24,6 +24,7 @@ METRICS_PATH = MODELS_DIR / "metrics.json"
 
 
 def _load_artifact() -> dict[str, Any] | None:
+    """Loads the trained model artifact, or None if missing/malformed."""
     if not BEST_MODEL_PATH.exists():
         return None
     data = joblib.load(BEST_MODEL_PATH)
@@ -33,12 +34,14 @@ def _load_artifact() -> dict[str, Any] | None:
 
 
 def _load_metrics() -> dict[str, Any]:
+    """Loads `metrics.json`, or `{}` if it doesn't exist yet."""
     if not METRICS_PATH.exists():
         return {}
     return json.loads(METRICS_PATH.read_text(encoding="utf-8"))
 
 
 async def predict_risk(comuna_id: int, db: AsyncSession) -> dict[str, Any]:
+    """Legacy classifier inference for a single commune (fallback path)."""
     metrics = _load_metrics()
     model_version = str(metrics.get("model_version") or "unknown")
 
@@ -97,6 +100,7 @@ async def predict_all_comunas(db: AsyncSession) -> None:
 
 
 async def _run_standalone() -> None:
+    """CLI entrypoint: runs predictions with a fresh async session."""
     async with AsyncSessionLocal() as db:
         await predict_all_comunas(db)
 

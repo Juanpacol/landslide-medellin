@@ -4,6 +4,7 @@ import asyncio
 from datetime import timezone
 from typing import Any
 
+import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,7 +59,8 @@ DENSITY_LAYERS: list[tuple[int, str]] = [
 ]
 
 
-async def _fetch_polygon(client, codigo: str) -> dict[str, Any] | None:
+async def _fetch_polygon(client: httpx.AsyncClient, codigo: str) -> dict[str, Any] | None:
+    """Fetch the comuna/corregimiento polygon feature for a given official code."""
     url = f"{COMUNA_BASE}/query"
     params = {
         "where": f"codigo='{codigo}'",
@@ -68,7 +70,7 @@ async def _fetch_polygon(client, codigo: str) -> dict[str, Any] | None:
         "f": "json",
     }
 
-    async def _call():
+    async def _call() -> dict[str, Any]:
         r = await client.get(url, params=params)
         r.raise_for_status()
         return r.json()
@@ -81,8 +83,9 @@ async def _fetch_polygon(client, codigo: str) -> dict[str, Any] | None:
 
 
 async def _query_point_layer(
-    client, base: str, layer_id: int, lon: float, lat: float
+    client: httpx.AsyncClient, base: str, layer_id: int, lon: float, lat: float
 ) -> list[dict[str, Any]]:
+    """Query an ArcGIS MapServer layer for features intersecting a point."""
     url = f"{base}/{layer_id}/query"
     params = {
         "geometry": f"{lon},{lat}",
@@ -94,7 +97,7 @@ async def _query_point_layer(
         "f": "json",
     }
 
-    async def _call():
+    async def _call() -> dict[str, Any]:
         r = await client.get(url, params=params)
         r.raise_for_status()
         return r.json()
@@ -104,6 +107,7 @@ async def _query_point_layer(
 
 
 async def _collect_medellin_features() -> tuple[list[dict[str, Any]], int, str | None]:
+    """Collect hazard and density features per commune from GeoMedellín ArcGIS layers."""
     detail_parts: list[str] = []
     rows: list[dict[str, Any]] = []
     async with httpx_client() as client:
@@ -163,6 +167,7 @@ async def _collect_medellin_features() -> tuple[list[dict[str, Any]], int, str |
 
 
 async def _run_medellin_datos(session: AsyncSession) -> int:
+    """Run the medellin_datos scrape, persist features, and log the run outcome."""
     started = utcnow()
     status = "error"
     downloaded = 0
@@ -227,13 +232,15 @@ async def _run_medellin_datos(session: AsyncSession) -> int:
 
 
 async def run_medellin_datos_scraper(session: AsyncSession | None = None) -> int:
+    """Run the medellin_datos scraper, opening a session if one isn't provided."""
     if session is None:
         async with AsyncSessionLocal() as s:
             return await _run_medellin_datos(s)
     return await _run_medellin_datos(session)
 
 
-async def main():
+async def main() -> None:
+    """Run the medellin_datos scraper and print the number of inserted features."""
     n = await run_medellin_datos_scraper()
     print("medellin_datos_inserted", n)
 

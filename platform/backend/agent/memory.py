@@ -13,6 +13,7 @@ _history_cache = TTLCache(ttl_seconds=300)
 
 
 async def get_history(session_id: str, db: AsyncSession, limit: int = 10) -> list[dict[str, str]]:
+    """Returns the last `limit` turns for a session, oldest first, serving from cache when fresh."""
     cache_key = (session_id, limit)
     cached = _history_cache.get(cache_key)
     if cached is not _MISSING:
@@ -33,6 +34,7 @@ async def get_history(session_id: str, db: AsyncSession, limit: int = 10) -> lis
 
 
 async def save_turn(session_id: str, role: str, content: str, db: AsyncSession) -> None:
+    """Persists one conversation turn and invalidates the session's cached history."""
     row = AgentConversation(session_id=session_id, role=role, content=content)
     db.add(row)
     await db.flush()

@@ -74,6 +74,7 @@ _RATE_LIMIT_S = 1.05
 
 
 def _centroid_lonlat(geometry: dict[str, Any]) -> tuple[float, float] | None:
+    """Compute the vertex-average centroid of a Polygon/MultiPolygon geometry."""
     gtype = geometry.get("type")
     coords = geometry.get("coordinates")
     if not coords:
@@ -130,6 +131,7 @@ async def _fetch_elevations(
 
 
 async def run_terrain_features() -> int:
+    """Sample SRTM elevation/slope per barrio centroid and upsert into barrio_terrain."""
     started = utcnow()
     status = "error"
     processed = 0
@@ -232,6 +234,7 @@ async def run_terrain_features() -> int:
 
 
 async def main() -> None:
+    """Run the terrain features backfill and print the number of barrios processed."""
     from observability.logging_config import configure_logging
 
     configure_logging("scraper-terrain-features")

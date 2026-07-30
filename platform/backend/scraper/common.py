@@ -25,6 +25,7 @@ T = TypeVar("T")
 
 
 def utcnow() -> datetime:
+    """Returns the current UTC time."""
     return datetime.now(timezone.utc)
 
 
@@ -34,6 +35,7 @@ async def with_retries(
     attempts: int = 3,
     base_delay_s: float = 1.0,
 ) -> T:
+    """Retries `factory` with exponential backoff up to `attempts` times."""
     delay = base_delay_s
     last: BaseException | None = None
     for i in range(attempts):
@@ -50,6 +52,7 @@ async def with_retries(
 
 
 def httpx_client(**kwargs: Any) -> httpx.AsyncClient:
+    """Builds an `httpx.AsyncClient` with the scraper's default headers/timeout."""
     kw: dict[str, Any] = {"headers": DEFAULT_HEADERS, "timeout": 60.0, "follow_redirects": True}
     kw.update(kwargs)
     return httpx.AsyncClient(**kw)
@@ -96,6 +99,7 @@ async def ml_feature_exists(
     reference_date: datetime,
     source_key: str,
 ) -> bool:
+    """Checks whether an `MLFeature` row already exists for this commune/date/source."""
     stmt = (
         select(func.count())
         .select_from(MLFeature)

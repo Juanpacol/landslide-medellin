@@ -95,12 +95,15 @@ class FeatureBuilder:
         self.models_dir.mkdir(parents=True, exist_ok=True)
 
     def scaler_path(self) -> Path:
+        """Path of the persisted scaler for this builder's models_dir."""
         return self.models_dir / "scaler.pkl"
 
     def feature_names_path(self) -> Path:
+        """Path of the persisted feature-name order for this builder's models_dir."""
         return self.models_dir / "feature_names.json"
 
     def collect_rows_sync(self, session: Session, commune_id: str) -> list[MLFeature]:
+        """Fetches a commune's `ml_features` rows, most recent first (sync session)."""
         stmt = (
             select(MLFeature)
             .where(MLFeature.commune_id == str(commune_id))
@@ -109,6 +112,7 @@ class FeatureBuilder:
         return list(session.scalars(stmt).all())
 
     async def collect_rows_async(self, session: AsyncSession, commune_id: str) -> list[MLFeature]:
+        """Fetches a commune's `ml_features` rows, most recent first (async session)."""
         stmt = (
             select(MLFeature)
             .where(MLFeature.commune_id == str(commune_id))
@@ -118,9 +122,11 @@ class FeatureBuilder:
         return list(result.all())
 
     def _per_row_numeric_parts(self, rows: list[MLFeature]) -> list[dict[str, float]]:
+        """Numeric parts per row, in the same order as `rows`."""
         return [row_to_numeric_parts(r) for r in rows]
 
     def _values_by_key(self, parts_list: list[dict[str, float]]) -> dict[str, list[float]]:
+        """Groups each key's values across all rows, for median imputation."""
         acc: dict[str, list[float]] = defaultdict(list)
         for parts in parts_list:
             for k, v in parts.items():
@@ -174,6 +180,7 @@ class FeatureBuilder:
         feature_order: list[str] | None = None,
         apply_scaler: bool = True,
     ) -> dict[str, Any]:
+        """Builds a commune's raw and (optionally) scaled feature vector for inference."""
         rows = await self.collect_rows_async(db, str(comuna_id))
         merged, raw_aligned = self.merge_with_median_impute(rows, feature_order=feature_order)
 
@@ -204,6 +211,7 @@ class FeatureBuilder:
 
     @staticmethod
     def save_feature_names(names: list[str], path: Path | None = None) -> Path:
+        """Persists the feature name order used to build the training matrix."""
         target = path or FEATURE_NAMES_PATH
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(names, indent=2), encoding="utf-8")
@@ -211,6 +219,7 @@ class FeatureBuilder:
 
     @staticmethod
     def load_feature_names(path: Path | None = None) -> list[str]:
+        """Loads the persisted feature name order, or `[]` if not yet saved."""
         target = path or FEATURE_NAMES_PATH
         if not target.exists():
             return []

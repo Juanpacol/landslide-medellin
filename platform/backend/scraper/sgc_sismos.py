@@ -67,6 +67,7 @@ async def _collect() -> tuple[list[dict[str, Any]], str | None]:
 
 
 async def _run_sgc_sismos(session: AsyncSession) -> int:
+    """Fetch new SGC earthquakes, insert and cluster them, and log the run."""
     started = utcnow()
     status = "error"
     downloaded = 0
@@ -134,6 +135,7 @@ async def _run_sgc_sismos(session: AsyncSession) -> int:
 
 
 async def run_sgc_sismos_scraper(session: AsyncSession | None = None) -> int:
+    """Run the SGC earthquake scraper, opening a session if one isn't provided."""
     if session is None:
         async with AsyncSessionLocal() as s:
             return await _run_sgc_sismos(s)

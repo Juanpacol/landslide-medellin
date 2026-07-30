@@ -51,6 +51,7 @@ _HAZARD_RANK: dict[str, int] = {"alta": 3, "media": 2, "baja": 1, "muy baja": 0}
 
 
 def _worst_hazard(grades: list[str]) -> str | None:
+    """Returns the highest-ranked hazard grade among `grades`."""
     ranked = [g for g in grades if g]
     if not ranked:
         return None
@@ -90,6 +91,7 @@ def _build_grid(
 
 
 async def run_mesh_grid() -> int:
+    """Builds the ~1.5km grid over Medellín and upserts hazard-annotated cells."""
     started = utcnow()
     status = "error"
     processed = 0

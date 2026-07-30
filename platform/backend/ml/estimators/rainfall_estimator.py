@@ -12,6 +12,7 @@ from ml.estimators.base import Signal
 
 
 def estimate_rainfall(snapshot: TerritorySnapshot) -> Signal:
+    """Normalized rainfall-trigger signal (SWI + antecedent precipitation) for a commune."""
     parts = _trigger_breakdown(
         soil_water_index_pct=snapshot.swi_pct,
         antecedent_precip_mm=snapshot.antecedent_mm,

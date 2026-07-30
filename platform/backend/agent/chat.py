@@ -255,6 +255,7 @@ async def _ask_ollama_stream(system_text: str, user_text: str, model: str) -> As
 
 
 async def chat(message: str, session_id: str, db: AsyncSession) -> str:
+    """Answer a chat message using local context and Ollama, persisting both turns."""
     history = await get_history(session_id, db, limit=6)
     await save_turn(session_id, "user", message, db)
 

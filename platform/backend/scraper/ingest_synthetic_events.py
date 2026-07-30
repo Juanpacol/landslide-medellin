@@ -41,6 +41,7 @@ SWI_LOOKBACK_DAYS = 30
 
 
 async def main() -> None:
+    """Generate and insert synthetic Snake Line landslide events per covered commune."""
     async with AsyncSessionLocal() as session:
         # 1. Load historical daily rain per commune
         daily_rain_by_commune = await _load_daily_rain_by_commune(session)

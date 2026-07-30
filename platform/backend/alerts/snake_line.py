@@ -51,6 +51,7 @@ def _critical_y(x_swi: float, commune_id: str) -> float:
 
 
 def classify_point(x_swi: float, y_rain_60min: float, commune_id: str) -> str:
+    """Classifies a (SWI, trailing rain) point against the commune's critical line."""
     critical_y = _critical_y(x_swi, commune_id)
     if y_rain_60min >= critical_y:
         return "ROJO"

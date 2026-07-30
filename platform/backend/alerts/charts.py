@@ -184,7 +184,8 @@ def build_risk_trend_chart(
     return _fig_to_png(fig)
 
 
-def _fig_to_png(fig) -> bytes:
+def _fig_to_png(fig: "plt.Figure") -> bytes:
+    """Renders a matplotlib figure to PNG bytes and closes it."""
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", facecolor="white")
     plt.close(fig)

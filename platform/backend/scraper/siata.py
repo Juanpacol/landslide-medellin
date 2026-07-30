@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,8 +41,8 @@ def _floor_minute_utc(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc).replace(second=0, microsecond=0)
 
 
-async def _fetch_siata_home_html(client) -> str | None:
-    async def _call():
+async def _fetch_siata_home_html(client: httpx.AsyncClient) -> str | None:
+    async def _call() -> str | None:
         r = await client.get(SIATA_HOME)
         if r.status_code == 403:
             return None
@@ -54,8 +55,8 @@ async def _fetch_siata_home_html(client) -> str | None:
         return None
 
 
-async def _fetch_pluvio(client) -> dict[str, Any]:
-    async def _call():
+async def _fetch_pluvio(client: httpx.AsyncClient) -> dict[str, Any]:
+    async def _call() -> dict[str, Any]:
         r = await client.get(PLUVIO_JSON)
         r.raise_for_status()
         return r.json()
@@ -66,6 +67,7 @@ async def _fetch_pluvio(client) -> dict[str, Any]:
 async def _collect_siata_payload() -> tuple[
     dict[str, list[float]], dict[str, dict[str, Any]], datetime, str | None, int
 ]:
+    """Fetch SIATA rain gauge readings and group valid values per commune."""
     detail: str | None = None
     async with httpx_client() as client:
         html = await _fetch_siata_home_html(client)
@@ -115,6 +117,7 @@ async def _collect_siata_payload() -> tuple[
 
 
 async def _run_siata(session: AsyncSession) -> int:
+    """Ingest SIATA rain readings, derive ML features, and fire post-ingest alerts."""
     started = utcnow()
     status = "error"
     downloaded = 0
@@ -257,13 +260,15 @@ async def _run_siata(session: AsyncSession) -> int:
 
 
 async def run_siata_scraper(session: AsyncSession | None = None) -> int:
+    """Run the SIATA rain scraper, opening a session if one isn't provided."""
     if session is None:
         async with AsyncSessionLocal() as s:
             return await _run_siata(s)
     return await _run_siata(session)
 
 
-async def main():
+async def main() -> None:
+    """Run the SIATA scraper and print the number of inserted features."""
     n = await run_siata_scraper()
     print("siata_inserted", n)
 

@@ -34,6 +34,7 @@ _CORREG_TO_ML: dict[str, str] = {
 
 
 def official_to_ml_commune(codigo: str | None, subtipo: int | None) -> str | None:
+    """Maps an ArcGIS official code (comuna or corregimiento) to the canonical id."""
     if not codigo:
         return None
     if codigo.startswith("SN"):
@@ -48,6 +49,7 @@ def official_to_ml_commune(codigo: str | None, subtipo: int | None) -> str | Non
 
 
 def parse_ml_commune_from_siata_field(comuna_raw: str) -> str | None:
+    """Extracts the canonical commune id from a free-text SIATA `comuna` field."""
     if not comuna_raw or not comuna_raw.strip():
         return None
     m = re.search(r"(\d{1,2})", comuna_raw)
@@ -64,6 +66,7 @@ def parse_ml_commune_from_siata_field(comuna_raw: str) -> str | None:
 async def lookup_commune_for_point(
     client: httpx.AsyncClient, lon: float, lat: float
 ) -> dict[str, Any]:
+    """Reverse geocodes a point against ArcGIS to find its commune."""
     params = {
         "geometry": f"{lon},{lat}",
         "geometryType": "esriGeometryPoint",
@@ -91,6 +94,7 @@ async def lookup_commune_for_point(
 
 
 def ring_centroid_lonlat(rings: list[list[list[float]]]) -> tuple[float, float]:
+    """Centroid (lon, lat) of a GeoJSON polygon's first ring."""
     ring = rings[0]
     sx = sum(p[0] for p in ring)
     sy = sum(p[1] for p in ring)

@@ -53,6 +53,7 @@ def _parse_dt(s: str) -> datetime | None:
 
 
 def _commune_from_text(text: str) -> str | None:
+    """Extract the ML commune id from a comuna/corregimiento mention in free text."""
     m = re.search(r"comuna\s*(\d{1,2})\b", text, flags=re.IGNORECASE)
     if m:
         return str(int(m.group(1)))
@@ -63,6 +64,7 @@ def _commune_from_text(text: str) -> str | None:
 
 
 async def _max_ml_date(session: AsyncSession, source: str) -> datetime | None:
+    """Return the most recent reference_date already ingested for a given source."""
     stmt = select(func.max(MLFeature.reference_date)).where(
         MLFeature.features["source"].as_string() == source
     )
@@ -75,6 +77,7 @@ async def _landslide_exists(session: AsyncSession, sid: str) -> bool:
 
 
 async def ingest_ideam_incremental() -> tuple[int, int]:
+    """Ingest IDEAM precipitation features since the last recorded reference date."""
     async with AsyncSessionLocal() as session:
         return await _ingest_ideam_incremental_session(session)
 
@@ -102,7 +105,7 @@ async def _ingest_ideam_incremental_session(session: AsyncSession) -> tuple[int,
                 "$offset": str(offset),
             }
 
-            async def _call(params=params):
+            async def _call(params: dict[str, Any] = params) -> Any:
                 r = await client.get(IDEAM_S54A_URL, params=params)
                 r.raise_for_status()
                 return r.json()
@@ -161,6 +164,7 @@ async def _ingest_ideam_incremental_session(session: AsyncSession) -> tuple[int,
 
 
 async def ingest_siata_incremental() -> tuple[int, int]:
+    """Ingest SIATA precipitation features since the last recorded reference date."""
     async with AsyncSessionLocal() as session:
         return await _ingest_siata_incremental_session(session)
 
@@ -191,7 +195,7 @@ async def _ingest_siata_incremental_session(session: AsyncSession) -> tuple[int,
         for fname in SIATA_FILES:
             url = f"{SIATA_HIST_BASE}/{fname}"
 
-            async def _dl(url=url):
+            async def _dl(url: str = url) -> str:
                 r = await client.get(url)
                 r.raise_for_status()
                 return r.text
@@ -266,6 +270,7 @@ async def _ingest_siata_incremental_session(session: AsyncSession) -> tuple[int,
 
 
 async def ingest_dagrd_incremental() -> tuple[int, int]:
+    """Ingest new DAGRD landslide events not already present in landslide_events."""
     async with AsyncSessionLocal() as session:
         return await _ingest_dagrd_incremental_session(session)
 
@@ -284,7 +289,7 @@ async def _ingest_dagrd_incremental_session(session: AsyncSession) -> tuple[int,
         for page in range(1, 6):
             params = {"search": "deslizamiento", "per_page": 100, "page": page}
 
-            async def _call(params=params):
+            async def _call(params: dict[str, Any] = params) -> list[dict[str, Any]]:
                 r = await client.get(WP_POSTS_URL, params=params)
                 if r.status_code == 400:
                     return []
@@ -329,6 +334,7 @@ async def _ingest_dagrd_incremental_session(session: AsyncSession) -> tuple[int,
 
 
 async def ingest_medata_incremental() -> tuple[int, int]:
+    """Ingest new MEDATA/Salvavidas alerts not already present in landslide_events."""
     async with AsyncSessionLocal() as session:
         return await _ingest_medata_incremental_session(session)
 
@@ -372,6 +378,7 @@ async def _ingest_medata_incremental_session(session: AsyncSession) -> tuple[int
 
 
 async def run_incremental(only: str | None = None) -> dict[str, Any]:
+    """Run all (or one) incremental ingestion source, logging each run's outcome."""
     started = utcnow()
     result: dict[str, Any] = {"started_at": started.isoformat(), "sources": {}}
 
@@ -412,6 +419,7 @@ async def run_incremental(only: str | None = None) -> dict[str, Any]:
 
 
 async def main(only: str | None) -> None:
+    """Run the incremental ingestion and print the aggregated JSON result."""
     out = await run_incremental(only=only)
     print(json.dumps(out, ensure_ascii=False))
 

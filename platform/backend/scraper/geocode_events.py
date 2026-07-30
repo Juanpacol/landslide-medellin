@@ -14,6 +14,7 @@ from scraper.historical_backfill import _commune_from_text
 
 
 async def main() -> None:
+    """Backfills `commune_id` for landslide events that have coordinates or text but no commune."""
     async with AsyncSessionLocal() as session:
         null_events = (
             (

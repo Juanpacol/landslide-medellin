@@ -255,6 +255,7 @@ async def validate_geo_coverage(session: AsyncSession) -> tuple[str, dict]:
 
 
 def _worse(a: str, b: str) -> str:
+    """Returns the more severe of two status strings by their fixed ordering."""
     order = {"ok": 0, "warning": 1, "critical": 2, "error": 3}
     return a if order.get(a, 0) >= order.get(b, 0) else b
 

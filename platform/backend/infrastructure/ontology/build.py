@@ -15,6 +15,7 @@ This is I/O (writes a file) and imports owlready2, so it lives in `infrastructur
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from owlready2 import DataProperty, FunctionalProperty, ObjectProperty, Thing, get_ontology
 
@@ -25,7 +26,9 @@ ONTOLOGY_IRI = "http://teyva.local/onto.owl"
 ONTOLOGY_PATH = Path(__file__).resolve().parents[4] / "ontology" / "teyva.owl"
 
 
-def build_ontology():
+def build_ontology() -> Any:
+    """Builds the ontology (T-Box + A-Box) in memory from `domain/communes.py` and
+    `domain/rules/catalog.py`; does not write it to disk."""
     onto = get_ontology(ONTOLOGY_IRI)
 
     with onto:
@@ -235,7 +238,8 @@ def build_ontology():
     return onto
 
 
-def save(onto=None, path: Path = ONTOLOGY_PATH) -> Path:
+def save(onto: Any = None, path: Path = ONTOLOGY_PATH) -> Path:
+    """Builds (if needed) and writes the ontology to `path` as RDF/XML."""
     onto = onto or build_ontology()
     path.parent.mkdir(parents=True, exist_ok=True)
     onto.save(file=str(path), format="rdfxml")
