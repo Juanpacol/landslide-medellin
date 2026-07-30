@@ -13,10 +13,10 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Instalar deps primero para aprovechar la caché de capas de Docker.
-# requirements.txt trae el --extra-index-url de PyTorch CPU: sin él se bajarían
+# requirements-prod.txt trae el --extra-index-url de PyTorch CPU: sin él se bajarían
 # ~5.5 GB de paquetes CUDA inservibles en un servidor sin GPU.
-COPY requirements.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY requirements-base.txt requirements-prod.txt ./
+RUN pip install --upgrade pip && pip install -r requirements-prod.txt
 
 # Pre-bakear el modelo de embeddings (~500 MB). Sin esto se descarga en la
 # PRIMERA consulta RAG y, como no hay caché persistente, se vuelve a descargar

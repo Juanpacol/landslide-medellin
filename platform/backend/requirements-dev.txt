@@ -1,11 +1,13 @@
 # Dependencias de desarrollo y CI. NO van en la imagen de producción — el
-# Dockerfile instala solo requirements.txt.
+# Dockerfile instala solo requirements-prod.txt.
 #
 # Uso local:  pip install -r requirements-dev.txt
--r requirements.txt
+-r requirements-base.txt
 
 pytest
 pytest-asyncio
+pytest-cov
+mypy
 ruff
 
 # bandit y detect-secrets los usa ci-security.yml, que los instala por su

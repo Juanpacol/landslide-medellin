@@ -1,49 +1,6 @@
-# Índice extra de PyTorch CPU-only. Va AQUÍ y no solo en el Dockerfile a
-# propósito: los 7 workflows de cron hacen `pip install -r requirements.txt`,
-# y sin esta línea seguirían bajando ~5.5 GB de paquetes CUDA (nvidia-*,
-# triton) que no sirven en un runner ni en un servidor sin GPU.
---extra-index-url https://download.pytorch.org/whl/cpu
-
-fastapi
-uvicorn[standard]
-python-dotenv
-sqlalchemy[asyncio]>=2.0
-asyncpg
-psycopg2-binary
-alembic
-greenlet
-pandas
-requests
-httpx
-beautifulsoup4
-apscheduler
-
-# shapely explícito: antes entraba como transitiva de geopandas, que se quitó
-# por no importarse en ningún módulo. scraper/mesh_grid.py la usa directo.
-shapely
-scipy
-scikit-learn
-imbalanced-learn
-
-# xgboost-cpu en vez de xgboost: mismo módulo (`import xgboost`), misma API y
-# compatible con el best_model.pkl existente, pero 5.7 MB en vez de 98 MB.
-# libgomp1 (OpenMP) sigue siendo necesario — no quitarlo del Dockerfile.
-xgboost-cpu
-joblib
-matplotlib
-pdfplumber
-
-# El bloque RAG. sentence-transformers arrastra torch; el pin +cpu es lo que
-# mantiene el ahorro: sin él, un release futuro que pida torch>=2.13 haría que
-# pip re-resolviera desde PyPI y la imagen volvería a 13 GB sin que se note.
-chromadb
-sentence-transformers
-torch==2.12.1+cpu
-
-fastmcp
-anthropic
-
-# Neuro-symbolic ontology (specs/001-ontology/): owlready2 loads and reasons over
-# ontology/teyva.owl; rdflib is the SPARQL layer used by specs/005-knowledge-graph/.
-owlready2
-rdflib
+# Alias de compatibilidad: los workflows de cron (scrapers, predict-risk, etc.)
+# y el Dockerfile instalan este archivo. El contenido real vive en
+# requirements-base.txt / requirements-prod.txt (runtime) y requirements-dev.txt
+# (test/lint, con -r a este mismo archivo). No lo dupliques: si necesitas
+# agregar una dependencia de runtime, hazlo en requirements-base.txt.
+-r requirements-base.txt

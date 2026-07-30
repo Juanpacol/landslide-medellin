@@ -1,0 +1,3 @@
+# Producción: mismas dependencias de runtime que requirements-base.txt, sin
+# herramientas de dev/test/lint. Usado por el Dockerfile de producción.
+-r requirements-base.txt
