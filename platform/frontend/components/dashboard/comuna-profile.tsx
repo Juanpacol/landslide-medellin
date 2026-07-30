@@ -28,6 +28,7 @@ import {
 } from '@/lib/api';
 import { ADVICE, LEVELS } from './commune-info';
 import { AlertStateBadge } from './alert-state-badge';
+import { DerivationPanel } from './derivation-panel';
 import { EvacuationRoutesCard } from './evacuation-routes-card';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -539,7 +540,11 @@ export function ComunaProfile({ communeId, onSelectCommune }: ComunaProfileProps
             </div>
             {explanation?.generated_by && (
               <span className="teyva-badge teyva-badge-neutral" style={{ fontSize: '10.5px', padding: '3px 9px' }}>
-                {explanation.generated_by === 'template' ? 'Análisis automático' : '✦ Generado por IA'}
+                {explanation.generated_by === 'template'
+                  ? 'Análisis automático'
+                  : explanation.generated_by === 'derivation'
+                    ? '🔗 Derivación neuro-simbólica'
+                    : '✦ Generado por IA'}
               </span>
             )}
           </div>
@@ -548,6 +553,26 @@ export function ComunaProfile({ communeId, onSelectCommune }: ComunaProfileProps
           </p>
         </div>
       )}
+
+      {/* ── Derivación neuro-simbólica ── */}
+      <div className="teyva-card anim-fade-up" style={{ padding: '20px 22px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '7px',
+            fontSize: '11px',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            color: 'var(--muted-foreground)',
+            marginBottom: '12px',
+          }}
+        >
+          Derivación del score
+        </div>
+        <DerivationPanel communeId={communeId} />
+      </div>
     </div>
   );
 }

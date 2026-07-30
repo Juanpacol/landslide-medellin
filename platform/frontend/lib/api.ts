@@ -497,6 +497,51 @@ export async function fetchRiskExplanation(communeId: string): Promise<RiskExpla
   return apiRequest<RiskExplanationResponse>(`/risk/explanation/${communeId}`);
 }
 
+// ── Derivación neuro-simbólica (application/neurosymbolic/infer.py) ────────────
+
+export interface DerivationFiredRule {
+  id: string;
+  description: string;
+  provenance: string;
+  priority: number;
+}
+
+export interface DerivationConflict {
+  rule_id: string;
+  effect: string;
+  reason?: string;
+  neural_level?: string;
+  rule_level?: string;
+  resolved_level?: string;
+}
+
+export interface Derivation {
+  neural_score: number | null;
+  neural_level: string;
+  fired_rules: DerivationFiredRule[];
+  not_evaluable_rules: string[];
+  vetoed: boolean;
+  calibration_note: string;
+}
+
+export interface DerivationResponse {
+  commune_id: string;
+  risk_score: number | null;
+  risk_category: string | null;
+  predicted_at: string | null;
+  derivation: Derivation | null;
+  conflicts: DerivationConflict[];
+  priority: string | null;
+  confidence: number | null;
+  source: string;
+}
+
+/** Fired rules, conflicts, and confidence behind a commune's latest
+ *  prediction — see application/neurosymbolic/infer.py (specs/003-inference-engine/). */
+export async function fetchDerivation(communeId: string): Promise<DerivationResponse> {
+  return apiRequest<DerivationResponse>(`/risk/derivation/${communeId}`);
+}
+
 // ── Sismos (red SIATA) ─────────────────────────────────────────────────────────
 
 export interface SeismicEvent {

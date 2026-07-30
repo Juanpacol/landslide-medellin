@@ -384,7 +384,13 @@ async def get_derivation(commune_id: str, db: AsyncSession = Depends(get_async_d
     )
     pred = (await db.execute(latest_pred_stmt)).scalars().first()
     if pred is None:
-        return {"commune_id": commune_id, "derivation": None, "conflicts": [], "priority": None}
+        return {
+            "commune_id": commune_id,
+            "derivation": None,
+            "conflicts": [],
+            "priority": None,
+            "confidence": None,
+        }
 
     raw = pred.raw_output or {}
     return {
@@ -395,6 +401,7 @@ async def get_derivation(commune_id: str, db: AsyncSession = Depends(get_async_d
         "derivation": raw.get("derivation"),
         "conflicts": raw.get("conflicts") or [],
         "priority": raw.get("priority"),
+        "confidence": raw.get("confidence"),
         "source": raw.get("source", "unknown"),
     }
 
