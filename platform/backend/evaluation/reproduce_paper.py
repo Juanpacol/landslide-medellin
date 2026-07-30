@@ -23,6 +23,7 @@ from evaluation.ablation import AblationCase, run_ablation
 from evaluation.latency import benchmark_ml_only, benchmark_neurosymbolic
 from evaluation.primary_metrics import rule_coverage
 from evaluation.run import arms_disagree, run_all_arms
+from evaluation.stability import StabilityCase, counterfactual_stability
 
 # Same seed and coverage rates as used to write paper.md §5 — the point of
 # fixing the seed here is that anyone running this file gets the exact
@@ -74,6 +75,9 @@ def collect_results() -> dict[str, Any]:
     ablation_rules = run_ablation("rules", cases)
     ablation_quality = run_ablation("quality", cases)
 
+    stability_cases = [StabilityCase(c.commune_id, c.neural_score, c.snapshot) for c in cases]
+    stability = counterfactual_stability(stability_cases, CATALOG)
+
     n_disagree = sum(
         1
         for case in cases
@@ -105,6 +109,12 @@ def collect_results() -> dict[str, Any]:
                 "n_changed": ablation_quality.n_level_changed,
                 "confidence_delta_mean": ablation_quality.confidence_delta_mean,
             },
+        },
+        "counterfactual_stability": {
+            "perturbation_pct": stability.perturbation_pct,
+            "n_eligible": stability.n_eligible,
+            "pct_level_changed": stability.pct_level_changed,
+            "pct_vetoed_changed": stability.pct_vetoed_changed,
         },
         "four_arm_disagreement": {"n_disagree": n_disagree, "n_total": len(snapshots)},
         "latency_ms": {
@@ -140,6 +150,13 @@ def main() -> None:
         f"pct={ar['pct_changed']} conf_delta={ar['confidence_delta_mean']}"
     )
     print(f"quality: n_changed={aq['n_changed']} conf_delta={aq['confidence_delta_mean']}")
+
+    cs = results["counterfactual_stability"]
+    print(
+        f"\n## Counterfactual stability (±{cs['perturbation_pct'] * 100:.0f}% rain)\n"
+        f"n_eligible={cs['n_eligible']} pct_level_changed={cs['pct_level_changed']} "
+        f"pct_vetoed_changed={cs['pct_vetoed_changed']}"
+    )
 
     disagreement = results["four_arm_disagreement"]
     print(f"arms disagree on {disagreement['n_disagree']}/{disagreement['n_total']}")
