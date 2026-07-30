@@ -6,7 +6,14 @@ import math
 
 import pytest
 
-from domain.geo import EARTH_RADIUS_KM, distance_km, haversine_km
+from domain.geo import (
+    EARTH_RADIUS_KM,
+    MIN_ACTIVE_PRECIP_MM,
+    MIN_STATIONS_FOR_IDW,
+    distance_km,
+    haversine_km,
+    idw_precip,
+)
 
 
 class TestHaversineKm:
@@ -61,3 +68,62 @@ class TestDistanceKm:
         assert distance_km(lat1=6.2, lon1=-75.5, lat2=6.2, lon2=-75.5) == pytest.approx(
             0.0, abs=1e-9
         )
+
+
+class TestIdwPrecip:
+    CENTROID = (6.2, -75.5)
+
+    def test_none_when_fewer_than_min_stations_active(self):
+        assert MIN_STATIONS_FOR_IDW == 2
+        points = [(6.2, -75.5, 5.0)]
+        result = idw_precip(points, centroid_lat=self.CENTROID[0], centroid_lon=self.CENTROID[1])
+        assert result is None
+
+    def test_none_when_all_stations_below_active_threshold(self):
+        points = [
+            (6.2, -75.5, 0.0),
+            (6.21, -75.51, MIN_ACTIVE_PRECIP_MM),
+        ]
+        result = idw_precip(points, centroid_lat=self.CENTROID[0], centroid_lon=self.CENTROID[1])
+        assert result is None
+
+    def test_none_when_zero_stations_reported(self):
+        result = idw_precip([], centroid_lat=self.CENTROID[0], centroid_lon=self.CENTROID[1])
+        assert result is None
+
+    def test_inactive_stations_are_excluded_not_averaged_in(self):
+        # A commune with 3 dry stations (0.0mm) and 2 wet ones should reflect the wet ones,
+        # not get diluted toward zero by the dry majority — the exact bug audit finding 2
+        # documented (180/228 zeroed stations dragging the mean to 0.003mm).
+        points = [
+            (6.2, -75.5, 0.0),
+            (6.2, -75.5, 0.0),
+            (6.2, -75.5, 0.0),
+            (6.2, -75.5, 10.0),
+            (6.2, -75.5, 10.0),
+        ]
+        result = idw_precip(points, centroid_lat=self.CENTROID[0], centroid_lon=self.CENTROID[1])
+        assert result == pytest.approx(10.0)
+
+    def test_coincident_station_returns_its_own_value(self):
+        points = [(6.2, -75.5, 7.5), (6.5, -75.9, 2.0)]
+        result = idw_precip(points, centroid_lat=6.2, centroid_lon=-75.5)
+        assert result == pytest.approx(7.5)
+
+    def test_closer_station_weighted_more_than_farther_one(self):
+        near = (6.201, -75.501, 20.0)  # ~0.15km from centroid
+        far = (6.5, -75.9, 2.0)  # tens of km away
+        result = idw_precip(
+            [near, far], centroid_lat=self.CENTROID[0], centroid_lon=self.CENTROID[1]
+        )
+        assert result is not None
+        assert result > 15.0  # dominated by the near station, not a flat (20+2)/2=11 average
+
+    def test_equidistant_stations_average_evenly(self):
+        # Two stations symmetric around the centroid on the same latitude get equal weight.
+        points = [
+            (6.2, -75.51, 4.0),
+            (6.2, -75.49, 8.0),
+        ]
+        result = idw_precip(points, centroid_lat=6.2, centroid_lon=-75.5)
+        assert result == pytest.approx(6.0, rel=1e-6)
