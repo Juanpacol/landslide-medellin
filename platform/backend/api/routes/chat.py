@@ -15,8 +15,8 @@ from integrations.agent_contracts import chat_stream as agent_chat_stream
 
 router = APIRouter()
 
-# Cada mensaje de chat cuesta una llamada LLM: límite por IP contra abuso,
-# spam y loops accidentales del frontend.
+# Every chat message costs one LLM call: per-IP limit against abuse, spam,
+# and accidental frontend loops.
 _chat_rate = rate_limit("chat", times=10, seconds=60)
 
 
@@ -33,9 +33,9 @@ class ChatResponse(BaseModel):
 @router.post("", response_model=ChatResponse, dependencies=[Depends(_chat_rate)])
 @router.post("/message", response_model=ChatResponse, dependencies=[Depends(_chat_rate)])
 async def post_message(body: ChatRequest, db: AsyncSession = Depends(get_async_db)) -> ChatResponse:
-    # Segundo nivel de límite, por sesión: protege contra una conversación
-    # individual descontrolada más allá del límite compartido por IP (útil
-    # detrás de NAT/proxy donde varias sesiones comparten la misma IP).
+    # Second limit tier, per session: protects against one runaway
+    # conversation beyond the shared per-IP limit (useful behind a NAT/proxy
+    # where several sessions share the same IP).
     rate_limit_by_session("chat_session", body.session_id, times=10, seconds=60)
     user_row = AgentConversation(
         session_id=body.session_id,
@@ -58,13 +58,13 @@ async def post_message(body: ChatRequest, db: AsyncSession = Depends(get_async_d
 async def stream_message(
     body: ChatRequest, db: AsyncSession = Depends(get_async_db)
 ) -> StreamingResponse:
-    """Variante en streaming (SSE) de `post_message()`.
+    """Streaming (SSE) variant of `post_message()`.
 
-    A diferencia de `post_message()`, aquí NO se guardan filas de
-    `AgentConversation` en la ruta: `chat_stream()`/`chat_rag_stream()` ya
-    hacen su propio `save_turn()` para el turno de usuario y el de asistente
-    (igual que hace `chat()` hoy), así que la ruta solo retransmite los
-    chunks como eventos SSE y comitea al final.
+    Unlike `post_message()`, `AgentConversation` rows are NOT saved in this
+    route: `chat_stream()`/`chat_rag_stream()` already do their own
+    `save_turn()` for the user turn and the assistant turn (same as
+    `chat()` does today), so the route just relays chunks as SSE events
+    and commits at the end.
     """
 
     rate_limit_by_session("chat_session", body.session_id, times=10, seconds=60)
@@ -85,11 +85,11 @@ async def list_sessions(
     q: str = Query("", max_length=200),
     db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, Any]:
-    """Lista sesiones de conversación agregando `agent_conversations`.
+    """Lists conversation sessions by aggregating `agent_conversations`.
 
-    No requiere tabla nueva: el título es el primer mensaje del usuario y el
-    preview es el último mensaje de la sesión. `q` filtra sesiones cuyo
-    contenido contenga el texto (case-insensitive).
+    Needs no new table: the title is the user's first message and the
+    preview is the session's last message. `q` filters sessions whose
+    content contains the text (case-insensitive).
     """
     base = select(
         AgentConversation.session_id,

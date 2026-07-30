@@ -1,7 +1,7 @@
 """
-Endpoints de alertas: sirve las gráficas PNG que acompañan las alertas,
-permite disparar una alerta de prueba enriquecida y genera el reporte de
-situación en lenguaje plano (con envío opcional a Slack).
+Alert endpoints: serves the PNG charts that accompany alerts, lets you
+fire an enriched test alert, and generates the plain-language situation
+report (with optional Slack delivery).
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ async def get_alert_chart(
     days: int = Query(7, ge=1, le=30),
     db: AsyncSession = Depends(get_async_db),
 ) -> Response:
-    """Devuelve la gráfica PNG de lluvia (con umbral y pico) para una comuna."""
+    """Returns the rain PNG chart (with threshold and peak) for a commune."""
     threshold = await _threshold_for(commune_id, db)
     category, score = await _latest_risk(commune_id, db)
     name = commune_display_name(commune_id)
@@ -66,9 +66,9 @@ async def get_evacuation_routes_endpoint(
     commune_id: str,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, Any]:
-    """Zonas seguras candidatas (parques/colegios/estadios de OpenStreetMap)
-    más cercanas a una comuna, con ruta caminando. MVP sin validar por
-    Defensoría/DAGRD — ver `alerts/evacuation.py`."""
+    """Candidate safe zones (OpenStreetMap parks/schools/stadiums) nearest
+    to a commune, with a walking route. MVP not validated by
+    Defensoría/DAGRD — see `alerts/evacuation.py`."""
     from alerts.evacuation import get_evacuation_routes
 
     return await get_evacuation_routes(db, commune_id)
@@ -77,10 +77,10 @@ async def get_evacuation_routes_endpoint(
 @router.post("/report", dependencies=[Depends(require_token)])
 async def create_situation_report(
     request: Request,
-    send_to_slack: bool = Query(False, description="Además de devolverlo, publicarlo en Slack"),
+    send_to_slack: bool = Query(False, description="In addition to returning it, post it to Slack"),
     db: AsyncSession = Depends(get_async_db),
 ) -> dict[str, Any]:
-    """Genera el reporte de situación del valle en lenguaje plano (≤200 palabras)."""
+    """Generates the valley's plain-language situation report (≤200 words)."""
     from api.audit import log_audit_event
     from alerts.reports import generate_situation_report, send_situation_report_to_slack
 

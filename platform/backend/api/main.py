@@ -10,16 +10,16 @@ from observability.logging_config import configure_logging
 
 configure_logging("teyva-api")
 
-# Falla el ARRANQUE (no solo warnings) si ENV=production sin API_TOKEN:
-# un despliegue mal configurado no puede quedar con endpoints mutantes abiertos.
+# Fails STARTUP (not just warnings) if ENV=production without API_TOKEN: a
+# misconfigured deployment can't stay up with mutating endpoints wide open.
 assert_production_auth()
 
 app = FastAPI(title="TEYVA API", version="0.1.0")
 install_exception_handlers(app)
 
-# CORS restringido por entorno. Definir ALLOWED_ORIGINS como lista separada por
-# comas (ej. "https://teyva.co,https://www.teyva.co"). Sin la variable, default
-# a frontend local de desarrollo. Nunca usar "*" con allow_credentials=True.
+# CORS restricted per environment. Set ALLOWED_ORIGINS as a comma-separated
+# list (e.g. "https://teyva.co,https://www.teyva.co"). Without the variable,
+# defaults to the local dev frontend. Never use "*" with allow_credentials=True.
 _origins_env = os.getenv("ALLOWED_ORIGINS", "").strip()
 _allowed_origins = (
     [o.strip() for o in _origins_env.split(",") if o.strip()]
@@ -44,8 +44,8 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 
 @app.get("/api/geo/communes")
 def communes_catalog() -> dict[str, list[dict[str, object]]]:
-    """Catálogo del territorio desde la fuente única (domain/communes.py).
-    El frontend consume esto en vez de duplicar la lista hardcodeada."""
+    """Territory catalog from the single source (domain/communes.py).
+    The frontend consumes this instead of duplicating the hardcoded list."""
     from domain.communes import COMMUNES
 
     return {

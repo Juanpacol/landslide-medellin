@@ -1,10 +1,10 @@
 """
-Helper de auditoría para endpoints sensibles.
+Audit helper for sensitive endpoints.
 
-Se llama EXPLÍCITAMENTE en cada endpoint auditado (no interceptor global):
-así queda visible en el propio handler qué se registra y con qué resumen.
-El payload nunca se guarda crudo (puede contener secretos, ej. URL de
-webhook) — solo su SHA-256 y un resumen legible sin datos sensibles.
+Called EXPLICITLY in each audited endpoint (no global interceptor): that
+way it's visible right in the handler what gets logged and with what
+summary. The payload is never stored raw (it can contain secrets, e.g. a
+webhook URL) — only its SHA-256 and a readable summary with no sensitive data.
 """
 
 from __future__ import annotations
@@ -36,8 +36,8 @@ def log_audit_event(
     payload: Any = None,
     summary: str | None = None,
 ) -> None:
-    """Agrega la fila de auditoría a la sesión (el commit lo hace el endpoint,
-    en la misma transacción que el cambio auditado — o ambos o ninguno)."""
+    """Adds the audit row to the session (the endpoint does the commit, in
+    the same transaction as the audited change — both or neither)."""
     session.add(
         AuditLog(
             actor=f"token@{_client_ip(request)}",

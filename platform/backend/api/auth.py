@@ -1,23 +1,23 @@
 """
-Autenticación por bearer token con dos niveles: admin y viewer.
+Bearer-token authentication with two levels: admin and viewer.
 
-Tokens (variables de entorno):
-- API_TOKEN         → rol admin: endpoints mutantes/operativos (umbrales,
-                      webhooks, predicciones manuales, reportes).
-- API_TOKEN_VIEWER  → rol viewer (opcional): lectura autenticada donde se
-                      exija. Un token admin siempre satisface viewer.
+Tokens (environment variables):
+- API_TOKEN         → admin role: mutating/operational endpoints
+                      (thresholds, webhooks, manual predictions, reports).
+- API_TOKEN_VIEWER  → viewer role (optional): authenticated reads where
+                      required. An admin token always satisfies viewer.
 
-Comportamiento por entorno:
-- Desarrollo (ENV != production y sin API_TOKEN): se permite el acceso con
-  warning en logs, igual que antes.
-- Producción (ENV/ENVIRONMENT == "production"): API_TOKEN es OBLIGATORIO.
-  `assert_production_auth()` corre en el startup de FastAPI y tumba el
-  arranque si falta — un despliegue mal configurado no puede quedar abierto.
+Behavior per environment:
+- Development (ENV != production and no API_TOKEN): access is allowed
+  with a log warning, same as before.
+- Production (ENV/ENVIRONMENT == "production"): API_TOKEN is MANDATORY.
+  `assert_production_auth()` runs at FastAPI startup and aborts startup
+  if it's missing — a misconfigured deployment can't stay open.
 
-Uso:
+Usage:
     from api.auth import require_token, require_viewer
     @router.post("/predict-all", dependencies=[Depends(require_token)])   # admin
-    @router.get("/algo",         dependencies=[Depends(require_viewer)])  # viewer o admin
+    @router.get("/algo",         dependencies=[Depends(require_viewer)])  # viewer or admin
 """
 
 from __future__ import annotations
@@ -40,11 +40,11 @@ def is_production() -> bool:
 
 
 def assert_production_auth() -> None:
-    """Llamar en el startup de la app: en producción sin API_TOKEN, abortar."""
+    """Call at app startup: in production without API_TOKEN, abort."""
     if is_production() and not os.getenv("API_TOKEN"):
         raise RuntimeError(
-            "ENV=production sin API_TOKEN definido: los endpoints mutantes quedarían "
-            "abiertos. Definir API_TOKEN (y opcionalmente API_TOKEN_VIEWER) antes de arrancar."
+            "ENV=production without API_TOKEN set: mutating endpoints would be "
+            "left open. Set API_TOKEN (and optionally API_TOKEN_VIEWER) before starting."
         )
 
 
@@ -61,19 +61,19 @@ def _matches(provided: str | None, expected: str | None) -> bool:
 
 
 async def require_token(authorization: str | None = Header(default=None)) -> None:
-    """Rol admin: exige el token API_TOKEN."""
+    """Admin role: requires the API_TOKEN token."""
     expected = os.getenv("API_TOKEN")
 
     if not expected:
         if is_production():
-            # assert_production_auth() ya debería haber tumbado el arranque;
-            # defensa en profundidad por si la app se montó sin ese hook.
+            # assert_production_auth() should already have aborted startup;
+            # defense in depth in case the app was mounted without that hook.
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth no configurada."
             )
         logger.warning(
-            "API_TOKEN no configurado: endpoint crítico accesible sin auth (modo dev). "
-            "Definir API_TOKEN en producción."
+            "API_TOKEN not set: critical endpoint reachable without auth (dev mode). "
+            "Set API_TOKEN in production."
         )
         return
 
@@ -86,7 +86,7 @@ async def require_token(authorization: str | None = Header(default=None)) -> Non
 
 
 async def require_viewer(authorization: str | None = Header(default=None)) -> None:
-    """Rol viewer: acepta API_TOKEN_VIEWER o API_TOKEN (admin ⊇ viewer)."""
+    """Viewer role: accepts API_TOKEN_VIEWER or API_TOKEN (admin ⊇ viewer)."""
     admin = os.getenv("API_TOKEN")
     viewer = os.getenv("API_TOKEN_VIEWER")
 
@@ -95,7 +95,7 @@ async def require_viewer(authorization: str | None = Header(default=None)) -> No
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth no configurada."
             )
-        logger.warning("Sin tokens configurados: acceso viewer sin auth (modo dev).")
+        logger.warning("No tokens configured: viewer access without auth (dev mode).")
         return
 
     provided = _bearer(authorization)
