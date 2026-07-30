@@ -13,6 +13,7 @@ GitHub Actions workflow invokes `python -m ml.predict` and the API imports it.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from application.fire_alerts import alerts_after_prediction
 from db.models.risk_explanation import RiskExplanation
 from db.models.risk_prediction import RiskPrediction
+from db.models.veto_log import VetoLog
 from domain.communes import COMMUNES
 from errors.error_handler import BusinessError, TeyvaError, TransientError, handle_errors
 
@@ -36,6 +38,28 @@ _PREDICTION_FALLBACK: dict[str, Any] = {
     "features_used": {},
     "error": "fallo al predecir esta comuna (ver logs)",
 }
+
+
+def _veto_log_rows(commune_id: str, verdict: Any, *, run_at: datetime) -> list[VetoLog]:
+    """Pure: builds one `VetoLog` row per fired `Veto` conflict in `verdict.conflicts`.
+
+    No I/O — the caller `db.add()`s the result. Split out from `run_predictions` so the
+    "which conflicts count as a veto, what fields do they carry" logic is unit-testable
+    without a database session."""
+    if not verdict.derivation.get("vetoed"):
+        return []
+    return [
+        VetoLog(
+            commune_id=str(commune_id),
+            run_at=run_at,
+            rule_id=str(conflict.get("rule_id", "unknown")),
+            reason=str(conflict.get("reason", "unknown")),
+            neural_level=conflict.get("neural_level"),
+            neural_score=verdict.derivation.get("neural_score"),
+        )
+        for conflict in verdict.conflicts
+        if conflict.get("effect") == "veto"
+    ]
 
 
 def _classify_predict_exception(exc: Exception) -> TeyvaError:
@@ -104,6 +128,8 @@ async def run_predictions(db: AsyncSession) -> None:
                 "priority": verdict.priority,
                 "source": "neurosymbolic",
             }
+            for row in _veto_log_rows(str(cid), verdict, run_at=datetime.now(timezone.utc)):
+                db.add(row)
         else:
             out = await _predict_one_commune(cid, db)
             risk_score = float(out.get("risk_score") or 0.0)

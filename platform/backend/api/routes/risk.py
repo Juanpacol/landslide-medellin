@@ -499,6 +499,40 @@ async def get_seismic_events(
     }
 
 
+@router.get("/veto-log")
+async def get_veto_log(
+    commune_id: str | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_async_db),
+) -> dict[str, Any]:
+    """Recent inference runs where a `Veto` rule fired (`domain/rules/catalog.py`) — the
+    system declaring "insufficient/corrupted evidence" instead of guessing. Same data already
+    persisted per-run in `risk_predictions.raw_output`, flattened here for audit without
+    parsing JSONB."""
+    from db.models.veto_log import VetoLog
+
+    limit = max(1, min(int(limit), 500))
+    stmt = select(VetoLog).order_by(VetoLog.run_at.desc()).limit(limit)
+    if commune_id:
+        stmt = stmt.where(VetoLog.commune_id == str(commune_id))
+    rows = (await db.execute(stmt)).scalars().all()
+    return {
+        "logs": [
+            {
+                "id": r.id,
+                "commune_id": r.commune_id,
+                "run_at": r.run_at.isoformat() if r.run_at else None,
+                "rule_id": r.rule_id,
+                "reason": r.reason,
+                "neural_level": r.neural_level,
+                "neural_score": r.neural_score,
+            }
+            for r in rows
+        ],
+        "total": len(rows),
+    }
+
+
 async def _inherited_risk_for_communes(db: AsyncSession, commune_ids: list[str]) -> dict[str, Any]:
     """Worst risk among the communes a grid cell intersects. Not a
     per-cell prediction — inherited from the commune-level model."""

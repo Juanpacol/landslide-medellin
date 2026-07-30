@@ -20,6 +20,7 @@ from db.models.safe_zone import SafeZone
 from db.models.scraping_log import ScrapingLog
 from db.models.seismic_event import SeismicEvent
 from db.models.seismic_event_cluster import SeismicEventCluster
+from db.models.veto_log import VetoLog
 
 __all__ = [
     "Base",
@@ -44,4 +45,5 @@ __all__ = [
     "ScrapingLog",
     "SeismicEvent",
     "SeismicEventCluster",
+    "VetoLog",
 ]
