@@ -1,16 +1,18 @@
 """
-Repositorio de sismos: inserción deduplicada y agrupación en eventos canónicos.
+Seismic repository: deduplicated insertion and grouping into canonical events.
 
-Toda la lógica de "¿son el mismo sismo?" vive en `domain/seismic_dedup.py`, que
-es puro y testeable sin base de datos. Aquí solo está el I/O.
+All "are these the same earthquake?" logic lives in
+`domain/seismic_dedup.py`, which is pure and testable without a database.
+Only the I/O lives here.
 
-Dos cosas que este módulo arregla del código anterior:
+Two things this module fixes from the previous code:
 
-1. **N consultas → 1.** `scraper/siata_sismos.py` hacía un `SELECT` por fila para
-   comprobar si el `source_row_id` ya existía. Con USGS y el SGC añadidos eso
-   escala mal; `existing_source_row_ids` resuelve el lote en una sola consulta.
-2. **Agrupación en clústeres.** Sin ella, cada sismo cuenta una vez por agencia
-   en la Σ de magnitud² de `ml/seismic_features.py`, con inflado cuadrático.
+1. **N queries → 1.** `scraper/siata_sismos.py` did one `SELECT` per row to
+   check if the `source_row_id` already existed. With USGS and SGC added,
+   that scales badly; `existing_source_row_ids` resolves the batch in a
+   single query.
+2. **Cluster grouping.** Without it, each earthquake counts once per agency
+   in `ml/seismic_features.py`'s Σ of magnitude², inflating it quadratically.
 """
 
 from __future__ import annotations
@@ -35,7 +37,7 @@ from domain.seismic_dedup import (
 
 
 async def existing_source_row_ids(session: AsyncSession, source_row_ids: Iterable[str]) -> set[str]:
-    """Cuáles de estos `source_row_id` ya están en la BD. UNA sola consulta."""
+    """Which of these `source_row_id`s already exist in the DB. ONE single query."""
     ids = [i for i in source_row_ids if i]
     if not ids:
         return set()
@@ -44,18 +46,18 @@ async def existing_source_row_ids(session: AsyncSession, source_row_ids: Iterabl
 
 
 async def insert_events(session: AsyncSession, rows: Sequence[dict[str, Any]]) -> int:
-    """Inserta reportes crudos ignorando los que ya existan. Devuelve los nuevos.
+    """Inserts raw reports, ignoring ones that already exist. Returns the new ones.
 
-    Idempotente por construcción: `on_conflict_do_nothing` sobre el único
-    `source_row_id`. Una corrida duplicada (cron + scheduler local a la vez)
-    cuesta una fila en `scraping_logs`, nunca datos duplicados.
+    Idempotent by construction: `on_conflict_do_nothing` on the unique
+    `source_row_id`. A duplicate run (cron + local scheduler at once) costs
+    one row in `scraping_logs`, never duplicated data.
 
-    Las filas se normalizan a un conjunto de claves COMÚN antes de insertar. Hace
-    falta porque las fuentes son heterogéneas: SIATA trae `station_code` y
-    `station_name`, USGS y el SGC no. En un INSERT multi-fila, SQLAlchemy exige
-    que todos los dicts tengan las mismas claves; si no, falla con
-    `CompileError: ... explicitly rendered as a boundparameter`, que no dice nada
-    sobre la causa real.
+    Rows are normalized to a COMMON key set before inserting. Needed
+    because sources are heterogeneous: SIATA carries `station_code` and
+    `station_name`, USGS and SGC don't. In a multi-row INSERT, SQLAlchemy
+    requires every dict to have the same keys; otherwise it fails with
+    `CompileError: ... explicitly rendered as a boundparameter`, which says
+    nothing about the real cause.
     """
     if not rows:
         return 0
@@ -75,7 +77,7 @@ async def insert_events(session: AsyncSession, rows: Sequence[dict[str, Any]]) -
 
 
 def _to_key(row: SeismicEvent | SeismicEventCluster) -> EventKey:
-    """Adapta una fila de la BD al dataclass puro del dominio."""
+    """Adapts a DB row to the domain's pure dataclass."""
     at = getattr(row, "event_at", None) or getattr(row, "event_local_at", None)
     return EventKey(
         event_at=at,  # type: ignore[arg-type]
@@ -89,8 +91,8 @@ def _to_key(row: SeismicEvent | SeismicEventCluster) -> EventKey:
 
 
 async def _candidate_clusters(session: AsyncSession, at: datetime) -> list[SeismicEventCluster]:
-    """Clústeres dentro de la ventana temporal de coincidencia (índice sobre
-    `event_at`, así que son un puñado de filas)."""
+    """Clusters within the matching time window (indexed on `event_at`, so
+    it's a handful of rows)."""
     margin = timedelta(seconds=MATCH_TIME_WINDOW_S)
     stmt = select(SeismicEventCluster).where(
         SeismicEventCluster.event_at >= at - margin,
@@ -100,13 +102,13 @@ async def _candidate_clusters(session: AsyncSession, at: datetime) -> list[Seism
 
 
 async def assign_cluster(session: AsyncSession, event: SeismicEvent) -> int | None:
-    """Asigna `event` a un clúster existente o crea uno. Devuelve el `cluster_id`.
+    """Assigns `event` to an existing cluster or creates one. Returns the `cluster_id`.
 
-    No hace commit: lo hace quien llama, para que la asignación viaje en la misma
-    transacción que la inserción del reporte.
+    Doesn't commit: the caller does, so the assignment travels in the same
+    transaction as the report's insertion.
 
-    Un evento sin `event_local_at` no se puede agrupar (el tiempo es la clave
-    primaria de la coincidencia) y se deja con `cluster_id = NULL`.
+    An event with no `event_local_at` can't be grouped (time is the
+    matching primary key) and is left with `cluster_id = NULL`.
     """
     if event.event_local_at is None:
         return None
@@ -130,7 +132,7 @@ async def assign_cluster(session: AsyncSession, event: SeismicEvent) -> int | No
             member_count=1,
         )
         session.add(cluster)
-        # flush (no commit) para obtener el id generado sin cerrar la transacción.
+        # flush (no commit) to get the generated id without closing the transaction.
         await session.flush()
         event.cluster_id = cluster.id
         return cluster.id
@@ -141,8 +143,8 @@ async def assign_cluster(session: AsyncSession, event: SeismicEvent) -> int | No
     cluster.sources = sources
     cluster.source_count = len(sources)
 
-    # Si la fuente nueva tiene MÁS autoridad, reemplaza los valores canónicos.
-    # A igualdad de fuente no se toca nada: reprocesar no debe mover el consenso.
+    # If the new source has MORE authority, it replaces the canonical values.
+    # On a source tie, nothing is touched: reprocessing must not move consensus.
     if source_rank(event.source) < source_rank(cluster.canonical_source):
         cluster.event_at = event.event_local_at
         cluster.magnitude = event.magnitude
@@ -160,11 +162,11 @@ async def assign_cluster(session: AsyncSession, event: SeismicEvent) -> int | No
 async def recent_clusters(
     session: AsyncSession, since: datetime, *, until: datetime | None = None
 ) -> list[SeismicEventCluster]:
-    """Sismos canónicos con magnitud conocida en una ventana.
+    """Canonical earthquakes with known magnitude in a window.
 
-    Esta es la superficie que consume `ml/seismic_features.py`: un sismo, una
-    fila. Se filtra `magnitude IS NOT NULL` porque la intensidad es una Σ de
-    magnitud² y una fila sin magnitud no aporta nada.
+    This is the surface `ml/seismic_features.py` consumes: one earthquake,
+    one row. Filtered by `magnitude IS NOT NULL` because intensity is a Σ
+    of magnitude² and a row with no magnitude contributes nothing.
     """
     stmt = select(SeismicEventCluster).where(
         SeismicEventCluster.event_at >= since,
@@ -178,10 +180,10 @@ async def recent_clusters(
 async def unclustered_events(
     session: AsyncSession, *, limit: int = 1000, since: datetime | None = None
 ) -> list[SeismicEvent]:
-    """Reportes todavía sin clúster, en orden cronológico.
+    """Reports still without a cluster, in chronological order.
 
-    Los usa `scraper/seismic_cluster_backfill.py`. El orden importa: agrupar de
-    más antiguo a más nuevo reproduce el orden en que habrían llegado.
+    Used by `scraper/seismic_cluster_backfill.py`. Order matters: grouping
+    oldest to newest reproduces the order they would have arrived in.
     """
     stmt = (
         select(SeismicEvent)

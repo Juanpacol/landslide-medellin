@@ -1,8 +1,8 @@
 """
-Repositorio de RiskPrediction — encapsula la query "última predicción por
-comuna", que antes vivía copiada en alerts/slack.py (×2, lluvia y crítico),
-api/routes/rain.py (/live) y api/routes/risk.py (/comunas, con variante de
-cutoff). Un solo lugar para el patrón subquery-max-join.
+RiskPrediction repository — encapsulates the "latest prediction per
+commune" query, previously copied across alerts/slack.py (×2, rain and
+critical), api/routes/rain.py (/live) and api/routes/risk.py (/comunas,
+with a cutoff variant). One single place for the subquery-max-join pattern.
 """
 
 from __future__ import annotations
@@ -18,9 +18,9 @@ from db.models.risk_prediction import RiskPrediction
 async def latest_by_commune(
     session: AsyncSession, *, since: datetime | None = None
 ) -> dict[str, RiskPrediction]:
-    """Última RiskPrediction por comuna. `since` acota la búsqueda (p.ej.
-    7 días en /comunas: las predicciones corren cada 6h, no hace falta leer
-    la tabla completa)."""
+    """Latest RiskPrediction per commune. `since` bounds the search (e.g.
+    7 days in /comunas: predictions run every 6h, no need to read the whole
+    table)."""
     subq = select(
         RiskPrediction.commune_id,
         func.max(RiskPrediction.created_at).label("max_at"),
@@ -42,6 +42,6 @@ async def latest_by_commune(
 async def latest_scores_by_commune(
     session: AsyncSession, *, since: datetime | None = None
 ) -> dict[str, tuple[float | None, str | None]]:
-    """Variante liviana: commune_id → (risk_score, risk_category)."""
+    """Lightweight variant: commune_id → (risk_score, risk_category)."""
     rows = await latest_by_commune(session, since=since)
     return {cid: (r.risk_score, r.risk_category) for cid, r in rows.items()}

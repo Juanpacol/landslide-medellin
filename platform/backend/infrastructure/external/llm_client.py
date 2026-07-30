@@ -1,10 +1,10 @@
 """
-Configuración y clientes LLM compartidos (Anthropic primario, Ollama fallback).
+Shared LLM configuration and clients (Anthropic primary, Ollama fallback).
 
-El cliente lazy de Anthropic estaba duplicado en agent/chat_rag.py,
-alerts/reports.py y agent/risk_explanations.py — tres copias del mismo
-singleton. Este módulo es el único dueño de la conexión; la LÓGICA de
-conversación (tools, streaming, prompts) sigue en agent/.
+The lazy Anthropic client used to be duplicated in agent/chat_rag.py,
+alerts/reports.py and agent/risk_explanations.py — three copies of the same
+singleton. This module is the sole owner of the connection; conversation
+LOGIC (tools, streaming, prompts) stays in agent/.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ _anthropic_client: Any = None
 
 
 def get_anthropic_client() -> Any:
-    """Cliente lazy: solo se construye (y solo exige ANTHROPIC_API_KEY) si
-    realmente se llega a usar el proveedor Anthropic."""
+    """Lazy client: only built (and only requires ANTHROPIC_API_KEY) if the
+    Anthropic provider actually ends up being used."""
     global _anthropic_client
     if _anthropic_client is None:
         import anthropic

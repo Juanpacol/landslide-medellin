@@ -1,8 +1,8 @@
-"""Lee el estado de Alembic del repo y de la BD vía la API de Alembic.
+"""Reads Alembic's repo and DB state via Alembic's API.
 
-Nada de parsear la salida de `alembic current` o `alembic heads`: esa salida
-es para humanos y cambia entre versiones. `ScriptDirectory` y
-`MigrationContext` son la API estable.
+No parsing of `alembic current` or `alembic heads` output: that output is
+for humans and changes between versions. `ScriptDirectory` and
+`MigrationContext` are the stable API.
 """
 
 from __future__ import annotations
@@ -14,13 +14,13 @@ from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 
-# .../platform/backend — dos niveles arriba de infrastructure/migrations/.
+# .../platform/backend — two levels above infrastructure/migrations/.
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
 @dataclass(frozen=True)
 class RepoState:
-    """Migraciones presentes en el checkout actual."""
+    """Migrations present in the current checkout."""
 
     heads: tuple[str, ...]
     known: frozenset[str]
@@ -28,28 +28,28 @@ class RepoState:
 
 def _script_directory() -> ScriptDirectory:
     cfg = Config(str(BACKEND_DIR / "alembic.ini"))
-    # alembic.ini trae `script_location = alembic` (relativo al cwd). El guard
-    # corre con cwd distintos — los crons usan working-directory, el
-    # docker-entrypoint no — así que se fuerza la ruta absoluta.
+    # alembic.ini has `script_location = alembic` (relative to cwd). The
+    # guard runs with different cwds — crons use working-directory, the
+    # docker-entrypoint doesn't — so the absolute path is forced.
     cfg.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
     return ScriptDirectory.from_config(cfg)
 
 
 def read_repo_state() -> RepoState:
-    """Revisiones del repo. NO toca la base de datos."""
+    """Repo revisions. Does NOT touch the database."""
     script = _script_directory()
-    # walk_revisions() recorre base→heads: el conjunto resultante es
-    # exactamente "lo que alembic sabe resolver". Una migración aplicada a la
-    # BD pero nunca commiteada NO aparece aquí — así se detecta el drift.
+    # walk_revisions() walks base→heads: the resulting set is exactly "what
+    # alembic knows how to resolve". A migration applied to the DB but
+    # never committed does NOT appear here — that's how drift is detected.
     known = frozenset(sc.revision for sc in script.walk_revisions())
     return RepoState(heads=tuple(script.get_heads()), known=known)
 
 
 def read_db_heads() -> tuple[str, ...]:
-    """Revisiones en la tabla `alembic_version`.
+    """Revisions in the `alembic_version` table.
 
-    Se usa get_current_heads() y no get_current_revision(): devuelve () en una
-    BD virgen (tabla inexistente) y tolera múltiples filas sin lanzar.
+    Uses get_current_heads(), not get_current_revision(): returns () on a
+    fresh DB (table doesn't exist) and tolerates multiple rows without raising.
     """
     from db.session import sync_engine
 
@@ -58,11 +58,12 @@ def read_db_heads() -> tuple[str, ...]:
 
 
 def pending_revisions(db_heads: tuple[str, ...], repo: RepoState) -> list[str]:
-    """Revisiones del repo que la BD todavía no aplicó.
+    """Repo revisions the DB hasn't applied yet.
 
-    Precondición: todas las `db_heads` deben estar en `repo.known`. Con una
-    revisión desconocida, iterate_revisions lanzaría — por eso quien llama
-    verifica primero (ver diagnosis.diagnose, que evalúa DB_AHEAD antes).
+    Precondition: every `db_heads` entry must be in `repo.known`. With an
+    unknown revision, iterate_revisions would raise — that's why the
+    caller checks first (see diagnosis.diagnose, which evaluates DB_AHEAD
+    before this).
     """
     script = _script_directory()
     applied: set[str] = set()

@@ -1,8 +1,8 @@
 """
-Cliente HTTP de Slack (Incoming Webhooks) — transporte puro.
+Slack HTTP client (Incoming Webhooks) — pure transport.
 
-La CONSTRUCCIÓN de payloads (bloques, colores, cooldowns) sigue en
-alerts/slack.py y alerts/snake_line.py; aquí solo vive el POST.
+Payload CONSTRUCTION (blocks, colors, cooldowns) stays in alerts/slack.py
+and alerts/snake_line.py; only the POST lives here.
 """
 
 from __future__ import annotations
@@ -19,15 +19,15 @@ logger = logging.getLogger(__name__)
 async def post_webhook(
     webhook_url: str, payload: dict, *, retries: int = 3, base_delay_s: float = 1.0
 ) -> tuple[str, int | None]:
-    """POST al webhook. Devuelve ("sent"|"failed", status_code|None).
-    Nunca lanza: un Slack caído no debe tumbar alertas ni predicciones.
+    """POST to the webhook. Returns ("sent"|"failed", status_code|None).
+    Never raises: a downed Slack must not take down alerts or predictions.
 
-    El retry vive AQUÍ, no en cada call-site de alerts/slack.py: esta función
-    es dueña del contrato "nunca lanza, siempre devuelve (status, code)"; si
-    el retry viviera afuera, cada uno de los ~4 call-sites tendría que
-    reimplementar el swallow-never-throw, con riesgo de que alguien lo olvide.
-    Solo los 5xx (falla del lado de Slack) reintentan — un 4xx (payload
-    inválido o webhook revocado) no se arregla reintentando.
+    The retry lives HERE, not at each of alerts/slack.py's call sites: this
+    function owns the "never raises, always returns (status, code)"
+    contract; if the retry lived outside, each of the ~4 call sites would
+    have to reimplement the swallow-never-throw, risking someone forgetting
+    it. Only 5xx (failure on Slack's side) retries — a 4xx (invalid payload
+    or revoked webhook) isn't fixed by retrying.
     """
 
     async def _attempt() -> tuple[str, int | None]:
@@ -36,7 +36,7 @@ async def post_webhook(
         if r.status_code == 200:
             return "sent", r.status_code
         if 500 <= r.status_code < 600:
-            raise TransientError(f"Slack respondió {r.status_code}")
+            raise TransientError(f"Slack responded {r.status_code}")
         return "failed", r.status_code
 
     try:
@@ -47,5 +47,5 @@ async def post_webhook(
             exceptions=(TransientError, httpx.TimeoutException, httpx.ConnectError),
         )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Slack webhook error tras reintentos: %s", exc)
+        logger.warning("Slack webhook error after retries: %s", exc)
         return "failed", None

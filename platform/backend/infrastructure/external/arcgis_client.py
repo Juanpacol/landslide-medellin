@@ -1,9 +1,9 @@
 """
-Cliente del servidor de mapas ArcGIS de Medellín + utilidades geo.
+Medellín's ArcGIS map server client + geo utilities.
 
-Movido desde scraper/commune.py (que re-exporta por compatibilidad: todos
-los scrapers y ml/seismic_features importan de allí). El mapeo código
-oficial → id canónico se deriva de domain/communes.py, no se duplica.
+Moved from scraper/commune.py (which re-exports for compatibility: every
+scraper and ml/seismic_features import from there). The official-code →
+canonical-id mapping is derived from domain/communes.py, not duplicated.
 """
 
 from __future__ import annotations
@@ -15,10 +15,10 @@ import httpx
 
 from domain.communes import COMMUNES
 
-# Re-exportadas: `haversine_km` vivía aquí, pero es geometría PURA y ahora está
-# en `domain/geo.py`, para que la capa de dominio pueda usarla sin arrastrar
-# httpx. Se sigue exponiendo desde aquí porque varios módulos la importan de esta
-# ruta (`ml/seismic_features.py`, `alerts/evacuation.py`).
+# Re-exported: `haversine_km` used to live here, but it's PURE geometry and
+# now lives in `domain/geo.py`, so the domain layer can use it without
+# dragging in httpx. Still exposed from here because several modules import
+# it from this path (`ml/seismic_features.py`, `alerts/evacuation.py`).
 from domain.geo import distance_km, haversine_km
 from scraper.common import with_retries
 
@@ -27,7 +27,7 @@ COMUNA_QUERY_URL = (
     "ServiciosCiudad/CartografiaBase/MapServer/11/query"
 )
 
-# Código oficial de corregimiento → id canónico, derivado de la fuente única.
+# Official corregimiento code → canonical id, derived from the single source.
 _CORREG_TO_ML: dict[str, str] = {
     c.official_code: c.id for c in COMMUNES if c.tipo == "corregimiento"
 }

@@ -1,8 +1,8 @@
-"""Clasificación del estado de Alembic. PURO: sin I/O, sin BD.
+"""Classification of Alembic's state. PURE: no I/O, no DB.
 
-Vive aquí y no en `domain/` a propósito: `domain/` es el territorio y las
-reglas de riesgo de deslizamiento, no plomería de despliegue. Pero sigue la
-misma disciplina — nada de I/O — para que sea testeable sin base de datos.
+Lives here and not in `domain/` on purpose: `domain/` is the territory and
+the landslide risk rules, not deployment plumbing. But it follows the same
+discipline — no I/O — so it's testable without a database.
 """
 
 from __future__ import annotations
@@ -10,14 +10,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
-# Vocabulario de estados de `agent_run_logs` (ver monitoring/notify.py).
+# Status vocabulary from `agent_run_logs` (see monitoring/notify.py).
 STATUS_OK = "ok"
 STATUS_WARNING = "warning"
 STATUS_CRITICAL = "critical"
 
 
 class DriftKind(str, Enum):
-    """Tipos de divergencia entre las migraciones del repo y las de la BD."""
+    """Types of divergence between the repo's migrations and the DB's."""
 
     OK = "ok"
     DB_AHEAD = "db_ahead"
@@ -32,7 +32,7 @@ class Diagnosis:
     status: str
     summary: str
     detail: dict = field(default_factory=dict)
-    # False ⇒ `alembic upgrade head` fallaría o corrompería: hay que omitirlo.
+    # False ⇒ `alembic upgrade head` would fail or corrupt: it must be skipped.
     safe_to_upgrade: bool = True
 
 
@@ -43,49 +43,49 @@ def diagnose(
     known: frozenset[str],
     pending: list[str],
 ) -> Diagnosis:
-    """Clasifica el estado de las migraciones.
+    """Classifies the migration state.
 
     Args:
-        db_heads: revisiones en la tabla `alembic_version`
-        repo_heads: revisiones head presentes en `alembic/versions/`
-        known: TODAS las revisiones alcanzables en el repo
-        pending: revisiones del repo aún no aplicadas en la BD
+        db_heads: revisions in the `alembic_version` table
+        repo_heads: head revisions present in `alembic/versions/`
+        known: ALL revisions reachable in the repo
+        pending: repo revisions not yet applied to the DB
 
     Returns:
-        Diagnosis con severidad y si es seguro correr `upgrade head`.
+        Diagnosis with severity and whether `upgrade head` is safe to run.
     """
     unknown = [rev for rev in db_heads if rev not in known]
 
-    # PRIMERO, y el orden importa: si la BD apunta a una revisión que no está
-    # en el repo, `pending` se calculó sobre una cadena rota y no significa
-    # nada. Este es el bug real que tumbó los 6 crons el 2026-07-26.
+    # FIRST, and the order matters: if the DB points to a revision not in
+    # the repo, `pending` was computed over a broken chain and means
+    # nothing. This is the real bug that took down the 6 crons on 2026-07-26.
     if unknown:
         return Diagnosis(
             kind=DriftKind.DB_AHEAD,
             status=STATUS_CRITICAL,
             safe_to_upgrade=False,
             summary=(
-                f"BD adelante del código: la revisión {', '.join(unknown)} no existe "
-                f"en el repo. `alembic upgrade head` falla en todos los crons."
+                f"DB ahead of code: revision {', '.join(unknown)} doesn't exist "
+                f"in the repo. `alembic upgrade head` fails on every cron."
             ),
             detail={
                 "db_heads": list(db_heads),
                 "repo_heads": list(repo_heads),
                 "unknown_revisions": unknown,
                 "remediation": (
-                    "commitear y pushear la migración faltante a main "
-                    "(ver docs/RUNBOOK_MIGRATIONS.md)"
+                    "commit and push the missing migration to main "
+                    "(see docs/RUNBOOK_MIGRATIONS.md)"
                 ),
             },
         )
 
-    # Dos heads ⇒ alembic aborta con "Multiple head revisions are present".
+    # Two heads ⇒ alembic aborts with "Multiple head revisions are present".
     if len(repo_heads) > 1:
         return Diagnosis(
             kind=DriftKind.MULTIPLE_REPO_HEADS,
             status=STATUS_CRITICAL,
             safe_to_upgrade=False,
-            summary=f"El repo tiene {len(repo_heads)} heads de alembic: `upgrade head` es ambiguo.",
+            summary=f"The repo has {len(repo_heads)} alembic heads: `upgrade head` is ambiguous.",
             detail={
                 "repo_heads": list(repo_heads),
                 "remediation": "alembic merge -m 'merge heads' " + " ".join(repo_heads),
@@ -96,24 +96,24 @@ def diagnose(
         return Diagnosis(
             kind=DriftKind.EMPTY_DB,
             status=STATUS_WARNING,
-            summary="BD sin alembic_version: se aplicará el esquema completo.",
+            summary="DB with no alembic_version: the full schema will be applied.",
             detail={"pending_count": len(pending)},
         )
 
-    # Estado normal entre un merge a main y el siguiente cron: el upgrade SÍ
-    # debe correr (omitirlo dejaría al scraper escribiendo contra un esquema
-    # viejo). El silencio de la primera detección lo maneja el agente.
+    # Normal state between a merge to main and the next cron: the upgrade
+    # SHOULD run (skipping it would leave the scraper writing against an
+    # old schema). The silence on first detection is handled by the agent.
     if pending:
         return Diagnosis(
             kind=DriftKind.PENDING,
             status=STATUS_WARNING,
-            summary=f"{len(pending)} migración(es) del repo sin aplicar en la BD.",
+            summary=f"{len(pending)} repo migration(s) not yet applied to the DB.",
             detail={"pending": pending, "db_heads": list(db_heads)},
         )
 
     return Diagnosis(
         kind=DriftKind.OK,
         status=STATUS_OK,
-        summary=f"Alembic sincronizado ({db_heads[0]}).",
+        summary=f"Alembic in sync ({db_heads[0]}).",
         detail={"db_heads": list(db_heads)},
     )

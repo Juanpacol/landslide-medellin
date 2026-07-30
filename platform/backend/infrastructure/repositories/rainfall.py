@@ -1,6 +1,6 @@
 """
-Repositorio de lluvia y umbrales — queries compartidas entre las alertas
-Slack (alerts/slack.py) y el monitor de lluvia (api/routes/rain.py).
+Rainfall and threshold repository — queries shared between Slack alerts
+(alerts/slack.py) and the rain monitor (api/routes/rain.py).
 """
 
 from __future__ import annotations
@@ -17,28 +17,30 @@ DEFAULT_THRESHOLD_MM = 35.0
 
 
 async def thresholds_by_commune(session: AsyncSession) -> dict[str, float]:
-    """Umbral diario configurado por comuna (sin default: el caller decide
-    qué hacer con las comunas sin fila — DEFAULT_THRESHOLD_MM)."""
+    """Daily threshold configured per commune (no default: the caller
+    decides what to do with communes without a row — DEFAULT_THRESHOLD_MM)."""
     result = await session.execute(select(CommuneThreshold))
     return {r.commune_id: r.threshold_mm for r in result.scalars().all()}
 
 
 async def accumulated_since_by_commune(session: AsyncSession, since: datetime) -> dict[str, float]:
-    """Lluvia acumulada por comuna desde `since` (típicamente medianoche local).
+    """Accumulated rain per commune since `since` (typically local midnight).
 
-    Suma TODAS las fuentes de `rainfall_timeseries` sin filtrar, y eso es correcto
-    solo porque se apoya en dos invariantes que se garantizan al ESCRIBIR:
+    Sums ALL sources in `rainfall_timeseries` unfiltered, and that's only
+    correct because it relies on two invariants guaranteed at WRITE time:
 
-    1. El pronóstico nunca entra en esta tabla (vive en `rainfall_forecast`). Si
-       entrara, esta suma inflaría el acumulado del día y dispararía alertas
-       Slack rojas falsas — este resultado alimenta `alerts_after_rain_ingest`.
-    2. `owm_observed` solo se escribe para un (comuna, día) que NO tenga ya filas
-       de SIATA. Sin esa compuerta, un total diario de OWM se sumaría a los ~48
-       snapshots de SIATA del mismo día y contaría la lluvia dos veces.
+    1. The forecast never enters this table (it lives in
+       `rainfall_forecast`). If it did, this sum would inflate the day's
+       accumulation and fire false red Slack alerts — this result feeds
+       `alerts_after_rain_ingest`.
+    2. `owm_observed` is only written for a (commune, day) that does NOT
+       already have SIATA rows. Without that gate, an OWM daily total would
+       get added to the same day's ~48 SIATA snapshots and double-count the
+       rain.
 
-    Si algún día hace falta relajar el punto 2, esta función necesita un filtro
-    por `source` y una escalera de precedencia — que es justo lo que hace
-    `infrastructure/repositories/daily_rain.py` para el grano diario.
+    If relaxing point 2 is ever needed, this function needs a `source`
+    filter and a precedence ladder — exactly what
+    `infrastructure/repositories/daily_rain.py` does for the daily grain.
     """
     result = await session.execute(
         select(RainfallTimeseries.commune_id, func.sum(RainfallTimeseries.precip_mm))

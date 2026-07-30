@@ -1,7 +1,7 @@
 """
-Repositorio de LandslideEvent — el filtro is_synthetic=false es la regla de
-oro del pipeline ML (los sintéticos calibran Snake Line, no entrenan el
-clasificador). Centralizarlo evita que un consumidor nuevo lo olvide.
+LandslideEvent repository — the is_synthetic=false filter is the ML
+pipeline's golden rule (synthetic events calibrate Snake Line, they don't
+train the classifier). Centralizing it stops a new consumer from forgetting it.
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from db.models.landslide_event import LandslideEvent
 
 
 def real_events_sync(session: Session) -> list[LandslideEvent]:
-    """Eventos REALES (excluye sintéticos). Versión sync para ml/train y
-    ml/benchmark, que corren fuera del event loop."""
+    """REAL events (excludes synthetic). Sync version for ml/train and
+    ml/benchmark, which run outside the event loop."""
     return list(
         session.scalars(select(LandslideEvent).where(LandslideEvent.is_synthetic.is_(False))).all()
     )

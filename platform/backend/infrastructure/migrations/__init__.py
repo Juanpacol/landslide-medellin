@@ -1,6 +1,6 @@
-"""Estado de las migraciones de Alembic: repo vs. base de datos.
+"""Alembic migration state: repo vs. database.
 
-`alembic_state` hace el I/O (lee `alembic/versions/` y la tabla
-`alembic_version`); `diagnosis` clasifica el resultado con una función pura.
-La separación es lo que permite testear la lógica sin BD.
+`alembic_state` does the I/O (reads `alembic/versions/` and the
+`alembic_version` table); `diagnosis` classifies the result with a pure
+function. The separation is what lets the logic be tested without a DB.
 """
