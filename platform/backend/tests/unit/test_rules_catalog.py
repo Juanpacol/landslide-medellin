@@ -14,6 +14,7 @@ from domain.rules.catalog import (
     R_GEO_04,
     R_HIST_01,
     R_QUAL_01,
+    R_QUAL_02,
     R_SEIS_01,
 )
 from domain.rules.engine import Escalate, RaisePriority, SetFloor, Veto, evaluate
@@ -116,6 +117,39 @@ def test_r_qual_01_is_highest_priority_and_wins_ordering():
     assert trace.fired[0].id == "R-QUAL-01"
 
 
-def test_catalog_has_eight_rules_with_unique_ids():
-    assert len(CATALOG) == 8
-    assert len({r.id for r in CATALOG}) == 8
+def test_r_qual_02_vetoes_frozen_rain_signal_even_with_a_value_present():
+    snap = TerritorySnapshot(
+        commune_id="8", precip_72h_mm=0.003, quality_flags=frozenset({"frozen_rain_signal"})
+    )
+    assert R_QUAL_02.evaluate(snap) is True
+    assert isinstance(R_QUAL_02.effect, Veto)
+
+
+def test_r_qual_02_vetoes_implausible_rain_max():
+    snap = TerritorySnapshot(
+        commune_id="8", precip_72h_mm=0.003, quality_flags=frozenset({"implausible_rain_max"})
+    )
+    assert R_QUAL_02.evaluate(snap) is True
+
+
+def test_r_qual_02_does_not_fire_without_rain_quality_flags():
+    snap = TerritorySnapshot(
+        commune_id="8", precip_72h_mm=5.0, quality_flags=frozenset({"stale_seismic_feed"})
+    )
+    assert R_QUAL_02.evaluate(snap) is False
+
+
+def test_r_qual_02_wins_ordering_over_lower_priority_rules():
+    snap = TerritorySnapshot(
+        commune_id="8",
+        slope_p90_deg=40.0,
+        precip_72h_mm=0.003,
+        quality_flags=frozenset({"frozen_rain_signal"}),
+    )
+    trace = evaluate(snap, CATALOG)
+    assert trace.fired[0].id == "R-QUAL-02"
+
+
+def test_catalog_has_nine_rules_with_unique_ids():
+    assert len(CATALOG) == 9
+    assert len({r.id for r in CATALOG}) == 9

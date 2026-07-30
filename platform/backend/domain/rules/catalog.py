@@ -163,6 +163,29 @@ R_QUAL_01 = Rule(
     "indistinguishable from a confirmed absence of risk.",
 )
 
+
+_CORRUPTED_RAIN_FLAGS = frozenset({"frozen_rain_signal", "implausible_rain_max"})
+
+
+def _r_qual_02(s: TerritorySnapshot) -> bool | None:
+    return bool(_CORRUPTED_RAIN_FLAGS & s.quality_flags)
+
+
+R_QUAL_02 = Rule(
+    id="R-QUAL-02",
+    description="Rain feed confirmed frozen/implausible city-wide vetoes the score: a "
+    "present-but-corrupted trigger reading is not more trustworthy than a missing one.",
+    priority=999,
+    condition=_r_qual_02,
+    effect=Veto(reason="corrupted_rain_signal"),
+    provenance="Closes the gap R-QUAL-01 left open: has_trigger_signal only checks for `None`, "
+    "so SIATA's frozen 0.003mm reading (audit finding 2, docs/research/audit-2026-07.md §4) "
+    "passed through as a 'confirmed' trigger value instead of tripping the veto. "
+    "quality_flags is now populated at inference time by "
+    "infrastructure/repositories/data_quality.py, reusing the same predicates "
+    "monitoring/scraper_validator.py runs periodically.",
+)
+
 CATALOG: tuple[Rule, ...] = (
     R_GEO_01,
     R_GEO_02,
@@ -172,4 +195,5 @@ CATALOG: tuple[Rule, ...] = (
     R_EXPO_01,
     R_SEIS_01,
     R_QUAL_01,
+    R_QUAL_02,
 )

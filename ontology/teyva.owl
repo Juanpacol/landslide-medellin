@@ -460,5 +460,13 @@
   <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Zero trigger coverage (no rain, SWI, or seismic signal at all) vetoes the score: absence of signal is not evidence of absence of risk. =&gt; Veto</swrl_sketch>
 </owl:NamedIndividual>
 
+<owl:NamedIndividual rdf:about="#rule_r_qual_02">
+  <rdf:type rdf:resource="#SymbolicRule"/>
+  <rule_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">R-QUAL-02</rule_id>
+  <priority rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">999</priority>
+  <provenance rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Closes the gap R-QUAL-01 left open: has_trigger_signal only checks for `None`, so SIATA's frozen 0.003mm reading (audit finding 2, docs/research/audit-2026-07.md §4) passed through as a 'confirmed' trigger value instead of tripping the veto. quality_flags is now populated at inference time by infrastructure/repositories/data_quality.py, reusing the same predicates monitoring/scraper_validator.py runs periodically.</provenance>
+  <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Rain feed confirmed frozen/implausible city-wide vetoes the score: a present-but-corrupted trigger reading is not more trustworthy than a missing one. =&gt; Veto</swrl_sketch>
+</owl:NamedIndividual>
+
 
 </rdf:RDF>

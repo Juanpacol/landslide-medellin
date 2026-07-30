@@ -97,7 +97,8 @@ def render(verdict: Verdict) -> ExplanationTree:
         "high data coverage" if verdict.confidence >= 0.6 else "limited data coverage"
     )
     if verdict.derivation.get("vetoed"):
-        confidence_reason = "vetoed: no trigger signal at all"
+        veto_reasons = [c.get("reason") for c in verdict.conflicts if c.get("effect") == "veto"]
+        confidence_reason = f"vetoed: {', '.join(r for r in veto_reasons if r) or 'unknown reason'}"
     nodes.append(
         ExplanationNode(
             kind="confidence",

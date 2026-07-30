@@ -234,9 +234,11 @@ async def infer_commune(session, commune_id: str, *, as_of: date | None = None) 
 
 async def infer_all(session, *, as_of: date | None = None) -> dict[str, Verdict]:
     """All 21 communes in one pass, preserving `ml.hazard.hazard_by_commune`'s batch contract."""
+    from infrastructure.repositories.data_quality import current_quality_flags
     from ml.hazard import hazard_by_commune
 
     hazards = await hazard_by_commune(session, as_of=as_of)
+    quality_flags = await current_quality_flags(session)
 
     out: dict[str, Verdict] = {}
     for commune_id, hazard in hazards.items():
@@ -249,6 +251,7 @@ async def infer_all(session, *, as_of: date | None = None) -> dict[str, Verdict]
             antecedent_mm=hazard.trigger_components.get("antecedent"),
             precip_72h_mm=hazard.trigger_components.get("antecedent"),
             seismic_intensity=hazard.trigger_components.get("seismic"),
+            quality_flags=quality_flags,
         )
         out[commune_id] = resolve_verdict(commune_id, hazard.score, snapshot)
     return out
