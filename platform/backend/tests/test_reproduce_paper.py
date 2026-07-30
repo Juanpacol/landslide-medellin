@@ -13,10 +13,24 @@ from evaluation.reproduce_paper import _SEED, _build_snapshots
 import random
 
 
-def test_reproduce_paper_runs_without_error():
+def test_reproduce_paper_runs_without_error(monkeypatch):
+    import sys
+
     from evaluation import reproduce_paper
 
+    monkeypatch.setattr(sys, "argv", ["reproduce_paper"])
     reproduce_paper.main()  # must not raise
+
+
+def test_collect_results_is_json_serializable():
+    import json
+
+    from evaluation.reproduce_paper import collect_results
+
+    results = collect_results()
+    json.dumps(results)  # must not raise
+    assert results["rule_coverage"]["n_snapshots"] == 21
+    assert "latency_ms" in results
 
 
 def test_rule_coverage_numbers_match_the_paper():

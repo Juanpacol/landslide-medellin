@@ -1,0 +1,79 @@
+name: Neuro-Symbolic Evaluation
+
+# Runs specs/007-experimental-eval/'s reproducible metrics (rule coverage,
+# ablation, four-arm disagreement, latency — evaluation/reproduce_paper.py)
+# and uploads the JSON result as a build artifact.
+#
+# Deliberately DB-free: unlike ci-tests.yml, this doesn't need
+# DATABASE_URL/DATABASE_URL_SYNC secrets — evaluation/ operates on synthetic
+# TerritorySnapshots, never queries Supabase. See
+# docs/research/paper.md §7 for why that's the point, not a limitation of
+# this workflow.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "platform/backend/evaluation/**"
+      - "platform/backend/domain/rules/**"
+      - "platform/backend/domain/quality.py"
+      - "platform/backend/application/neurosymbolic/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "platform/backend/evaluation/**"
+      - "platform/backend/domain/rules/**"
+      - "platform/backend/domain/quality.py"
+      - "platform/backend/application/neurosymbolic/**"
+  workflow_dispatch:
+
+jobs:
+  evaluate:
+    name: Reproduce paper.md §5 metrics
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ./platform/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd platform/backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run evaluation/reproduce_paper.py
+        run: |
+          cd platform/backend
+          mkdir -p evaluation/results
+          out="evaluation/results/$(date -u +%Y-%m-%d_%H-%M-%S).json"
+          python -m evaluation.reproduce_paper --json-out "$out"
+          echo "RESULT_PATH=platform/backend/$out" >> "$GITHUB_ENV"
+
+      - name: Run evaluation test suite
+        run: |
+          cd platform/backend
+          pytest tests/test_evaluation_primary_metrics.py tests/test_evaluation_run.py \
+                 tests/test_evaluation_ablation.py tests/test_evaluation_latency.py \
+                 tests/test_reproduce_paper.py -v
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neurosymbolic-eval-results
+          path: ${{ env.RESULT_PATH }}
+          retention-days: 90
+
+      - name: Notify failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}

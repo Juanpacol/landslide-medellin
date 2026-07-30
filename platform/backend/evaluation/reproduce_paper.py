@@ -9,7 +9,12 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
+import json
 import random
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
 from application.neurosymbolic.infer import resolve_verdict
 from domain.rules.catalog import CATALOG
@@ -55,50 +60,105 @@ def _build_snapshots(rng: random.Random) -> list[TerritorySnapshot]:
     return snapshots
 
 
-def main() -> None:
+def collect_results() -> dict[str, Any]:
+    """Runs every §5.2/§5.3/§5.5 computation and returns a JSON-serializable
+    dict — used both by `main()`'s printed report and by the CI workflow,
+    which writes this straight to `evaluation/results/`."""
     rng = random.Random(_SEED)
     snapshots = _build_snapshots(rng)
 
-    print("## §5.2 Rule coverage")
-    report = rule_coverage(snapshots, CATALOG)
-    print(f"n_snapshots={report.n_snapshots} pct_any_fired={report.pct_snapshots_with_any_fired_rule}")
-    for rule_id, rate in report.fire_rate_by_rule.items():
-        print(f"  {rule_id}: fire={rate:.2f} evaluable={report.evaluable_rate_by_rule[rule_id]:.2f}")
+    coverage = rule_coverage(snapshots, CATALOG)
 
-    print("\n## §5.3 Ablation")
     rng2 = random.Random(_SEED)  # fresh sequence, matches paper.md's independent score draw
     cases = [AblationCase(s.commune_id, rng2.uniform(0, 1), s) for s in snapshots]
     ablation_rules = run_ablation("rules", cases)
     ablation_quality = run_ablation("quality", cases)
-    print(
-        f"rules: n_changed={ablation_rules.n_level_changed}/{ablation_rules.n_cases} "
-        f"pct={ablation_rules.pct_level_changed} conf_delta={ablation_rules.confidence_delta_mean}"
-    )
-    print(
-        f"quality: n_changed={ablation_quality.n_level_changed} "
-        f"conf_delta={ablation_quality.confidence_delta_mean}"
+
+    n_disagree = sum(
+        1
+        for case in cases
+        if arms_disagree(run_all_arms(case.commune_id, case.neural_score, case.snapshot))
     )
 
-    n_disagree = 0
-    for case in cases:
-        arms = run_all_arms(case.commune_id, case.neural_score, case.snapshot)
-        if arms_disagree(arms):
-            n_disagree += 1
-    print(f"arms disagree on {n_disagree}/{len(snapshots)}")
-
-    print("\n## §5.5 Latency")
     scores = [rng.uniform(0, 1) for _ in range(210)]
     ml_report = benchmark_ml_only(scores, repeats=10)
-    print(f"ml_only: p50={ml_report.p50_ms}ms p95={ml_report.p95_ms}ms")
-
     ns_cases = [(s.commune_id, rng.uniform(0, 1), s) for s in snapshots]
     ns_report = benchmark_neurosymbolic(ns_cases, repeats=50)
-    print(f"neurosymbolic: p50={ns_report.p50_ms}ms p95={ns_report.p95_ms}ms")
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "seed": _SEED,
+        "rule_coverage": {
+            "n_snapshots": coverage.n_snapshots,
+            "pct_any_fired": coverage.pct_snapshots_with_any_fired_rule,
+            "fire_rate_by_rule": coverage.fire_rate_by_rule,
+            "evaluable_rate_by_rule": coverage.evaluable_rate_by_rule,
+        },
+        "ablation": {
+            "rules": {
+                "n_changed": ablation_rules.n_level_changed,
+                "n_cases": ablation_rules.n_cases,
+                "pct_changed": ablation_rules.pct_level_changed,
+                "confidence_delta_mean": ablation_rules.confidence_delta_mean,
+            },
+            "quality": {
+                "n_changed": ablation_quality.n_level_changed,
+                "confidence_delta_mean": ablation_quality.confidence_delta_mean,
+            },
+        },
+        "four_arm_disagreement": {"n_disagree": n_disagree, "n_total": len(snapshots)},
+        "latency_ms": {
+            "ml_only": {"p50": ml_report.p50_ms, "p95": ml_report.p95_ms},
+            "neurosymbolic": {"p50": ns_report.p50_ms, "p95": ns_report.p95_ms},
+        },
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--json-out",
+        type=Path,
+        default=None,
+        help="Write results as JSON to this path (e.g. evaluation/results/<timestamp>.json)",
+    )
+    args = parser.parse_args()
+
+    results = collect_results()
+
+    print("## §5.2 Rule coverage")
+    rc = results["rule_coverage"]
+    print(f"n_snapshots={rc['n_snapshots']} pct_any_fired={rc['pct_any_fired']}")
+    for rule_id, rate in rc["fire_rate_by_rule"].items():
+        print(f"  {rule_id}: fire={rate:.2f} evaluable={rc['evaluable_rate_by_rule'][rule_id]:.2f}")
+
+    print("\n## §5.3 Ablation")
+    ar = results["ablation"]["rules"]
+    aq = results["ablation"]["quality"]
+    print(
+        f"rules: n_changed={ar['n_changed']}/{ar['n_cases']} "
+        f"pct={ar['pct_changed']} conf_delta={ar['confidence_delta_mean']}"
+    )
+    print(f"quality: n_changed={aq['n_changed']} conf_delta={aq['confidence_delta_mean']}")
+
+    disagreement = results["four_arm_disagreement"]
+    print(f"arms disagree on {disagreement['n_disagree']}/{disagreement['n_total']}")
+
+    print("\n## §5.5 Latency")
+    lat = results["latency_ms"]
+    print(f"ml_only: p50={lat['ml_only']['p50']}ms p95={lat['ml_only']['p95']}ms")
+    print(f"neurosymbolic: p50={lat['neurosymbolic']['p50']}ms p95={lat['neurosymbolic']['p95']}ms")
 
     # Sanity check the pure function is actually deterministic — resolve_verdict
     # must give the same answer twice for the same inputs (specs/002-rule-engine/).
-    s0 = snapshots[0]
+    rng = random.Random(_SEED)
+    s0 = _build_snapshots(rng)[0]
     assert resolve_verdict(s0.commune_id, 0.5, s0) == resolve_verdict(s0.commune_id, 0.5, s0)
+
+    if args.json_out is not None:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        args.json_out.write_text(json.dumps(results, indent=2), encoding="utf-8")
+        print(f"\nWrote {args.json_out}")
 
 
 if __name__ == "__main__":
