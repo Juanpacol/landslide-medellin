@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-_BACKEND_ENV = Path(__file__).resolve().parents[1] / ".env"
+_BACKEND_ENV = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=_BACKEND_ENV, override=True)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")

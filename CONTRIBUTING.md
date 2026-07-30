@@ -36,7 +36,7 @@ pytest tests/ -v --tb=short
 
 - **Filosofía "no mocks"** (documentada en `tests/conftest.py`): los tests de integración de agente/chat corren contra Postgres y Ollama reales, no contra mocks. Si tu cambio toca `agent/`, `rag/` o flujos de BD, verifica que esos servicios estén arriba antes de correr la suite completa.
 - Los tests **puros** (sin BD, sin red) van igual en `tests/` sin subcarpetas — es el estilo del repo. `tests/test_migration_guard.py` es la plantilla de referencia: lógica separada de I/O, testeable en milisegundos.
-- Evals de prompts: `/eval-prompt chat_rag|risk_explanations|slack_webhooks` (reportes en `tests/eval_results/`).
+- Evals de prompts: `/eval-prompt chat_rag|risk_explanations|slack_webhooks` (reportes en `tests/evals/eval_results/`).
 - No testear solo el happy path. Los scrapers en particular se prueban contra datos reales, no solo contra el caso feliz.
 - **Correr los tests antes de pushear**, no después de que falle el CI.
 

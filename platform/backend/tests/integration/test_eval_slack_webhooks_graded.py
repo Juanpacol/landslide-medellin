@@ -15,8 +15,8 @@ from pathlib import Path
 import httpx
 import pytest
 
-from tests.eval_grader import grade_slack_webhook
-from tests.eval_runner import (
+from tests.evals.eval_grader import grade_slack_webhook
+from tests.evals.eval_runner import (
     GradedTestResult,
     find_latest_report,
     format_graded_report_summary,
@@ -27,8 +27,8 @@ from tests.eval_runner import (
 )
 from tests.test_eval_slack_webhooks import _build_payload
 
-CONFIG_FILE = Path(__file__).parent / "eval_config" / "slack_webhooks.json"
-RESULTS_DIR = Path(__file__).parent / "eval_results"
+CONFIG_FILE = Path(__file__).parent.parent / "evals" / "eval_config" / "slack_webhooks.json"
+RESULTS_DIR = Path(__file__).parent.parent / "evals" / "eval_results"
 QUALITY_THRESHOLD = 6.5
 
 

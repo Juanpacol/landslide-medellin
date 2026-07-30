@@ -174,7 +174,7 @@ sources look down, check `gh workflow list` first.
 - Python: type hints mandatory, async for I/O, snake_case. TypeScript: strict, camelCase,
   PascalCase components, Tailwind styles + tokens in `app/globals.css`.
 - Prompt tests: `/eval-prompt chat_rag|risk_explanations|slack_webhooks` (reports in
-  `tests/eval_results/`).
+  `tests/evals/eval_results/`).
 - Don't test only the happy path; scrapers are tested against real data.
 - Update this file if the architecture changes.
 

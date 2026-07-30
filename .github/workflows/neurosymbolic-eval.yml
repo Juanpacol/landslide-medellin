@@ -67,9 +67,9 @@ jobs:
       - name: Run evaluation test suite
         run: |
           cd platform/backend
-          pytest tests/test_evaluation_primary_metrics.py tests/test_evaluation_run.py \
-                 tests/test_evaluation_ablation.py tests/test_evaluation_latency.py \
-                 tests/test_reproduce_paper.py -v
+          pytest tests/unit/test_evaluation_primary_metrics.py tests/unit/test_evaluation_run.py \
+                 tests/unit/test_evaluation_ablation.py tests/unit/test_evaluation_latency.py \
+                 tests/unit/test_reproduce_paper.py -v
 
       - name: Upload results artifact
         uses: actions/upload-artifact@v4

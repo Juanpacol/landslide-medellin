@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.eval_runner import (
+from tests.evals.eval_runner import (
     TestResult,
     format_report_summary,
     generate_report,
@@ -21,8 +21,8 @@ from tests.eval_runner import (
     validate_slack_webhook,
 )
 
-CONFIG_FILE = Path(__file__).parent / "eval_config" / "slack_webhooks.json"
-RESULTS_DIR = Path(__file__).parent / "eval_results"
+CONFIG_FILE = Path(__file__).parent.parent / "evals" / "eval_config" / "slack_webhooks.json"
+RESULTS_DIR = Path(__file__).parent.parent / "evals" / "eval_results"
 
 
 def _build_payload(test_case: dict) -> dict:

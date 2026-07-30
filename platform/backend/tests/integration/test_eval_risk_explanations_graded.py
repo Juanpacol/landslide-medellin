@@ -21,8 +21,8 @@ import httpx
 import pytest
 
 from agent.risk_explanations import _render_narrative, _template_explanation_structured
-from tests.eval_grader import grade_risk_explanation
-from tests.eval_runner import (
+from tests.evals.eval_grader import grade_risk_explanation
+from tests.evals.eval_runner import (
     GradedTestResult,
     find_latest_report,
     format_graded_report_summary,
@@ -32,8 +32,8 @@ from tests.eval_runner import (
     validate_risk_explanation,
 )
 
-CONFIG_FILE = Path(__file__).parent / "eval_config" / "risk_explanations.json"
-RESULTS_DIR = Path(__file__).parent / "eval_results"
+CONFIG_FILE = Path(__file__).parent.parent / "evals" / "eval_config" / "risk_explanations.json"
+RESULTS_DIR = Path(__file__).parent.parent / "evals" / "eval_results"
 QUALITY_THRESHOLD = 7.0
 
 

@@ -1,0 +1,19 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: pure tests with no I/O (no DB, no network, no external services).",
+    "integration: tests that hit real infrastructure (Postgres/Supabase, Ollama, HTTP).",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "alembic/*",
+    "*/alembic/*",
+    "tests/*",
+    ".venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+fail_under = 85

@@ -18,7 +18,7 @@ from agent.risk_explanations import (
     _render_narrative,
 )
 from domain.risk_rules import RISK_THRESHOLD_ALTO, RISK_THRESHOLD_CRITICO, RISK_THRESHOLD_MEDIO
-from tests.eval_runner import (
+from tests.evals.eval_runner import (
     TestResult,
     format_report_summary,
     generate_report,
@@ -26,8 +26,8 @@ from tests.eval_runner import (
     validate_risk_explanation,
 )
 
-CONFIG_FILE = Path(__file__).parent / "eval_config" / "risk_explanations.json"
-RESULTS_DIR = Path(__file__).parent / "eval_results"
+CONFIG_FILE = Path(__file__).parent.parent / "evals" / "eval_config" / "risk_explanations.json"
+RESULTS_DIR = Path(__file__).parent.parent / "evals" / "eval_results"
 
 
 @pytest.fixture

@@ -14,7 +14,7 @@ of raw numbers.
 - `agent/risk_explanations.py` — refactored to rephrase `ExplanationTree`; delete `_IS_LADERA`,
   `_NOMBRES`; add faithfulness check.
 - `platform/frontend/components/dashboard/comuna-profile.tsx` — derivation panel.
-- `tests/eval_results/` — new eval-prompt case for the rephrasing prompt.
+- `tests/evals/eval_results/` — new eval-prompt case for the rephrasing prompt.
 
 ## Interfaces
 

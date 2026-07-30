@@ -1,7 +1,7 @@
 """
 Parametrized evaluation tests for chat_rag prompt.
 
-These tests load test cases from tests/eval_config/chat_rag.json and
+These tests load test cases from tests/evals/eval_config/chat_rag.json and
 validate that chat_rag responses match expected criteria (in-scope vs
 out-of-scope, variants, etc.).
 
@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from agent.chat_rag import chat_rag
-from tests.eval_runner import (
+from tests.evals.eval_runner import (
     TestResult,
     format_report_summary,
     generate_report,
@@ -24,8 +24,8 @@ from tests.eval_runner import (
     validate_chat_rag_response,
 )
 
-CONFIG_FILE = Path(__file__).parent / "eval_config" / "chat_rag.json"
-RESULTS_DIR = Path(__file__).parent / "eval_results"
+CONFIG_FILE = Path(__file__).parent.parent / "evals" / "eval_config" / "chat_rag.json"
+RESULTS_DIR = Path(__file__).parent.parent / "evals" / "eval_results"
 
 
 @pytest.fixture

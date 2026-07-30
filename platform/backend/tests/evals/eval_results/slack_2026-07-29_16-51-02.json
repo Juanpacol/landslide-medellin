@@ -1,0 +1,46 @@
+{
+  "prompt_module": "alerts/slack",
+  "total_tests": 5,
+  "passed": 5,
+  "failed": 0,
+  "accuracy": "100.0%",
+  "threshold": "85%",
+  "threshold_passed": true,
+  "average_score": null,
+  "graded_count": 0,
+  "quality_threshold": null,
+  "quality_threshold_passed": null,
+  "executed_at": "2026-07-29T16:51:02.673699",
+  "results": [
+    {
+      "test_id": "critical_risk_structure",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "critical_risk_with_factors",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "high_risk_alert",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "rainfall_threshold_alert",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_id": "no_blocks_empty",
+      "passed": true,
+      "error": null,
+      "duration_ms": 0.0
+    }
+  ]
+}
