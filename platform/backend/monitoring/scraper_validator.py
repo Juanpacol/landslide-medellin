@@ -43,7 +43,7 @@ from db.session import AsyncSessionLocal
 from domain.communes import COMMUNES
 from domain.quality import (
     MAX_PLAUSIBLE_DAILY_MM,
-    MIN_PLAUSIBLE_MAX_MM,
+    MIN_PLAUSIBLE_MAX_MM,  # noqa: F401 -- re-exported; see test_scraper_validator_quality_wiring.py
     MIN_ROWS_FOR_DISTINCT_CHECK,
     SEISMIC_STALE_DAYS,
     is_frozen_signal,

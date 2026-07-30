@@ -7,7 +7,7 @@ construction.
 from __future__ import annotations
 
 from agent.risk_explanations import generate_explanation_from_verdict
-from application.neurosymbolic.explain import is_faithful, render
+from application.neurosymbolic.explain import render
 from application.neurosymbolic.infer import resolve_verdict
 from domain.rules.facts import TerritorySnapshot
 

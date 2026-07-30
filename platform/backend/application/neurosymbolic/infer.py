@@ -14,7 +14,7 @@ Conflict-resolution precedence (see `docs/adr/0003-conflict-resolution-precedenc
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 

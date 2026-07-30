@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 
 from rdflib import RDF, Graph, URIRef
-from rdflib.namespace import XSD
 
 from kg.build import TEYVA, add_critical_facilities, build_static_graph
 

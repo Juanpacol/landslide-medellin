@@ -76,8 +76,7 @@ def test_shared_stream_query_is_honestly_empty_on_the_static_graph():
 
 
 def test_add_critical_facilities_populates_exposed_facilities_query(monkeypatch):
-    from rdflib import RDF, Literal
-    from rdflib.namespace import XSD
+    from rdflib import RDF
 
     import kg.build as kg_build
 
