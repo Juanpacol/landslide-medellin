@@ -1,14 +1,14 @@
 """
-Caso de uso: correr la predicción de riesgo para todo el territorio.
+Use case: run the risk prediction for the entire territory.
 
-Orquesta (movido desde ml/predict.py::predict_all_comunas):
-  1. inferencia por comuna (ml/predict.py::predict_risk — el motor ML),
-  2. explicación en lenguaje natural (agent/risk_explanations),
-  3. persistencia (RiskPrediction + RiskExplanation) y observabilidad,
-  4. checks de alertas post-predicción (application/fire_alerts).
+Orchestrates (moved from ml/predict.py::predict_all_comunas):
+  1. per-commune inference (ml/predict.py::predict_risk — the ML engine),
+  2. natural-language explanation (agent/risk_explanations),
+  3. persistence (RiskPrediction + RiskExplanation) and observability,
+  4. post-prediction alert checks (application/fire_alerts).
 
-ml/predict.py mantiene `predict_all_comunas()` como wrapper fino porque el
-workflow de GitHub Actions invoca `python -m ml.predict` y la API lo importa.
+ml/predict.py keeps `predict_all_comunas()` as a thin wrapper because the
+GitHub Actions workflow invokes `python -m ml.predict` and the API imports it.
 """
 
 from __future__ import annotations
@@ -23,12 +23,12 @@ from db.models.risk_prediction import RiskPrediction
 from domain.communes import COMMUNES
 from errors.error_handler import BusinessError, TeyvaError, TransientError, handle_errors
 
-# predict_risk() por comuna no tenía NINGÚN try/except: una excepción sin
-# capturar (datos faltantes, fallo de I/O al construir features) abortaba
-# el loop completo y ninguna de las 21 comunas se comiteaba, porque el
-# commit ocurre una sola vez al final. Este fallback es lo que devuelve
-# _predict_one_commune cuando una comuna puntual falla, para que las demás
-# sigan procesándose.
+# predict_risk() per commune used to have NO try/except at all: an
+# uncaught exception (missing data, I/O failure building features) aborted
+# the whole loop and none of the 21 communes got committed, because the
+# commit happens only once at the end. This fallback is what
+# _predict_one_commune returns when a single commune fails, so the rest
+# keep processing.
 _PREDICTION_FALLBACK: dict[str, Any] = {
     "risk_score": 0.0,
     "risk_level": "bajo",
@@ -39,10 +39,9 @@ _PREDICTION_FALLBACK: dict[str, Any] = {
 
 
 def _classify_predict_exception(exc: Exception) -> TeyvaError:
-    """I/O externo (BD, filesystem, red) es transitorio y candidato a
-    retry; cualquier otra falla (features faltantes/corruptas) es un
-    estado de negocio esperado para una comuna puntual — no debe abortar
-    las demás."""
+    """External I/O (DB, filesystem, network) is transient and a retry
+    candidate; any other failure (missing/corrupt features) is an expected
+    business state for a single commune — it must not abort the rest."""
     if isinstance(exc, (OSError, TimeoutError, ConnectionError)):
         return TransientError(str(exc))
     return BusinessError(str(exc))
@@ -119,7 +118,7 @@ async def run_predictions(db: AsyncSession) -> None:
                 "source": "classifier_fallback",
             }
 
-        # Explicación en lenguaje natural (LLM si hay API key, template si no).
+        # Natural-language explanation (LLM if an API key is set, template otherwise).
         try:
             precip_mm = float(
                 features_used.get("precip_sum_mm_day")

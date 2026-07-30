@@ -1,19 +1,19 @@
 """
-Caso de uso: disparar los checks de alertas Slack en los puntos del ciclo
-donde tiene sentido.
+Use case: fire the Slack alert checks at the points in the cycle where it
+makes sense.
 
-Antes cada punto de disparo conocía qué checks concretos correr
-(scraper/siata.py importaba rain+snake, ml/predict.py importaba
-critical+yellow, el scheduler el watchdog). Este módulo es el único dueño
-de esa composición: qué se chequea DESPUÉS de ingerir lluvia, DESPUÉS de
-predecir, y periódicamente.
+Each trigger point used to know which specific checks to run
+(scraper/siata.py imported rain+snake, ml/predict.py imported
+critical+yellow, the scheduler the watchdog). This module is the sole owner
+of that composition: what gets checked AFTER ingesting rain, AFTER
+predicting, and periodically.
 
-Regla compartida: un Slack caído nunca tumba la corrida que lo disparó — se
-formaliza con `application/orchestrator.py::run_steps`, que loggea cada paso
-por separado y no bloquea a los demás. Efecto colateral positivo del
-refactor: antes `alerts_after_prediction` envolvía critical_risk y yellow en
-un ÚNICO try/except — si el primero fallaba, el segundo nunca corría. Con
-pasos independientes, cada uno corre pase lo que pase con el otro.
+Shared rule: a downed Slack never takes down the run that triggered it —
+formalized via `application/orchestrator.py::run_steps`, which logs each
+step separately and doesn't block the others. Positive side effect of the
+refactor: `alerts_after_prediction` used to wrap critical_risk and yellow in
+a SINGLE try/except — if the first failed, the second never ran. With
+independent steps, each runs regardless of what happens to the other.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 async def alerts_after_rain_ingest(session: AsyncSession, commune_ids: list[str]) -> None:
-    """Tras ingerir lluvia (SIATA cada 30 min): umbral diario + Snake Line."""
+    """After ingesting rain (SIATA every 30 min): daily threshold + Snake Line."""
 
     async def _rainfall() -> None:
         from alerts.slack import check_and_fire_alerts
@@ -49,7 +49,7 @@ async def alerts_after_rain_ingest(session: AsyncSession, commune_ids: list[str]
 
 
 async def alerts_after_prediction(session: AsyncSession) -> None:
-    """Tras escribir predicciones nuevas: riesgo crítico + estado Amarillo."""
+    """After writing new predictions: critical risk + Yellow state."""
 
     async def _critical_risk() -> None:
         from alerts.slack import check_and_fire_critical_risk_alerts
@@ -70,11 +70,11 @@ async def alerts_after_prediction(session: AsyncSession) -> None:
 
 
 async def alerts_scraper_watchdog(session: AsyncSession) -> list[str]:
-    """Periódico (scheduler cada 30 min): scrapers caídos o silenciosos."""
+    """Periodic (scheduler every 30 min): downed or silent scrapers."""
     try:
         from alerts.slack import check_and_fire_scraper_alerts
 
         return await check_and_fire_scraper_alerts(session)
     except Exception:  # noqa: BLE001
-        logger.exception("Watchdog de scrapers falló (no crítico)")
+        logger.exception("Scraper watchdog failed (non-critical)")
         return []

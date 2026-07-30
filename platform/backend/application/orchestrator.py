@@ -1,21 +1,22 @@
-"""Orquestador en proceso: composición nombrada de pasos con dependencias y
-trazabilidad estructurada. Sin infraestructura nueva (sin Redis/Kafka/colas)
-— decisión de arquitectura del proyecto.
+"""In-process orchestrator: named composition of steps with dependencies and
+structured traceability. No new infrastructure (no Redis/Kafka/queues) —
+a deliberate architecture decision for this project.
 
-Formaliza el patrón que ya vivía disperso en `fire_alerts.py` (cada función
-envolvía sus llamadas en try/except + logger.exception por separado). No
-reemplaza ese contrato, lo hace explícito: un paso no crítico que falla se
-loggea y NO bloquea a sus dependientes — mismo comportamiento de hoy
-("un Slack caído no debe tumbar alertas ni predicciones").
+Formalizes the pattern that used to live scattered across `fire_alerts.py`
+(each function wrapped its calls in its own try/except + logger.exception).
+Doesn't replace that contract, makes it explicit: a non-critical step that
+fails is logged and does NOT block its dependents — same behavior as
+today ("a downed Slack must not take down alerts or predictions").
 
-Alcance deliberado — qué NO orquesta este módulo:
-- Cross-workflow (scraper → predict en GitHub Actions): los 6 crons siguen
-  siendo independientes, sin `needs:`/`workflow_run`. Encadenarlos sería
-  infraestructura de orquestación nueva, aunque no cueste dinero.
-- El retry declarado en `Step.retries` es una capacidad del módulo, no algo
-  usado hoy en los pasos de `fire_alerts.py`: esos checks no son idempotentes
-  de forma segura a nivel de paso completo (podrían re-marcar cooldown). El
-  retry real y seguro ya vive en `infrastructure/external/slack_client.py::post_webhook`.
+Deliberate scope — what this module does NOT orchestrate:
+- Cross-workflow (scraper → predict in GitHub Actions): the 6 crons remain
+  independent, no `needs:`/`workflow_run`. Chaining them would be new
+  orchestration infrastructure, even if it costs nothing.
+- The retry declared in `Step.retries` is a capability of the module, not
+  something used today in `fire_alerts.py`'s steps: those checks aren't
+  safely idempotent at the whole-step level (they could re-mark cooldown).
+  The real, safe retry already lives in
+  `infrastructure/external/slack_client.py::post_webhook`.
 """
 
 from __future__ import annotations
@@ -49,8 +50,8 @@ class StepResult:
 
 
 def _topological_order(steps: list[Step]) -> list[Step]:
-    """Orden simple sobre `depends_on`. Sin paralelismo: el volumen actual
-    (2-3 pasos por composición) no lo justifica."""
+    """Simple ordering over `depends_on`. No parallelism: current volume
+    (2-3 steps per composition) doesn't justify it."""
     by_name = {s.name: s for s in steps}
     ordered: list[Step] = []
     seen: set[str] = set()
@@ -71,10 +72,10 @@ def _topological_order(steps: list[Step]) -> list[Step]:
 
 
 async def run_steps(steps: list[Step]) -> list[StepResult]:
-    """Ejecuta los pasos en orden topológico. Un paso cuya dependencia falló
-    (y esa dependencia es `critical=True`) se salta (`status="skipped"`); en
-    caso contrario se ejecuta igual — mismo espíritu de "un check caído no
-    tumba a los demás"."""
+    """Runs the steps in topological order. A step whose dependency failed
+    (and that dependency is `critical=True`) is skipped (`status="skipped"`);
+    otherwise it runs anyway — same spirit as "a downed check doesn't take
+    down the others"."""
     ordered = _topological_order(steps)
     results: dict[str, StepResult] = {}
 
@@ -91,10 +92,10 @@ async def run_steps(steps: list[Step]) -> list[StepResult]:
             results[step.name] = StepResult(
                 name=step.name,
                 status="skipped",
-                error=f"dependencia crítica falló: {blocked_by}",
+                error=f"critical dependency failed: {blocked_by}",
             )
             logger.warning(
-                "orchestrator: paso '%s' omitido, dependencia crítica falló",
+                "orchestrator: step '%s' skipped, critical dependency failed",
                 step.name,
                 extra={"step": step.name, "status": "skipped"},
             )
@@ -111,7 +112,7 @@ async def run_steps(steps: list[Step]) -> list[StepResult]:
             duration_ms = (time.monotonic() - started) * 1000
             results[step.name] = StepResult(name=step.name, status="ok", duration_ms=duration_ms)
             logger.info(
-                "orchestrator: paso '%s' ok (%.0fms)",
+                "orchestrator: step '%s' ok (%.0fms)",
                 step.name,
                 duration_ms,
                 extra={"step": step.name, "status": "ok", "duration_ms": duration_ms},
@@ -122,7 +123,7 @@ async def run_steps(steps: list[Step]) -> list[StepResult]:
                 name=step.name, status="error", error=str(exc), duration_ms=duration_ms
             )
             logger.exception(
-                "orchestrator: paso '%s' falló (%.0fms)",
+                "orchestrator: step '%s' failed (%.0fms)",
                 step.name,
                 duration_ms,
                 extra={"step": step.name, "status": "error", "duration_ms": duration_ms},

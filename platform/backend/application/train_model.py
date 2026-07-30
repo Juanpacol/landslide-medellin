@@ -1,11 +1,11 @@
 """
-Caso de uso: reentrenar el modelo y regenerar el reporte.
+Use case: retrain the model and regenerate the report.
 
-Wrapper fino sobre ml/train.py (el motor de entrenamiento) + ml/evaluation
-(reporte). Existe para que API/scheduler/futuros jobs tengan UN punto de
-entrada, y para que la regla "el reporte se regenera junto al modelo" viva
-en un solo lugar. `python -m ml.train` (GitHub Actions) sigue funcionando:
-su main() delega aquí.
+Thin wrapper over ml/train.py (the training engine) + ml/evaluation
+(report). Exists so API/scheduler/future jobs have ONE entry point, and so
+the rule "the report is regenerated alongside the model" lives in a single
+place. `python -m ml.train` (GitHub Actions) keeps working: its main()
+delegates here.
 """
 
 from __future__ import annotations
@@ -17,19 +17,19 @@ logger = logging.getLogger(__name__)
 
 
 def run_training() -> dict[str, Any]:
-    """Entrena (si la señal lo permite) y regenera report.md. Devuelve el
-    payload de métricas de la corrida (ver ml/train.py::train)."""
+    """Trains (if the signal allows it) and regenerates report.md. Returns
+    the run's metrics payload (see ml/train.py::train)."""
     from ml.train import train
 
     payload = train()
 
-    # El reporte lee metrics.json + best_model.pkl; si la corrida abortó,
-    # ambos siguen describiendo al modelo vigente (escritura atómica).
+    # The report reads metrics.json + best_model.pkl; if the run aborted,
+    # both still describe the current model (atomic write).
     try:
         from ml.evaluation import generate_report
 
         generate_report()
     except Exception:  # noqa: BLE001
-        logger.exception("No se pudo regenerar report.md (no crítico)")
+        logger.exception("Could not regenerate report.md (non-critical)")
 
     return payload
