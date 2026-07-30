@@ -267,6 +267,37 @@ warns against filling its table with placeholder values to appear more complete 
 rubric with working infrastructure behind it is a more honest artifact than a filled one with
 fabricated numbers.
 
+### 5.7 Real-data spot check
+
+Everything above (§5.1–§5.6) runs on synthetic `TerritorySnapshot`s constructed to approximate
+today's data-coverage pattern. As a complement — not a replacement, n=21 and a single point in
+time carry no statistical power — this project also ran the exact same inference code read-only
+against the real production database on 2026-07-30
+(`evaluation/validate_against_production.py`, full report in
+`docs/research/production_validation_2026-07-30.md`).
+
+Two things it confirmed live rather than by reasoning about the audit: the rainfall signal is
+still frozen today, independently verified per-commune (20 of 21 communes, `domain.quality
+.is_frozen_signal` against real `rainfall_timeseries` rows), and `barrio_terrain` is still
+entirely empty in production (0 of 401 barrios) — the SPEC-006 terrain scraper was built and
+live-tested against the real SRTM API this session, but never run against production, so
+susceptibility coverage in the live system remains exactly what the audit found, not the
+improved coverage this paper's architecture enables once that scraper is actually run.
+
+It also surfaced a real, previously undocumented gap rather than confirming an assumption: going
+in, `R-QUAL-01` (the zero-coverage veto, §3.2) was expected to fire broadly given the live
+corruption. **It fired for zero of 21 communes.** The veto checks for total data *absence*
+(`None`), and a corrupted-but-present reading (0.003mm, not `None`) does not trip it — nor does a
+commune with genuinely zero rain data but a present seismic reading, since the veto's condition
+is an OR across all trigger sources. This is a real, evidenced limitation of the rule's current
+scope, not a hypothetical one: the failure mode the audit documented (implausible-but-present
+data) turns out to be common, while the failure mode `R-QUAL-01` actually catches (total absence)
+is comparatively rare. The spot-check's script closes part of the gap by computing the same
+frozen-signal predicate `monitoring/scraper_validator.py` already uses and feeding it into
+`TerritorySnapshot.quality_flags` — which correctly lowered confidence for the affected communes
+(0.53 → 0.42) — but a rule that vetoes specifically on a quality flag, not just on absence, is a
+recommended follow-up this paper does not implement.
+
 ## 6. Limitations
 
 - No real, georeferenced landslide event dataset exists (36 usable events, 0 positives under the
@@ -275,6 +306,17 @@ fabricated numbers.
 - TWI and NDVI remain entirely unpopulated (0% evaluable in §5.2), blocking 4 of 8 rules from
   ever firing on real data. This needs a DEM flow-accumulation pipeline and satellite-imagery
   access this project does not have configured.
+- `R-QUAL-01`'s zero-coverage veto is narrower than "the trigger data is trustworthy" — it only
+  catches total absence, not a corrupted-but-present reading or a case where one trigger source
+  (e.g. seismic) masks the total absence of another (rain). §5.7's real-data spot check found
+  this fires for 0 of 21 real communes today despite the rainfall corruption affecting 20 of 21 —
+  the opposite of what was expected going in, and a concrete gap for future work rather than a
+  hypothetical one.
+- Terrain data (slope, from SPEC-006's SRTM ingestion) exists as working, tested code
+  (`scraper/terrain_features.py`) but has never been run against the production database — the
+  live system's susceptibility coverage remains 1 of 5 declared components (`barrio_hazard`
+  only), confirmed directly against production on 2026-07-30 (§5.7), not just inferred from the
+  scraper never having been invoked with write access.
 - The confidence formula (§3.3) and the rule catalog's thresholds are declared from literature
   and domain judgment, not fit against outcomes — consistent with the declared-index design
   throughout, but genuinely uncalibrated.
@@ -295,14 +337,24 @@ by a single script committed alongside this paper:
 
 ```bash
 cd platform/backend && export PYTHONPATH=.
-pytest tests -q                             # 348 passed, 12 skipped at time of writing
+pytest tests -q                             # 381 passed, 12 skipped at time of writing
 python -m evaluation.reproduce_paper        # prints every §5.2/§5.3/§5.5 number, fixed seed=42
 ```
 
-No API keys, database credentials, or GPU are required for any number reported here — the entire
-evaluation runs on pure Python functions over synthetic `TerritorySnapshot`s. The only external
-dependency exercised in this project (not in this evaluation) is Open Topo Data's public SRTM API
-for terrain ingestion (`scraper/terrain_features.py`), which needs no key.
+No API keys, database credentials, or GPU are required for any number reported in §5.1–§5.6 — the
+entire evaluation runs on pure Python functions over synthetic `TerritorySnapshot`s. The only
+external dependency exercised in this project (not in this evaluation) is Open Topo Data's public
+SRTM API for terrain ingestion (`scraper/terrain_features.py`), which needs no key.
+
+§5.7's real-data spot check is the one exception: it requires read access to the production
+database and is not reproducible without those credentials, by design — it is meant to be run
+again whenever someone with that access wants a fresh point-in-time read, not to be part of the
+credential-free reproduction path:
+
+```bash
+cd platform/backend && export PYTHONPATH=.
+python -m evaluation.validate_against_production --json-out docs/research/production_validation_<date>.json
+```
 
 ## 8. Conclusion
 

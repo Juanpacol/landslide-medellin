@@ -1,0 +1,372 @@
+{
+  "generated_at": "2026-07-30T05:18:23.677277+00:00",
+  "scope": "single-point-in-time spot-check against real production Supabase data; NOT a repeated measurement, NOT a backtest (no real historical event labels exist)",
+  "n_communes": 21,
+  "n_vetoed": 0,
+  "pct_vetoed": 0.0,
+  "n_arms_disagree": 0,
+  "pct_arms_disagree": 0.0,
+  "n_no_rain_or_seismic_signal": 0,
+  "n_terrain_populated": 0,
+  "n_frozen_rain_signal": 20,
+  "rule_coverage": {
+    "pct_any_fired": 0.4762,
+    "fire_rate_by_rule": {
+      "R-GEO-01": 0.0,
+      "R-GEO-02": 0.0,
+      "R-GEO-03": 0.0,
+      "R-GEO-04": 0.0,
+      "R-HIST-01": 0.47619047619047616,
+      "R-EXPO-01": 0.0,
+      "R-SEIS-01": 0.0,
+      "R-QUAL-01": 0.0
+    },
+    "evaluable_rate_by_rule": {
+      "R-GEO-01": 0.0,
+      "R-GEO-02": 0.0,
+      "R-GEO-03": 0.0,
+      "R-GEO-04": 0.0,
+      "R-HIST-01": 1.0,
+      "R-EXPO-01": 0.0,
+      "R-SEIS-01": 0.9523809523809523,
+      "R-QUAL-01": 1.0
+    }
+  },
+  "per_commune": [
+    {
+      "commune_id": "1",
+      "nombre": "Popular",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "2",
+      "nombre": "Santa Cruz",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "3",
+      "nombre": "Manrique",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "4",
+      "nombre": "Aranjuez",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "5",
+      "nombre": "Castilla",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "6",
+      "nombre": "Doce de Octubre",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "7",
+      "nombre": "Robledo",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "8",
+      "nombre": "Villa Hermosa",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "9",
+      "nombre": "Buenos Aires",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "10",
+      "nombre": "La Candelaria",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "11",
+      "nombre": "Laureles-Estadio",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "12",
+      "nombre": "La América",
+      "neural_score": null,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.13,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "13",
+      "nombre": "San Javier",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "14",
+      "nombre": "El Poblado",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "15",
+      "nombre": "Guayabal",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "16",
+      "nombre": "Belén",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [
+        "R-HIST-01"
+      ],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "elevated"
+    },
+    {
+      "commune_id": "17",
+      "nombre": "Palmitas",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "18",
+      "nombre": "San Cristóbal",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "19",
+      "nombre": "Altavista",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "20",
+      "nombre": "San Antonio de Prado",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    },
+    {
+      "commune_id": "21",
+      "nombre": "Santa Elena",
+      "neural_score": 0.0,
+      "levels_by_arm": {
+        "ml_only": "bajo",
+        "declared_index": "bajo",
+        "rules_only": "bajo",
+        "neurosymbolic": "bajo"
+      },
+      "fired_rules": [],
+      "vetoed": false,
+      "confidence": 0.425,
+      "priority": "normal"
+    }
+  ]
+}
