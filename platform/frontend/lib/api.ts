@@ -528,6 +528,13 @@ export interface Derivation {
   calibration_note: string;
 }
 
+/** Mutually-exclusive presentation view: either a trustworthy estimate, or an explicit
+ *  "insufficient data" state with its cause — never both. `risk_score`/`risk_category` above
+ *  stay populated even when vetoed (alerting depends on it); this is the field to render. */
+export type DerivationDisplay =
+  | { status: 'estimated'; score: number | null; level: string; confidence: number | null }
+  | { status: 'insufficient_data'; reason: string };
+
 export interface DerivationResponse {
   commune_id: string;
   risk_score: number | null;
@@ -538,6 +545,7 @@ export interface DerivationResponse {
   priority: string | null;
   confidence: number | null;
   source: string;
+  display: DerivationDisplay;
 }
 
 /** Fired rules, conflicts, and confidence behind a commune's latest

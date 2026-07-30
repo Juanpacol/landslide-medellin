@@ -57,51 +57,53 @@ export function DerivationPanel({ communeId }: DerivationPanelProps) {
 
   const confidencePct = data.confidence !== null && data.confidence !== undefined ? Math.round(data.confidence * 100) : null;
   const hasConflicts = (data.conflicts ?? []).length > 0;
+  const isInsufficientData = data.display.status === 'insufficient_data';
 
   return (
     <div style={{ fontSize: '12px', color: 'var(--foreground)', lineHeight: 1.6 }}>
-      {/* Neural score */}
-      <div
-        style={{
-          marginBottom: '12px',
-          padding: '10px 12px',
-          borderRadius: '8px',
-          background: 'var(--muted)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, marginBottom: '4px' }}>
-          <Sparkles size={14} />
-          Score neuronal:{' '}
-          {derivation.neural_score !== null ? `${(derivation.neural_score * 100).toFixed(1)}%` : '—'} (
-          {derivation.neural_level})
-        </div>
-        {data.priority && data.priority !== 'normal' && (
-          <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>
-            Prioridad operativa: <strong>{data.priority}</strong>
-          </div>
-        )}
-      </div>
-
-      {/* Vetoed banner */}
-      {derivation.vetoed && (
+      {/* Mutually-exclusive headline: a trustworthy estimate, OR insufficient data + cause —
+          never both (docs/research/audit-2026-07.md §5). */}
+      {data.display.status === 'insufficient_data' ? (
         <div
           style={{
             marginBottom: '12px',
-            padding: '10px',
+            padding: '10px 12px',
             borderRadius: '8px',
             background: 'oklch(0.95 0.08 25 / 0.3)',
             border: '1px solid oklch(0.9 0.15 25)',
             display: 'flex',
             gap: '8px',
-            fontSize: '11px',
+            fontSize: '12px',
             color: 'oklch(0.4 0.15 25)',
           }}
         >
           <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
           <span>
-            <strong>Score vetado</strong>: no hay señal de disparador (lluvia/sismo) para validar
-            este resultado. Ausencia de dato ≠ ausencia de riesgo.
+            <strong>Datos insuficientes</strong> — {data.display.reason}. Ausencia de dato ≠
+            ausencia de riesgo: no se muestra un nivel numérico porque la señal disponible no es
+            confiable, en vez de estimar sobre un dato roto.
           </span>
+        </div>
+      ) : (
+        <div
+          style={{
+            marginBottom: '12px',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            background: 'var(--muted)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, marginBottom: '4px' }}>
+            <Sparkles size={14} />
+            Score neuronal:{' '}
+            {derivation.neural_score !== null ? `${(derivation.neural_score * 100).toFixed(1)}%` : '—'} (
+            {derivation.neural_level})
+          </div>
+          {data.priority && data.priority !== 'normal' && (
+            <div style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>
+              Prioridad operativa: <strong>{data.priority}</strong>
+            </div>
+          )}
         </div>
       )}
 
@@ -185,7 +187,7 @@ export function DerivationPanel({ communeId }: DerivationPanelProps) {
         {derivation.calibration_note}
       </div>
 
-      {confidencePct !== null && (
+      {!isInsufficientData && confidencePct !== null && (
         <div style={{ marginTop: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
             <span style={{ color: 'var(--muted-foreground)' }}>Confianza (esta corrida)</span>

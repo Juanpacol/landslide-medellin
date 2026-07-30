@@ -52,6 +52,32 @@ class Verdict:
     conflicts: tuple[dict[str, Any], ...]
     calibration_status: str = CALIBRATION_STATUS
 
+    @property
+    def display(self) -> dict[str, Any]:
+        """Mutually-exclusive presentation view: either a trustworthy estimate, or an explicit
+        "insufficient data" state with its cause — never both, unlike `score`/`level` above.
+
+        Deliberately additive, not a replacement: `score`/`level`/`confidence` stay populated
+        even when vetoed, because `alerts/slack.py`'s critical-risk check and `RiskPrediction`'s
+        stored `risk_category` column key off a canonical category string
+        (`domain/risk_rules.py`) — swapping that value for an "insufficient_data" sentinel would
+        silently stop critical alerts from firing for a vetoed commune, with no error raised.
+        This field exists purely for API/dashboard consumers that want an explicit
+        "prediction OR insufficient-data" render without touching that internal contract.
+        """
+        if self.derivation.get("vetoed"):
+            veto_reasons = [c.get("reason") for c in self.conflicts if c.get("effect") == "veto"]
+            return {
+                "status": "insufficient_data",
+                "reason": ", ".join(r for r in veto_reasons if r) or "unknown",
+            }
+        return {
+            "status": "estimated",
+            "score": self.score,
+            "level": self.level,
+            "confidence": self.confidence,
+        }
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "commune_id": self.commune_id,
@@ -62,6 +88,7 @@ class Verdict:
             "derivation": self.derivation,
             "conflicts": list(self.conflicts),
             "calibration_status": self.calibration_status,
+            "display": self.display,
         }
 
 

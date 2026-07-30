@@ -393,16 +393,36 @@ async def get_derivation(
         }
 
     raw = pred.raw_output or {}
+    conflicts = raw.get("conflicts") or []
+    derivation = raw.get("derivation") or {}
+    display = raw.get("display")
+    if display is None:
+        # Older rows predate the `display` field — recompute it from the same
+        # derivation/conflicts already stored, so they don't need a backfill.
+        if derivation.get("vetoed"):
+            veto_reasons = [c.get("reason") for c in conflicts if c.get("effect") == "veto"]
+            display = {
+                "status": "insufficient_data",
+                "reason": ", ".join(r for r in veto_reasons if r) or "unknown",
+            }
+        else:
+            display = {
+                "status": "estimated",
+                "score": float(pred.risk_score) if pred.risk_score is not None else None,
+                "level": pred.risk_category,
+                "confidence": raw.get("confidence"),
+            }
     return {
         "commune_id": commune_id,
         "risk_score": float(pred.risk_score) if pred.risk_score is not None else None,
         "risk_category": pred.risk_category,
         "predicted_at": pred.created_at.isoformat() if pred.created_at else None,
         "derivation": raw.get("derivation"),
-        "conflicts": raw.get("conflicts") or [],
+        "conflicts": conflicts,
         "priority": raw.get("priority"),
         "confidence": raw.get("confidence"),
         "source": raw.get("source", "unknown"),
+        "display": display,
     }
 
 

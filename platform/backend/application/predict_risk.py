@@ -127,6 +127,10 @@ async def run_predictions(db: AsyncSession) -> None:
                 "conflicts": list(verdict.conflicts),
                 "priority": verdict.priority,
                 "source": "neurosymbolic",
+                # Mutually-exclusive presentation view (Verdict.display): {"status":
+                # "estimated", ...} or {"status": "insufficient_data", "reason": ...} — never
+                # both. Additive only; risk_score/risk_level columns above are unaffected.
+                "display": verdict.display,
             }
             for row in _veto_log_rows(str(cid), verdict, run_at=datetime.now(timezone.utc)):
                 db.add(row)

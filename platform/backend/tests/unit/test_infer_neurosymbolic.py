@@ -87,3 +87,47 @@ def test_priority_max_when_critical_facility_nearby():
     )
     verdict = resolve_verdict("14", 0.1, snapshot)
     assert verdict.priority == "max"
+
+
+class TestVerdictDisplay:
+    """Verdict.display — the mutually-exclusive presentation view (estimate XOR insufficient
+    data), additive on top of score/level/confidence which stay populated either way."""
+
+    def test_estimated_status_when_not_vetoed(self):
+        snapshot = TerritorySnapshot(
+            commune_id="11", slope_p90_deg=5.0, precip_72h_mm=10.0, swi_pct=20.0
+        )
+        verdict = resolve_verdict("11", 0.5, snapshot)
+        assert verdict.display == {
+            "status": "estimated",
+            "score": verdict.score,
+            "level": verdict.level,
+            "confidence": verdict.confidence,
+        }
+
+    def test_insufficient_data_status_when_vetoed(self):
+        snapshot = TerritorySnapshot(commune_id="1")  # no trigger signal at all
+        verdict = resolve_verdict("1", 0.6, snapshot)
+        assert verdict.display["status"] == "insufficient_data"
+        assert "no_trigger_signal" in verdict.display["reason"]
+
+    def test_display_never_carries_both_shapes(self):
+        vetoed = resolve_verdict("1", 0.6, TerritorySnapshot(commune_id="1"))
+        estimated = resolve_verdict(
+            "11", 0.5, TerritorySnapshot(commune_id="11", precip_72h_mm=10.0, swi_pct=20.0)
+        )
+        assert "score" not in vetoed.display and "level" not in vetoed.display
+        assert "reason" not in estimated.display
+
+    def test_score_and_level_stay_populated_even_when_vetoed(self):
+        # Critical: alerts/slack.py and RiskPrediction.risk_category key off these staying
+        # real values — display is additive, never a replacement for them.
+        snapshot = TerritorySnapshot(commune_id="1")
+        verdict = resolve_verdict("1", 0.9, snapshot)
+        assert verdict.score is not None
+        assert verdict.level in ("bajo", "medio", "alto", "critico")
+
+    def test_as_dict_includes_display(self):
+        verdict = resolve_verdict("1", 0.6, TerritorySnapshot(commune_id="1"))
+        assert "display" in verdict.as_dict()
+        assert verdict.as_dict()["display"] == verdict.display
