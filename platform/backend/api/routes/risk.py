@@ -442,6 +442,7 @@ async def get_seismic_events(
     stations that captured it.
     """
     from db.models.seismic_event import SeismicEvent
+    from domain.quality import SEISMIC_STALE_DAYS, is_stale
 
     days = max(1, min(int(days), 3650))
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
@@ -452,6 +453,18 @@ async def get_seismic_events(
         .limit(200)
     )
     rows = (await db.execute(stmt)).scalars().all()
+
+    # Frescura del feed, misma definición que monitoring/scraper_validator.py: un feed sin
+    # eventos nuevos hace más de SEISMIC_STALE_DAYS puede estar roto, no "sin sismos".
+    latest_event_at = (await db.execute(select(func.max(SeismicEvent.event_local_at)))).scalar()
+    days_since_last_event = (
+        (datetime.now(timezone.utc) - latest_event_at).days if latest_event_at else None
+    )
+    feed_is_stale = (
+        is_stale(days_since_last_event, threshold_days=SEISMIC_STALE_DAYS)
+        if days_since_last_event is not None
+        else True
+    )
 
     dedup: dict[tuple, dict[str, Any]] = {}
     for r in rows:
@@ -477,7 +490,13 @@ async def get_seismic_events(
         key=lambda e: e["event_local_at"] or "",
         reverse=True,
     )
-    return {"events": events, "total": len(events)}
+    return {
+        "events": events,
+        "total": len(events),
+        "latest_event_at": latest_event_at.isoformat() if latest_event_at else None,
+        "days_since_last_event": days_since_last_event,
+        "is_stale": feed_is_stale,
+    }
 
 
 async def _inherited_risk_for_communes(db: AsyncSession, commune_ids: list[str]) -> dict[str, Any]:

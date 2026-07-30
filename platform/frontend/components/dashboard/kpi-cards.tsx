@@ -1,8 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CloudRain, MapPin, Mountain, TriangleAlert } from 'lucide-react';
-import { fetchRiskStats, fetchScraperHealth, type RiskStats, type ScraperHealthResponse } from '@/lib/api';
+import { Activity, CloudRain, MapPin, Mountain, TriangleAlert } from 'lucide-react';
+import {
+  fetchRiskStats,
+  fetchScraperHealth,
+  fetchSeismicEvents,
+  type RiskStats,
+  type ScraperHealthResponse,
+  type SeismicEventsResponse,
+} from '@/lib/api';
 
 interface Kpi {
   label: string;
@@ -58,11 +65,18 @@ function StatCard({ kpi }: { kpi: Kpi }) {
 export function KpiCards() {
   const [stats, setStats] = useState<RiskStats | null>(null);
   const [health, setHealth] = useState<ScraperHealthResponse | null>(null);
+  const [seismic, setSeismic] = useState<SeismicEventsResponse | null>(null);
 
   useEffect(() => {
     fetchRiskStats().then(setStats).catch(() => setStats(null));
     fetchScraperHealth().then(setHealth).catch(() => setHealth(null));
+    fetchSeismicEvents(7).then(setSeismic).catch(() => setSeismic(null));
   }, []);
+
+  const seismicMaxMag = useMemo(() => {
+    if (!seismic?.events.length) return null;
+    return Math.max(...seismic.events.map((e) => e.magnitude ?? 0));
+  }, [seismic]);
 
   const kpis = useMemo<Kpi[]>(() => {
     const critico = stats?.comunas_riesgo_critico ?? '—';
@@ -106,16 +120,34 @@ export function KpiCards() {
         trend: 'Últimos 30 días',
         trendColor: 'var(--muted-foreground)',
       },
+      {
+        label: 'Sismos últimos 7 días',
+        value: seismic ? String(seismic.total) : '—',
+        icon: <Activity size={17} />,
+        chipBg: 'oklch(0.94 0.04 300)',
+        chipFg: 'oklch(0.55 0.1 300)',
+        // is_stale distingue "sin sismos confirmado" de "el feed puede estar caído" —
+        // no colapsar ambos casos en el mismo "0" silencioso (audit finding 2).
+        trend: seismic?.is_stale
+          ? `⚠ Feed sin datos hace ${seismic.days_since_last_event ?? '?'}d`
+          : seismicMaxMag != null
+            ? `Máx. M${seismicMaxMag.toFixed(1)}`
+            : 'Sin sismos confirmado',
+        trendColor: seismic?.is_stale ? 'oklch(0.6 0.15 50)' : 'var(--muted-foreground)',
+      },
     ];
-  }, [stats]);
+  }, [stats, seismic, seismicMaxMag]);
 
-  // Estado real de las fuentes (antes hardcodeado como ✓ siempre)
+  // Estado real de las fuentes (antes hardcodeado como ✓ siempre, y solo lluvia/emergencias —
+  // sin las fuentes sísmicas, que también alimentan el índice de riesgo).
   const sources = useMemo(() => {
     const bySource = new Map(health?.sources.map((s) => [s.source, s.status]) ?? []);
     return [
       { key: 'siata', label: 'SIATA' },
       { key: 'ideam', label: 'IDEAM' },
       { key: 'dagrd', label: 'DAGRD' },
+      { key: 'siata_sismos', label: 'Sismos SIATA' },
+      { key: 'sgc', label: 'Sismos SGC' },
     ].map((s) => ({ ...s, status: bySource.get(s.key) ?? 'unknown' }));
   }, [health]);
 
@@ -123,7 +155,7 @@ export function KpiCards() {
 
   return (
     <section
-      className="anim-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+      className="anim-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
       aria-label="Indicadores clave"
     >
       {kpis.map((kpi) => (
@@ -168,7 +200,7 @@ export function KpiCards() {
         </div>
         <div style={{ fontSize: '12px', color: 'oklch(0.44 0.04 260)', lineHeight: 1.6, fontWeight: 500 }}>
           Scrapers:{' '}
-          <strong style={{ color: 'oklch(0.26 0.03 262)', fontWeight: 700 }}>5 fuentes</strong>
+          <strong style={{ color: 'oklch(0.26 0.03 262)', fontWeight: 700 }}>{sources.length} fuentes</strong>
           {' '}· Modelo:{' '}
           <strong style={{ color: 'oklch(0.26 0.03 262)', fontWeight: 700 }}>XGBoost</strong>
         </div>

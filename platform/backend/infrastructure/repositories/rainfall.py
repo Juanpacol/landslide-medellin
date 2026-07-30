@@ -14,6 +14,10 @@ from db.models.commune_threshold import CommuneThreshold
 from db.models.rainfall_timeseries import RainfallTimeseries
 
 DEFAULT_THRESHOLD_MM = 35.0
+# Cuántos días atrás buscar la última lectura conocida cuando una comuna no
+# tiene snapshots desde medianoche — evita "Sin datos" cuando el scraper solo
+# está momentáneamente atrasado, en vez de caído.
+LATEST_KNOWN_LOOKBACK_DAYS = 7
 
 
 async def thresholds_by_commune(session: AsyncSession) -> dict[str, float]:
@@ -48,3 +52,38 @@ async def accumulated_since_by_commune(session: AsyncSession, since: datetime) -
         .group_by(RainfallTimeseries.commune_id)
     )
     return {row[0]: float(row[1]) for row in result.all()}
+
+
+async def latest_snapshot_by_commune(
+    session: AsyncSession, *, lookback_days: int = LATEST_KNOWN_LOOKBACK_DAYS
+) -> dict[str, tuple[datetime, float]]:
+    """Most recent (snapshot_at, precip_mm) per commune within `lookback_days`, regardless of
+    whether it falls before today's midnight.
+
+    Used as a fallback so a commune with no readings since midnight shows its last known value
+    with its age, instead of a silent `0.0` indistinguishable from "confirmed no rain".
+    """
+    from datetime import timedelta, timezone
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    subq = (
+        select(
+            RainfallTimeseries.commune_id,
+            func.max(RainfallTimeseries.snapshot_at).label("latest_at"),
+        )
+        .where(RainfallTimeseries.snapshot_at >= cutoff)
+        .group_by(RainfallTimeseries.commune_id)
+        .subquery()
+    )
+    result = await session.execute(
+        select(
+            RainfallTimeseries.commune_id,
+            RainfallTimeseries.snapshot_at,
+            RainfallTimeseries.precip_mm,
+        ).join(
+            subq,
+            (RainfallTimeseries.commune_id == subq.c.commune_id)
+            & (RainfallTimeseries.snapshot_at == subq.c.latest_at),
+        )
+    )
+    return {row[0]: (row[1], float(row[2])) for row in result.all()}

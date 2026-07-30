@@ -240,7 +240,11 @@ function ThresholdSettings({
   const [saving, setSaving] = useState<string | null>(null);
 
   const acumMap: Record<string, number> = {};
-  liveData?.comunas.forEach((c) => { acumMap[c.commune_id] = c.precip_acum_mm; });
+  const staleMap: Record<string, number | null> = {};
+  liveData?.comunas.forEach((c) => {
+    acumMap[c.commune_id] = c.precip_acum_mm;
+    if (c.is_stale) staleMap[c.commune_id] = c.data_age_hours;
+  });
 
   const handleSave = async (communeId: string, current: number) => {
     const val = parseFloat(editing[communeId] ?? String(current));
@@ -283,6 +287,22 @@ function ThresholdSettings({
                     <span style={{ fontSize: '12px', minWidth: '36px', color: over ? 'oklch(0.5 0.18 25)' : 'inherit', fontWeight: over ? 700 : 400 }}>
                       {acum.toFixed(1)}
                     </span>
+                    {staleMap[t.commune_id] != null && (
+                      <span
+                        title={`Sin lecturas nuevas desde hace ${Math.round(staleMap[t.commune_id]!)}h — mostrando la última conocida`}
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          padding: '2px 6px',
+                          borderRadius: '99px',
+                          background: 'oklch(0.93 0.05 75)',
+                          color: 'oklch(0.5 0.1 60)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        desactualizado · {Math.round(staleMap[t.commune_id]!)}h
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td style={{ padding: '9px 10px' }}>

@@ -64,18 +64,35 @@ async def get_live_rainfall(session: AsyncSession = Depends(get_async_db)) -> di
             }
         )
 
-    from infrastructure.repositories.rainfall import thresholds_by_commune
+    from infrastructure.repositories.rainfall import (
+        latest_snapshot_by_commune,
+        thresholds_by_commune,
+    )
     from infrastructure.repositories.risk_predictions import latest_scores_by_commune
 
     thresholds: dict[str, float] = await thresholds_by_commune(session)
     risks = await latest_scores_by_commune(session)
 
     now_utc = datetime.now(timezone.utc)
+
+    # Fallback: comunas sin snapshots desde medianoche consultan su última
+    # lectura conocida (hasta 7 días atrás) en vez de mostrar 0.0 silencioso,
+    # indistinguible de "confirmado sin lluvia" (audit finding 2).
+    communes_without_today = [cid for cid, _ in _COMUNAS if cid not in by_commune]
+    latest_known = await latest_snapshot_by_commune(session) if communes_without_today else {}
+
     comunas_out = []
     for cid, name in _COMUNAS:
         acum = round(running.get(cid, 0.0), 2)
         threshold = thresholds.get(cid, 35.0)
         risk_score, risk_category = risks.get(cid, (None, None))
+        is_stale = False
+        data_age_hours: float | None = None
+        if cid not in by_commune and cid in latest_known:
+            last_at, last_mm = latest_known[cid]
+            is_stale = True
+            data_age_hours = round((now_utc - last_at).total_seconds() / 3600, 1)
+            acum = round(last_mm, 2)
         comunas_out.append(
             {
                 "commune_id": cid,
@@ -86,6 +103,8 @@ async def get_live_rainfall(session: AsyncSession = Depends(get_async_db)) -> di
                 "is_over_threshold": acum > threshold,
                 "risk_score": risk_score,
                 "risk_category": risk_category,
+                "is_stale": is_stale,
+                "data_age_hours": data_age_hours,
             }
         )
 

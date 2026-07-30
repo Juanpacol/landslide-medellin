@@ -116,6 +116,10 @@ export interface RainCommuneData {
   is_over_threshold: boolean;
   risk_score: number | null;
   risk_category: string | null;
+  /** true si no hubo lecturas desde medianoche y precip_acum_mm viene de la última lectura conocida (hasta 7 días atrás). */
+  is_stale: boolean;
+  /** Antigüedad de esa última lectura conocida, en horas. null si hay datos frescos de hoy. */
+  data_age_hours: number | null;
 }
 
 export interface LiveRainfallResponse {
@@ -554,7 +558,16 @@ export interface SeismicEvent {
   stations: string[];
 }
 
-export async function fetchSeismicEvents(days = 365): Promise<{ events: SeismicEvent[]; total: number }> {
+export interface SeismicEventsResponse {
+  events: SeismicEvent[];
+  total: number;
+  latest_event_at: string | null;
+  days_since_last_event: number | null;
+  /** true si el feed sísmico lleva más de 30 días sin eventos nuevos — posible feed/parser roto, no "sin sismos". */
+  is_stale: boolean;
+}
+
+export async function fetchSeismicEvents(days = 365): Promise<SeismicEventsResponse> {
   return apiRequest(`/risk/seismic-events?days=${days}`);
 }
 

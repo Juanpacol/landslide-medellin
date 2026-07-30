@@ -13,6 +13,10 @@ interface SeismicChartData {
 export function SeismicChart() {
   const [data, setData] = useState<SeismicChartData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [staleInfo, setStaleInfo] = useState<{ isStale: boolean; daysSinceLast: number | null }>({
+    isStale: false,
+    daysSinceLast: null,
+  });
 
   useEffect(() => {
     (async () => {
@@ -20,6 +24,8 @@ export function SeismicChart() {
         const res = await fetch('/api/risk/seismic-events?days=30');
         if (!res.ok) throw new Error();
         const json = await res.json();
+
+        setStaleInfo({ isStale: !!json.is_stale, daysSinceLast: json.days_since_last_event ?? null });
 
         const byDay: Record<string, { count: number; maxMag: number }> = {};
         (json.events || []).forEach((e: any) => {
@@ -48,17 +54,34 @@ export function SeismicChart() {
 
   if (loading) return <div className="text-center py-4 text-sm text-muted-foreground">Cargando sismos…</div>;
 
+  const staleBanner = staleInfo.isStale && (
+    <div
+      className="mb-3 rounded-lg px-3 py-2 text-xs"
+      style={{ background: 'oklch(0.94 0.05 75)', color: 'oklch(0.5 0.1 60)' }}
+    >
+      ⚠ El feed sísmico lleva {staleInfo.daysSinceLast ?? '?'} días sin eventos nuevos — puede
+      indicar una fuente caída, no necesariamente ausencia de sismos.
+    </div>
+  );
+
   if (!data.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-        <Activity className="w-6 h-6 mb-2 opacity-50" />
-        <p className="text-sm">Sin sismos registrados en 30 días</p>
+      <div className="flex flex-col items-center py-8 text-muted-foreground">
+        {staleBanner}
+        <div className="flex flex-col items-center justify-center">
+          <Activity className="w-6 h-6 mb-2 opacity-50" />
+          <p className="text-sm">
+            {staleInfo.isStale ? 'Sin datos recientes del feed sísmico' : 'Sin sismos registrados en 30 días'}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-80">
+    <div className="w-full">
+      {staleBanner}
+      <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -100,6 +123,7 @@ export function SeismicChart() {
           />
         </BarChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }
