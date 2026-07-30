@@ -25,11 +25,14 @@ latency — across four arms (ML-only, rules-only, neuro-symbolic, current decla
 2. Surrogate metrics table is captioned as a surrogate on synthetic labels, with the circularity
    stated in the same table's notes.
 3. Primary metrics computed: rule coverage %, per-rule fire rate, explanation faithfulness %
-   (via SPEC-004's faithfulness check), expert agreement (20-case DAGRD rubric, Cohen's κ),
-   confidence-under-ablation delta, inference latency p50/p95, counterfactual stability under
-   ±5% rain perturbation (`evaluation/stability.py::counterfactual_stability` — a system that
-   flips risk category under noise within SIATA's own measurement error is unstable in a way
-   that matters operationally, independent of ground-truth labels).
+   (via SPEC-004's faithfulness check), expert agreement — two independent methodologies on the
+   same 20-case DAGRD rubric (`evaluation/rubric.md`): absolute categorical judgment (Cohen's κ,
+   `evaluation/expert_agreement.py::cohens_kappa`) and relative risk ranking (Kendall's τ-b,
+   `kendalls_tau`), neither superseding the other — confidence-under-ablation delta, inference
+   latency p50/p95, counterfactual stability under ±5% rain perturbation
+   (`evaluation/stability.py::counterfactual_stability` — a system that flips risk category
+   under noise within SIATA's own measurement error is unstable in a way that matters
+   operationally, independent of ground-truth labels).
 4. Ablation study: remove ontology / remove rules / remove quality layer, report delta on primary
    metrics.
 5. `docs/research/paper.md` written: problem, audit findings, architecture, evaluation,

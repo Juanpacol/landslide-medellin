@@ -58,6 +58,56 @@ system_vs_a = cohens_kappa(system, expert_a)
 system_vs_b = cohens_kappa(system, expert_b)
 ```
 
+## Alternative method: relative ranking
+
+Absolute categorical judgment (above) asks an expert to place a case in one of four boxes —
+which requires the expert to implicitly agree with `domain/risk_rules.py`'s exact thresholds
+(0.35/0.65/0.90) to be scored as "correct" against them. A landslide-risk expert may be
+confident that case A is riskier than case B without being confident whether either crosses a
+specific numeric boundary. Relative ranking sidesteps that: it only asks for an ordering, which
+is both easier to give reliably and doesn't smuggle in agreement with TEYVA's own category
+cutoffs as a precondition for the comparison meaning anything.
+
+1. Use the same 20-case selection as above (real cases with at least one evaluable rule).
+2. Show each expert the same 20 cases' raw evidence (same anti-anchoring rule: no system verdict
+   shown), and ask them to **rank all 20 from highest to lowest perceived risk** (ties allowed —
+   "these feel equally risky" is a valid answer, not a forced tie-break).
+3. Record each expert's rank (1 = highest risk) per case in the table below, plus the system's
+   own resolved `score` (not category) for the same cases, used as its implicit ranking.
+4. Compute agreement with `evaluation/expert_agreement.py::kendalls_tau()`:
+   - Expert A vs. Expert B — reliability of the ranking task itself (precondition for step 5
+     meaning anything, same logic as Cohen's κ in the categorical method).
+   - Expert A vs. system score, Expert B vs. system score — does the system's *relative*
+     ordering of cases match expert judgment, independent of whether its absolute category
+     cutoffs are right.
+
+### Ranking case table (fill after data collection)
+
+| # | commune_id | date | Expert A rank | Expert B rank | System score |
+|---|---|---|---|---|---|
+| 1 | | | | | |
+| 2 | | | | | |
+| ... | | | | | |
+| 20 | | | | | |
+
+### Computing τ once filled
+
+```python
+from evaluation.expert_agreement import kendalls_tau
+
+expert_a_ranks = [...]  # 20 ranks (ties allowed), in case order
+expert_b_ranks = [...]
+system_scores = [...]  # 20 raw hazard scores, same case order — not categories
+
+ranking_reliability = kendalls_tau(expert_a_ranks, expert_b_ranks)
+system_vs_a = kendalls_tau(system_scores, expert_a_ranks)
+system_vs_b = kendalls_tau(system_scores, expert_b_ranks)
+```
+
+Both methodologies (categorical κ and ranking τ) can be run on the same 20 cases without
+conflict — they measure different things and neither supersedes the other. Report whichever the
+available experts' time allows; both together is strictly more evidence than either alone.
+
 ## Honesty note
 
 An unfilled rubric is not a negative result — it's an open item. Do not fill this table with
