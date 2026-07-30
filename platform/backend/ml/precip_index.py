@@ -1,18 +1,18 @@
 """
-Índice de Precipitación Antecedente (API, Antecedent Precipitation Index).
+Antecedent Precipitation Index (API).
 
-Estándar geotécnico para riesgo de deslizamientos: la lluvia reciente pesa
-más que la antigua porque el suelo drena con el tiempo. En vez de la suma
-plana de N días, se pondera cada día con un factor de decaimiento:
+Geotechnical standard for landslide risk: recent rain weighs more than old
+rain because soil drains over time. Instead of a flat sum over N days, each
+day is weighted with a decay factor:
 
-    API = Σ ( lluvia_día_i × decay^días_atrás_i )
+    API = Σ ( rain_day_i × decay^days_back_i )
 
-Con decay=0.85 la lluvia de hace 7 días aporta ~32% de su valor y la de
-hace 15 días ~9% — el suelo "olvida" gradualmente.
+With decay=0.85, rain from 7 days ago contributes ~32% of its value and
+rain from 15 days ago ~9% — the soil gradually "forgets".
 
-La serie diaria sale de `rainfall_timeseries` (snapshots SIATA cada 30 min,
-sumados por día) — la misma fuente que usa el monitor de lluvia y las
-alertas de Slack. NO usar `MLFeature.precip_acum_7d` (nunca se llena).
+The daily series comes from `rainfall_timeseries` (SIATA snapshots every 30
+min, summed per day) — the same source the rain monitor and Slack alerts
+use. Do NOT use `MLFeature.precip_acum_7d` (never populated).
 """
 
 from __future__ import annotations
@@ -27,9 +27,9 @@ from db.models.rainfall_timeseries import RainfallTimeseries
 DECAY_DEFAULT = 0.85
 WINDOW_DAYS_DEFAULT = 15
 
-# Clave con la que el índice viaja en el JSON `features` de MLFeature.
-# FeatureBuilder auto-detecta cualquier clave numérica nueva, así que el
-# modelo la incorpora al reentrenar sin cambios de esquema.
+# Key the index travels under in MLFeature's `features` JSON.
+# FeatureBuilder auto-detects any new numeric key, so the model picks it up
+# on retrain without a schema change.
 FEATURE_KEY = "antecedent_precip_index"
 
 
@@ -40,7 +40,7 @@ def compute_antecedent_precip_index(
     decay: float = DECAY_DEFAULT,
     window_days: int = WINDOW_DAYS_DEFAULT,
 ) -> float:
-    """API sobre una serie diaria. Días ausentes cuentan como 0 mm."""
+    """API over a daily series. Missing days count as 0 mm."""
     total = 0.0
     for days_back in range(window_days):
         d = as_of - timedelta(days=days_back)
@@ -57,7 +57,7 @@ async def antecedent_indexes_for_all_communes(
     decay: float = DECAY_DEFAULT,
     window_days: int = WINDOW_DAYS_DEFAULT,
 ) -> dict[str, float]:
-    """Índice por comuna en una sola query (agrupa snapshots por comuna+día)."""
+    """Index per commune in a single query (groups snapshots by commune+day)."""
     if as_of is None:
         as_of = datetime.now(timezone.utc).date()
     start_dt = datetime.combine(

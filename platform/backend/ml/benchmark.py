@@ -1,24 +1,24 @@
 """
-Benchmark fijo de evaluación — detecta regresiones entre reentrenamientos.
+Fixed evaluation benchmark — detects regressions across retrains.
 
-Problema que resuelve: sin un conjunto de evaluación ESTABLE, cada
-reentrenamiento puede "mejorar" su propia métrica de CV (calculada sobre
-datos que cambian corrida a corrida) mientras empeora contra los casos que
-importan. Este módulo congela un snapshot de casos
-`(commune_id, reference_date, label)` en `ml/models/benchmark.json` y cada
-corrida de `ml.train` lo evalúa igual, para que `benchmark_auc` sea
-comparable entre versiones del modelo.
+Problem this solves: without a STABLE evaluation set, every retrain can
+"improve" its own CV metric (computed on data that changes run to run)
+while getting worse on the cases that matter. This module freezes a
+snapshot of cases `(commune_id, reference_date, label)` in
+`ml/models/benchmark.json`, and every `ml.train` run evaluates against the
+same one, so `benchmark_auc` is comparable across model versions.
 
-Flujo:
-- `python -m ml.benchmark --freeze` crea/actualiza el snapshot desde la BD:
-  positivos = eventos reales (is_synthetic=false) con commune_id y fecha;
-  negativos = muestreo determinista (seed fijo) de días/comunas sin evento
-  en ±7 días, tomados de ml_features.
-- `evaluate_benchmark(model, scaler, feature_names, session)` (llamado desde
-  ml/train.py) reconstruye el vector de features de cada caso con el MISMO
-  FeatureBuilder de producción y reporta AUC-ROC sobre el snapshot.
+Flow:
+- `python -m ml.benchmark --freeze` creates/updates the snapshot from the
+  DB: positives = real events (is_synthetic=false) with commune_id and
+  date; negatives = deterministic sampling (fixed seed) of days/communes
+  with no event within ±7 days, taken from ml_features.
+- `evaluate_benchmark(model, scaler, feature_names, session)` (called from
+  ml/train.py) rebuilds each case's feature vector with the SAME
+  production FeatureBuilder and reports AUC-ROC over the snapshot.
 
-El snapshot NO se regenera en cada train: solo con --freeze explícito.
+The snapshot is NOT regenerated on every train run: only with explicit
+--freeze.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def _parse_date(s: str | None) -> date | None:
 
 
 def freeze_benchmark(session: Session) -> dict[str, Any]:
-    """Congela el snapshot actual de casos en benchmark.json."""
+    """Freezes the current snapshot of cases into benchmark.json."""
     from infrastructure.repositories.landslide_events import real_events_sync
 
     events = real_events_sync(session)
@@ -77,7 +77,7 @@ def freeze_benchmark(session: Session) -> dict[str, Any]:
         positives.append({"commune_id": cid, "reference_date": d.isoformat(), "label": "1"})
         event_days.add((cid, d))
 
-    # Candidatos a negativo: días/comunas con features y SIN evento en ±7d.
+    # Negative candidates: days/communes with features and NO event within ±7d.
     ml_rows = session.scalars(select(MLFeature).where(MLFeature.reference_date.isnot(None))).all()
     candidates: list[tuple[str, date]] = []
     seen: set[tuple[str, date]] = set()
@@ -119,18 +119,18 @@ def evaluate_benchmark(
     feature_names: list[str],
     session: Session,
 ) -> dict[str, Any] | None:
-    """AUC del modelo dado contra el snapshot congelado. None si no hay
-    snapshot o si no tiene ambas clases (motivo en el dict de retorno)."""
+    """Given model's AUC against the frozen snapshot. None if there's no
+    snapshot or it doesn't have both classes (reason in the return dict)."""
     if not BENCHMARK_PATH.exists():
         return {
             "benchmark_auc": None,
-            "reason": "sin benchmark.json — correr `python -m ml.benchmark --freeze`",
+            "reason": "no benchmark.json — run `python -m ml.benchmark --freeze`",
         }
 
     snapshot = json.loads(BENCHMARK_PATH.read_text(encoding="utf-8"))
     cases = snapshot.get("cases") or []
     if not cases:
-        return {"benchmark_auc": None, "reason": "benchmark.json vacío"}
+        return {"benchmark_auc": None, "reason": "benchmark.json is empty"}
 
     builder = FeatureBuilder(MODELS_DIR)
     all_rows = session.scalars(select(MLFeature)).all()
@@ -145,7 +145,7 @@ def evaluate_benchmark(
         ref_d = _parse_date(case["reference_date"])
         if ref_d is None:
             continue
-        # Solo historia hasta la fecha del caso (sin fuga del futuro).
+        # Only history up to the case's date (no future leakage).
         hist = [
             r
             for r in rows_by_commune.get(cid, [])
@@ -168,7 +168,7 @@ def evaluate_benchmark(
     if len(y) == 0 or len(np.unique(y)) < 2:
         return {
             "benchmark_auc": None,
-            "reason": "casos evaluables sin ambas clases (gap de cobertura de features)",
+            "reason": "evaluable cases missing one class (feature coverage gap)",
         }
 
     from sklearn.metrics import roc_auc_score
@@ -186,18 +186,18 @@ def evaluate_benchmark(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--freeze", action="store_true", help="Congelar snapshot desde la BD")
+    parser.add_argument("--freeze", action="store_true", help="Freeze snapshot from the DB")
     args = parser.parse_args()
 
     from db.session import SyncSessionLocal, sync_engine
 
-    _ = sync_engine  # fuerza init de conexión
+    _ = sync_engine  # forces connection init
     if args.freeze:
         with SyncSessionLocal() as session:
             snap = freeze_benchmark(session)
         print(json.dumps({k: snap[k] for k in ("frozen_at", "n_positive", "n_negative")}, indent=2))
     else:
-        print("Uso: python -m ml.benchmark --freeze")
+        print("Usage: python -m ml.benchmark --freeze")
 
 
 if __name__ == "__main__":

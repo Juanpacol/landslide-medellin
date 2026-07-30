@@ -19,7 +19,7 @@ MODELS_DIR = ML_DIR / "models"
 SCALER_PATH = MODELS_DIR / "scaler.pkl"
 FEATURE_NAMES_PATH = MODELS_DIR / "feature_names.json"
 
-# Claves JSON no numéricas / identificadores que no entran al vector.
+# Non-numeric JSON keys / identifiers that never enter the vector.
 _SKIP_JSON_KEYS = frozenset(
     {
         "source",
@@ -64,11 +64,11 @@ def _numeric_from_json(features: dict[str, Any] | None) -> dict[str, float]:
 
 
 def row_to_numeric_parts(row: MLFeature) -> dict[str, float]:
-    """Claves numéricas de una fila, ya filtradas por la deny-list.
+    """Numeric keys for a row, already filtered by the deny-list.
 
-    `precip_acum_7d` y `n_events_window` son columnas de la tabla, no del
-    JSONB, así que pasan por `is_denied` explícitamente: ambas están en
-    DENY_KEYS y no deben entrar al vector aunque se rellenen más adelante.
+    `precip_acum_7d` and `n_events_window` are table columns, not from the
+    JSONB, so they go through `is_denied` explicitly: both are in
+    DENY_KEYS and must not enter the vector even once they get populated.
     """
     parts = _numeric_from_json(row.features or {})
     if row.precip_acum_7d is not None and not is_denied("precip_acum_7d"):
@@ -88,7 +88,7 @@ def _median_map(values_by_key: dict[str, list[float]]) -> dict[str, float]:
 
 
 class FeatureBuilder:
-    """Construye vectores de features por comuna a partir de `ml_features`."""
+    """Builds per-commune feature vectors from `ml_features`."""
 
     def __init__(self, models_dir: Path | None = None) -> None:
         self.models_dir = models_dir or MODELS_DIR
@@ -134,9 +134,9 @@ class FeatureBuilder:
         feature_order: list[str] | None = None,
     ) -> tuple[dict[str, float], dict[str, float]]:
         """
-        Toma el valor más reciente por clave; si falta en la fila más reciente,
-        usa la mediana histórica de esa comuna para esa clave.
-        Retorna (features_used, raw_vector alineado a feature_order).
+        Takes the most recent value per key; if missing in the most recent
+        row, uses that commune's historical median for that key.
+        Returns (features_used, raw_vector aligned to feature_order).
         """
         if not rows:
             return {}, {}
@@ -144,7 +144,7 @@ class FeatureBuilder:
         parts_list = self._per_row_numeric_parts(rows)
         medians = _median_map(self._values_by_key(parts_list))
 
-        # Valores preferidos: de la fila más reciente (índice 0) hacia atrás.
+        # Preferred values: from the most recent row (index 0) backward.
         merged: dict[str, float] = {}
         keys_union: set[str] = set()
         for p in parts_list:
@@ -196,7 +196,7 @@ class FeatureBuilder:
 
     @staticmethod
     def save_scaler(scaler: Any, path: Path | None = None) -> Path:
-        """Persiste el `StandardScaler` (u otro) con joblib."""
+        """Persists the `StandardScaler` (or another) with joblib."""
         target = path or SCALER_PATH
         target.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(scaler, target)

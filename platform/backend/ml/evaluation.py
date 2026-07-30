@@ -40,21 +40,21 @@ def generate_report() -> str:
         metrics = json.loads(METRICS_PATH.read_text(encoding="utf-8"))
 
     lines: list[str] = [
-        "# Reporte de evaluación TEYVA ML",
+        "# TEYVA ML evaluation report",
         "",
-        "## Métricas de entrenamiento (CV / artefactos)",
+        "## Training metrics (CV / artifacts)",
         "",
-        f"- Muestras: **{metrics.get('n_samples', 'n/d')}**",
-        f"- Positivos (evento en +7d): **{metrics.get('n_positive', 'n/d')}**",
-        f"- Mejor modelo: **{metrics.get('best_model', 'n/d')}**",
-        f"- AUC-ROC medio (CV): **{_fmt(metrics.get('cv_mean_auc'))}**",
-        f"- Estrategia CV: **{metrics.get('cv_strategy', 'n/d')}**",
-        f"- AUC-ROC en dataset completo (ajustado): **{_fmt(metrics.get('train_auc_roc'))}**",
+        f"- Samples: **{metrics.get('n_samples', 'n/d')}**",
+        f"- Positives (event in +7d): **{metrics.get('n_positive', 'n/d')}**",
+        f"- Best model: **{metrics.get('best_model', 'n/d')}**",
+        f"- Mean AUC-ROC (CV): **{_fmt(metrics.get('cv_mean_auc'))}**",
+        f"- CV strategy: **{metrics.get('cv_strategy', 'n/d')}**",
+        f"- AUC-ROC on the full dataset (fitted): **{_fmt(metrics.get('train_auc_roc'))}**",
         "",
     ]
 
     if not BEST_MODEL_PATH.exists():
-        lines.append("_No hay `best_model.pkl`; ejecute `python -m ml.train`._")
+        lines.append("_No `best_model.pkl`; run `python -m ml.train`._")
         text = "\n".join(lines)
         REPORT_PATH.write_text(text, encoding="utf-8")
         return text
@@ -66,7 +66,7 @@ def generate_report() -> str:
         X, y, _names, _meta, _target_strategy, _coverage = _build_supervised_matrix(session)
 
     if X.size == 0 or len(np.unique(y)) < 2:
-        lines.append("_Datos insuficientes o una sola clase para métricas de clasificación._")
+        lines.append("_Insufficient data or a single class for classification metrics._")
         text = "\n".join(lines)
         REPORT_PATH.write_text(text, encoding="utf-8")
         return text
@@ -84,16 +84,16 @@ def generate_report() -> str:
 
     lines.extend(
         [
-            "## Métricas en dataset completo (umbral 0.5)",
+            "## Metrics on the full dataset (threshold 0.5)",
             "",
             f"- AUC-ROC: **{_fmt(auc)}**",
             f"- F1: **{_fmt(f1)}**",
-            f"- Precisión: **{_fmt(prec)}**",
+            f"- Precision: **{_fmt(prec)}**",
             f"- Recall: **{_fmt(rec)}**",
-            f"- Exactitud: **{_fmt(acc)}**",
+            f"- Accuracy: **{_fmt(acc)}**",
             "",
-            "_Nota: al evaluar sobre el mismo conjunto usado para ajustar el modelo, "
-            "estas métricas son optimistas; la referencia principal de generalización es el AUC-ROC de CV en `metrics.json`._",
+            "_Note: evaluating on the same set used to fit the model makes "
+            "these metrics optimistic; the primary generalization reference is the CV AUC-ROC in `metrics.json`._",
             "",
         ]
     )

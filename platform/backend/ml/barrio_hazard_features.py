@@ -1,19 +1,20 @@
 """
-Feature ML de coherencia barrio → comuna.
+ML feature for barrio → commune hazard coherence.
 
-El modelo predice a nivel de comuna, pero la amenaza geomorfológica oficial
-(VM_05, `db/models/barrio_hazard.py`) ya está muestreada a nivel de barrio
-(~401 polígonos). Sin este feature, el modelo "no sabe" que una comuna tiene
-varios barrios en amenaza Alta mientras otra no tiene ninguno — dos comunas
-con la misma lluvia recibían el mismo riesgo pese a tener geomorfología muy
-distinta.
+The model predicts at commune level, but the official geomorphological
+hazard (VM_05, `db/models/barrio_hazard.py`) is already sampled at barrio
+level (~401 polygons). Without this feature, the model "doesn't know" that
+one commune has several barrios in Alta hazard while another has none — two
+communes with the same rain got the same risk despite very different
+geomorphology.
 
-Este módulo resume esa información en un escalar por comuna:
+This module summarizes that information into one scalar per commune:
 
-    pct_barrios_alta_amenaza = barrios con hazard_grade "Alta" / total barrios con dato
+    pct_barrios_alta_amenaza = barrios with hazard_grade "Alta" / total barrios with data
 
-No sustituye una predicción real por barrio (eso requeriría series históricas
-por barrio, que no existen); es el puente estadístico disponible hoy.
+Doesn't replace a real per-barrio prediction (that would need per-barrio
+historical series, which don't exist); it's the statistical bridge available
+today.
 """
 
 from __future__ import annotations
@@ -27,8 +28,8 @@ FEATURE_KEY = "pct_barrios_alta_amenaza"
 
 
 async def pct_barrios_alta_amenaza(session: AsyncSession) -> dict[str, float]:
-    """% de barrios con amenaza 'Alta' por comuna (0.0-1.0). Comunas sin
-    ningún barrio con dato no aparecen en el resultado (no se inventa un 0)."""
+    """% of barrios with 'Alta' hazard per commune (0.0-1.0). Communes with
+    no barrio data at all don't appear in the result (no 0 is invented)."""
     rows = (await session.execute(select(BarrioHazard))).scalars().all()
 
     with_data: dict[str, int] = {}

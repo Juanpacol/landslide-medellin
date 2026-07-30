@@ -1,26 +1,28 @@
 """
-Feature ML de actividad sísmica reciente.
+ML feature for recent seismic activity.
 
-Un sismo cerca del valle, sobre suelo ya saturado por lluvia, es un disparador
-clásico de deslizamientos. La señal se resume en un escalar por comuna:
+An earthquake near the valley, on soil already saturated by rain, is a
+classic landslide trigger. The signal is summarized into one scalar per
+commune:
 
-    intensidad = Σ  magnitud² × atenuación_distancia × decaimiento_temporal
+    intensity = Σ  magnitude² × distance_attenuation × time_decay
 
-- atenuación_distancia: 1 / (1 + (d_km / 50)²), con d_km medido desde el
-  CENTROIDE DE CADA COMUNA al epicentro (no desde un centro único del valle):
-  un sismo con epicentro en el borde occidental pesa más en San Javier (13)
-  que en Santa Elena (90), ~20 km al oriente.
-- decaimiento temporal: 0.9^días — el efecto de un sismo sobre laderas
-  inestables se disipa en días/semanas.
+- distance_attenuation: 1 / (1 + (d_km / 50)²), with d_km measured from EACH
+  COMMUNE'S CENTROID to the epicenter (not from a single valley center): an
+  earthquake with an epicenter on the western edge weighs more for San
+  Javier (13) than for Santa Elena (90), ~20 km to the east.
+- time decay: 0.9^days — the effect of an earthquake on unstable slopes
+  dissipates over days/weeks.
 
-Los centroides salen de `domain/communes.py::CENTROIDS` (las 21, extraídos de
-la cartografía oficial) y se sobreescriben con `centroid_lat`/`centroid_lon` de
-MLFeature.features cuando `scraper/medellin_datos.py` los haya escrito. Antes
-se leían SOLO de la BD, así que sin ese scraper las 21 comunas caían al centro
-del valle y la señal por comuna se volvía una constante en silencio.
+Centroids come from `domain/communes.py::CENTROIDS` (all 21, extracted from
+official cartography) and get overridden with `centroid_lat`/`centroid_lon`
+from MLFeature.features once `scraper/medellin_datos.py` has written them.
+They used to be read ONLY from the DB, so without that scraper all 21
+communes fell back to the valley's center and the per-commune signal
+silently became a constant.
 
-La clave viaja como `seismic_recent_intensity` en el JSON `features` de
-MLFeature (FeatureBuilder la recoge automáticamente al reentrenar).
+The key travels as `seismic_recent_intensity` in MLFeature's `features`
+JSON (FeatureBuilder picks it up automatically on retrain).
 """
 
 from __future__ import annotations
@@ -37,8 +39,8 @@ from infrastructure.external.arcgis_client import haversine_km
 
 FEATURE_KEY = "seismic_recent_intensity"
 
-# Centro del Valle de Aburrá. Con CENTROIDS cubriendo las 21 comunas esto ya
-# solo aplica a un id desconocido, no a una comuna real.
+# Center of the Valle de Aburrá. With CENTROIDS covering all 21 communes,
+# this now only applies to an unknown id, never a real commune.
 VALLEY_LAT, VALLEY_LON = VALLEY_CENTROID
 
 TIME_DECAY_PER_DAY = 0.9
@@ -47,16 +49,16 @@ WINDOW_DAYS = 30
 
 
 async def _centroids_by_commune(session: AsyncSession) -> dict[str, tuple[float, float]]:
-    """(lat, lon) por comuna: semilla estática + override de lo scrapeado.
+    """(lat, lon) per commune: static seed + override from scraped data.
 
-    La semilla es `domain.communes.CENTROIDS` (las 21, de la cartografía
-    oficial). Encima se aplica lo que haya en `MLFeature.features`, fila más
-    reciente primero.
+    The seed is `domain.communes.CENTROIDS` (all 21, from official
+    cartography). On top of that, whatever is in `MLFeature.features` gets
+    applied, most recent row first.
 
-    Antes esta función SOLO leía de `ml_features`, así que en una base donde
-    `scraper/medellin_datos.py` no hubiera corrido devolvía `{}` y las 21
-    comunas caían al centro del valle — la señal sísmica por comuna se
-    convertía en una constante sin que nada lo avisara.
+    This function used to read ONLY from `ml_features`, so on a base where
+    `scraper/medellin_datos.py` hadn't run it returned `{}` and all 21
+    communes fell back to the valley's center — the per-commune seismic
+    signal turned into a constant with nothing flagging it.
     """
     out: dict[str, tuple[float, float]] = dict(CENTROIDS)
 
@@ -78,8 +80,8 @@ async def _centroids_by_commune(session: AsyncSession) -> dict[str, tuple[float,
 
 
 async def _recent_unique_events(session: AsyncSession) -> list[SeismicEvent]:
-    """Sismos de los últimos WINDOW_DAYS, deduplicados (un sismo aparece una
-    vez por estación que lo registró)."""
+    """Earthquakes from the last WINDOW_DAYS, deduplicated (an earthquake
+    appears once per station that recorded it)."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)
     stmt = select(SeismicEvent).where(SeismicEvent.event_local_at >= cutoff)
     rows = (await session.execute(stmt)).scalars().all()
@@ -103,7 +105,7 @@ def _intensity_at(lat: float, lon: float, events: list[SeismicEvent], now: datet
         if r.epicenter_lat is not None and r.epicenter_lon is not None:
             d_km = haversine_km(lon, lat, r.epicenter_lon, r.epicenter_lat)
         else:
-            d_km = DISTANCE_SCALE_KM  # sin coordenadas: atenuación media
+            d_km = DISTANCE_SCALE_KM  # no coordinates: average attenuation
         days_ago = max(0.0, (now - r.event_local_at).total_seconds() / 86400.0)
         attenuation = 1.0 / (1.0 + (d_km / DISTANCE_SCALE_KM) ** 2)
         total += (r.magnitude**2) * attenuation * (TIME_DECAY_PER_DAY**days_ago)
@@ -111,7 +113,7 @@ def _intensity_at(lat: float, lon: float, events: list[SeismicEvent], now: datet
 
 
 async def seismic_intensity_by_commune(session: AsyncSession) -> dict[str, float]:
-    """Intensidad sísmica reciente por comuna (dict vacío si no hay sismos)."""
+    """Recent seismic intensity per commune (empty dict if no earthquakes)."""
     events = await _recent_unique_events(session)
     if not events:
         return {}
@@ -120,14 +122,14 @@ async def seismic_intensity_by_commune(session: AsyncSession) -> dict[str, float
     out: dict[str, float] = {}
     for cid, (lat, lon) in centroids.items():
         out[cid] = _intensity_at(lat, lon, events, now)
-    # Valor de valle como fallback para comunas sin centroide conocido.
+    # Valley value as a fallback for communes with no known centroid.
     out["_default"] = _intensity_at(VALLEY_LAT, VALLEY_LON, events, now)
     return out
 
 
 async def seismic_recent_intensity(session: AsyncSession) -> float:
-    """Intensidad sísmica del valle (escalar único). Se mantiene para
-    compatibilidad; la señal por comuna está en seismic_intensity_by_commune."""
+    """Valley-wide seismic intensity (single scalar). Kept for
+    compatibility; the per-commune signal is in seismic_intensity_by_commune."""
     events = await _recent_unique_events(session)
     if not events:
         return 0.0

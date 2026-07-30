@@ -88,9 +88,9 @@ async def predict_risk(comuna_id: int, db: AsyncSession) -> dict[str, Any]:
 
 
 async def predict_all_comunas(db: AsyncSession) -> None:
-    """Wrapper fino: la orquestación vive en application/predict_risk.py.
-    Se mantiene aquí porque GitHub Actions invoca `python -m ml.predict` y
-    api/routes/risk.py importa este nombre."""
+    """Thin wrapper: orchestration lives in application/predict_risk.py.
+    Kept here because GitHub Actions invokes `python -m ml.predict` and
+    api/routes/risk.py imports this name."""
     from application.predict_risk import run_predictions
 
     await run_predictions(db)

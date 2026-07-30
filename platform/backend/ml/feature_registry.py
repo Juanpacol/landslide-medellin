@@ -1,34 +1,36 @@
 """
-Registro ÚNICO de las features del modelo. Declararlas aquí es lo único que
-las mete (o las saca) del vector.
+SINGLE registry of the model's features. Declaring one here is the only
+thing that puts it (or takes it out of) the vector.
 
-Por qué existe este módulo
---------------------------
-La lista de claves vivía en DOS sitios y divergieron en silencio:
-
-- el spread condicional de `scraper/siata.py` (qué se escribe en el JSONB), y
-- el literal `force_keys` de `ml/train.py` (qué entra al vector).
-
-El resultado quedó documentado en producción: `ml/models/feature_names.json`
-lista 7 features y NINGUNA de las 4 de ingeniería (`antecedent_precip_index`,
-`soil_water_index_pct`, `seismic_recent_intensity`, `pct_barrios_alta_amenaza`).
-La corrida de 11 features que las incluía abortó el 2026-07-07 (`n_positive: 0`,
-`target_strategy: past_7d_fallback` — ver `ml/models/last_train_attempt.json`) y
-nunca se reprodujo. La gobernanza de artefactos de `train.py` hizo su trabajo y
-protegió producción, pero nadie se enteró porque nada alertó.
-
-De las 7 features en producción, 6 no son meteorología: `centroid_lat`/`_lon`
-son identidad de comuna, `densidadmax` es estática, `precip_records` y
-`station_count` son conteos de filas (proxy de QUÉ SCRAPER escribió la fila), y
-`precip_sum_mm_day` solo lo escriben los scrapers históricos, así que en
-inferencia se rellena por mediana con una constante rancia por comuna. Con 26
-positivos, eso es un modelo que memoriza cuál de las 21 comunas tuvo eventos.
-
-Presupuesto de columnas
+Why this module exists
 -----------------------
-Con 26 positivos reales y `max_depth=3`, el techo defendible son ~12-14
-columnas. Añadir features es un juego de suma cero: para meter una hay que
-justificar la que sale. `DENY_KEYS` es la mitad del trabajo, no un detalle.
+The key list used to live in TWO places and diverged silently:
+
+- `scraper/siata.py`'s conditional spread (what gets written to the JSONB), and
+- `ml/train.py`'s `force_keys` literal (what enters the vector).
+
+The result was documented in production: `ml/models/feature_names.json`
+lists 7 features and NONE of the 4 engineered ones
+(`antecedent_precip_index`, `soil_water_index_pct`,
+`seismic_recent_intensity`, `pct_barrios_alta_amenaza`). The 11-feature run
+that included them aborted on 2026-07-07 (`n_positive: 0`,
+`target_strategy: past_7d_fallback` — see `ml/models/last_train_attempt.json`)
+and never reran. `train.py`'s artifact governance did its job and
+protected production, but nobody found out because nothing alerted.
+
+Of the 7 production features, 6 aren't weather: `centroid_lat`/`_lon` are
+commune identity, `densidadmax` is static, `precip_records` and
+`station_count` are row counts (a proxy for WHICH SCRAPER wrote the row),
+and `precip_sum_mm_day` is only written by the historical scrapers, so at
+inference time it's median-filled with a stale per-commune constant. With
+26 positives, that's a model that memorizes which of the 21 communes had
+events.
+
+Column budget
+--------------
+With 26 real positives and `max_depth=3`, the defensible ceiling is ~12-14
+columns. Adding features is a zero-sum game: to add one, you must justify
+which one leaves. `DENY_KEYS` is half the work, not a detail.
 """
 
 from __future__ import annotations
@@ -38,37 +40,37 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class FeatureSpec:
-    """Declaración de una feature. `key` es la clave en `MLFeature.features`."""
+    """Declaration of a feature. `key` is the key in `MLFeature.features`."""
 
     key: str
-    module: str  # dónde se calcula ("-" si la escribe un scraper directo)
-    window_days: int | None  # None = estática o de instante
+    module: str  # where it's computed ("-" if a scraper writes it directly)
+    window_days: int | None  # None = static or instantaneous
     descripcion: str
     in_model: bool = True
-    forward_looking: bool = False  # mira al FUTURO → jamás entrena (ver §pronóstico)
+    forward_looking: bool = False  # looks into the FUTURE → never trains (see §forecast)
 
 
 REGISTRY: tuple[FeatureSpec, ...] = (
-    # ── Lluvia ────────────────────────────────────────────────────────────────
+    # ── Rain ──────────────────────────────────────────────────────────────────
     FeatureSpec(
         key="antecedent_precip_index",
         module="ml/precip_index.py",
         window_days=15,
-        descripcion="Σ lluvia_d × 0.85^días_atrás. Saturación acumulada del suelo.",
+        descripcion="Σ rain_d × 0.85^days_back. Accumulated soil saturation.",
     ),
     FeatureSpec(
         key="soil_water_index_pct",
         module="ml/soil_water_index.py",
         window_days=30,
-        descripcion="Modelo de tanque: SWI = SWI×(1−0.15) + lluvia, tope 100.",
+        descripcion="Tank model: SWI = SWI×(1−0.15) + rain, capped at 100.",
     ),
     FeatureSpec(
         key="mean_precip_mm_snapshot",
         module="scraper/siata.py",
         window_days=None,
         descripcion=(
-            "Media de precipitación de las estaciones SIATA en el snapshot. "
-            "PENDIENTE de retirar: ver DENY_KEYS_PENDIENTE_LLUVIA."
+            "Mean precipitation across SIATA stations in the snapshot. "
+            "PENDING removal: see DENY_KEYS_PENDIENTE_LLUVIA."
         ),
     ),
     FeatureSpec(
@@ -76,37 +78,37 @@ REGISTRY: tuple[FeatureSpec, ...] = (
         module="scraper/ideam.py, scraper/historical_backfill.py",
         window_days=1,
         descripcion=(
-            "Suma diaria de precipitación. Solo la escriben los caminos "
-            "históricos/IDEAM. PENDIENTE de retirar: ver DENY_KEYS_PENDIENTE_LLUVIA."
+            "Daily precipitation sum. Only written by the historical/IDEAM "
+            "paths. PENDING removal: see DENY_KEYS_PENDIENTE_LLUVIA."
         ),
     ),
-    # ── Sismos ────────────────────────────────────────────────────────────────
+    # ── Seismic ───────────────────────────────────────────────────────────────
     FeatureSpec(
         key="seismic_recent_intensity",
         module="ml/seismic_features.py",
         window_days=30,
-        descripcion="Σ magnitud² × 1/(1+(d/50)²) × 0.9^días.",
+        descripcion="Σ magnitude² × 1/(1+(d/50)²) × 0.9^days.",
     ),
     FeatureSpec(
         key="seismic_x_swi",
-        module="scraper/siata.py (interacción)",
+        module="scraper/siata.py (interaction)",
         window_days=30,
-        descripcion="seismic_recent_intensity × (SWI/100). Sismo sobre suelo saturado.",
+        descripcion="seismic_recent_intensity × (SWI/100). Earthquake on saturated soil.",
     ),
-    # ── Terreno / vulnerabilidad (estáticas) ──────────────────────────────────
+    # ── Terrain / vulnerability (static) ────────────────────────────────────────
     FeatureSpec(
         key="pct_barrios_alta_amenaza",
         module="ml/barrio_hazard_features.py",
         window_days=None,
-        descripcion="% de barrios de la comuna en amenaza alta (VM_05 de GeoMedellín).",
+        descripcion="% of the commune's barrios in high hazard (GeoMedellín's VM_05).",
     ),
     FeatureSpec(
         key="densidadmax",
         module="scraper/medellin_datos.py",
         window_days=None,
         descripcion=(
-            "Densidad poblacional máxima. Estática por comuna, pero es "
-            "vulnerabilidad legítima — no un identificador."
+            "Maximum population density. Static per commune, but a "
+            "legitimate vulnerability signal — not an identifier."
         ),
     ),
 )
@@ -114,41 +116,42 @@ REGISTRY: tuple[FeatureSpec, ...] = (
 BY_KEY: dict[str, FeatureSpec] = {s.key: s for s in REGISTRY}
 
 
-# ── Claves EXCLUIDAS del vector ───────────────────────────────────────────────
+# ── Keys EXCLUDED from the vector ──────────────────────────────────────────────
 #
-# Se siguen escribiendo en el JSONB (hay código que las lee: por ejemplo
-# `ml/seismic_features.py::_centroids_by_commune` y
-# `alerts/evacuation.py::_commune_centroid` leen los centroides). Lo que se
-# impide es que lleguen a la matriz de entrenamiento.
+# Still written to the JSONB (there's code that reads them: e.g.
+# `ml/seismic_features.py::_centroids_by_commune` and
+# `alerts/evacuation.py::_commune_centroid` read the centroids). What's
+# prevented is them reaching the training matrix.
 DENY_KEYS: frozenset[str] = frozenset(
     {
-        # Identidad de comuna: constante por comuna para siempre. Con 26
-        # positivos el árbol memoriza cuál de las 21 comunas tuvo eventos.
+        # Commune identity: constant per commune forever. With 26
+        # positives the tree memorizes which of the 21 communes had events.
         "centroid_lat",
         "centroid_lon",
-        # Conteos de filas: proxy de QUÉ SCRAPER escribió la fila, no del clima.
+        # Row counts: a proxy for WHICH SCRAPER wrote the row, not the weather.
         "precip_records",
         "station_count",
-        # Siempre None en la BD (todos los scrapers la escriben así), así que
-        # nunca llegó al vector; queda declarada para que rellenar la columna
-        # más adelante no la meta al modelo por accidente. Además sería
-        # `antecedent_precip_index` con decay=1.0 y ventana=7 → r > 0.95.
-        # El propio docstring de precip_index.py ya dice "NO usar".
+        # Always None in the DB (every scraper writes it that way), so it
+        # never reached the vector; kept declared so backfilling the column
+        # later doesn't feed the model by accident. It would also be
+        # `antecedent_precip_index` with decay=1.0 and window=7 → r > 0.95.
+        # precip_index.py's own docstring already says "do NOT use".
         "precip_acum_7d",
         "n_events_window",
     }
 )
 
-# Claves que DEBEN salir del vector, pero todavía no.
+# Keys that MUST leave the vector, but not yet.
 #
-# `mean_precip_mm_snapshot` y `precip_sum_mm_day` son hoy la única señal de
-# lluvia del modelo. Se sustituyen por la clave canónica `precip_daily_mm`
-# (total diario resuelto por precedencia de fuentes), pero esa clave no existe
-# hasta que `ml/backfill_features.py` la pueble sobre el histórico. Retirarlas
-# ANTES de eso dejaría al modelo sin lluvia — peor que el problema.
+# `mean_precip_mm_snapshot` and `precip_sum_mm_day` are today the model's
+# only rain signal. They get replaced by the canonical `precip_daily_mm` key
+# (daily total resolved by source precedence), but that key doesn't exist
+# until `ml/backfill_features.py` populates it over the historical data.
+# Removing them BEFORE that would leave the model with no rain at all —
+# worse than the problem.
 #
-# Activación: mover estas dos a DENY_KEYS en el mismo PR que introduce
-# `precip_daily_mm`, y verificar con `feature_coverage["precip_daily_mm"] ≥ 0.95`.
+# Activation: move these two to DENY_KEYS in the same PR that introduces
+# `precip_daily_mm`, and verify with `feature_coverage["precip_daily_mm"] ≥ 0.95`.
 DENY_KEYS_PENDIENTE_LLUVIA: frozenset[str] = frozenset(
     {
         "mean_precip_mm_snapshot",
@@ -156,26 +159,26 @@ DENY_KEYS_PENDIENTE_LLUVIA: frozenset[str] = frozenset(
     }
 )
 
-# Prefijos de claves que nunca entran al vector.
-#   meta_*  metadatos de procedencia/salud de fuente (`meta_seismic_source_ok`)
-#   fc_*    derivadas del PRONÓSTICO: miran al futuro y la etiqueta es "evento
-#           en (ref_d, ref_d+7d]", así que entrenar con ellas filtra la causa
-#           física de la etiqueta. Se usan en inferencia vía doble puntuación
-#           (x_now / x_projected), nunca en entrenamiento.
+# Key prefixes that never enter the vector.
+#   meta_*  source provenance/health metadata (`meta_seismic_source_ok`)
+#   fc_*    derived from the FORECAST: they look into the future and the
+#           label is "event within (ref_d, ref_d+7d]", so training with
+#           them leaks the label's physical cause. Used at inference via
+#           double scoring (x_now / x_projected), never at training time.
 DENY_PREFIXES: tuple[str, ...] = ("meta_", "fc_")
 
 
-# Claves que se fuerzan a entrar al vector aunque ninguna fila las tenga
-# todavía. Sin esto, la unión de claves observadas las descarta en silencio y
-# la feature "existe" en el código pero nunca entrena — exactamente lo que
-# pasó con las 4 de ingeniería.
+# Keys forced into the vector even if no row has them yet. Without this,
+# the union of observed keys silently drops them and the feature "exists"
+# in code but never trains — exactly what happened with the 4 engineered
+# ones.
 FORCE_KEYS: frozenset[str] = frozenset(
     s.key for s in REGISTRY if s.in_model and not s.forward_looking
 )
 
 
 def is_denied(key: str) -> bool:
-    """True si la clave no debe entrar al vector de features."""
+    """True if the key must not enter the feature vector."""
     if key in DENY_KEYS:
         return True
     return key.startswith(DENY_PREFIXES)
