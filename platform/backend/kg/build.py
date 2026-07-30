@@ -1,30 +1,44 @@
-"""Knowledge graph A-Box builder — populates an `rdflib.Graph` with territory individuals and
-`adjacentTo` edges, queryable via SPARQL. `domain/rules/catalog.py` rules that need spatial
-predicates (e.g. a future "upslope neighbour" rule) call `run_query()`, not the DB directly —
-this is runtime infrastructure, not a visualization demo (specs/005-knowledge-graph/spec.md).
+"""Knowledge graph A-Box builder — populates an `rdflib.Graph` with territory individuals,
+`adjacentTo` edges, and critical-facility exposure, queryable via SPARQL. `domain/rules/catalog.py`
+rules that need spatial predicates (e.g. a future "upslope neighbour" rule) call `run_query()`,
+not the DB directly — this is runtime infrastructure, not a visualization demo
+(specs/005-knowledge-graph/spec.md).
 
 Scope note vs. the original spec: full A-Box population from Postgres (barrio_terrain,
-barrio_hazard, safe_zones, seismic_events, non-synthetic landslide_events) and polygon-based
-adjacency via shapely are NOT implemented here — that needs an AsyncSession and the barrio
-polygon file, both bigger asynchronous integration work. What IS implemented: territory nodes
-(reusing infrastructure/ontology/loader.py, so there's exactly one definition of "the 21
-territories") and a centroid-proximity approximation of `adjacentTo`, declared as an
-approximation, not the real polygon-adjacency the full spec calls for
-(specs/005-knowledge-graph/tasks.md tracks the rest).
+barrio_hazard, seismic_events, non-synthetic landslide_events) and polygon-based adjacency via
+shapely are NOT implemented here — that needs an AsyncSession and the barrio polygon file, both
+bigger asynchronous integration work. What IS implemented, DB-free: territory nodes (reusing
+infrastructure/ontology/loader.py, so there's exactly one definition of "the 21 territories"), a
+centroid-proximity approximation of `adjacentTo`, and REAL critical-facility data — hospitals and
+clinics near each commune's centroid, fetched live from OpenStreetMap's public Overpass API (the
+same source `alerts/evacuation.py` already uses for safe zones, no key required). "Shared
+stream" data needs `landslide_events`/hydrography from Postgres and is NOT implemented; its query
+file exists as the declared target, returning empty until that data is wired in.
 """
 
 from __future__ import annotations
 
+import logging
+import time
 from math import atan2, cos, radians, sin, sqrt
+from typing import Any
 
 from rdflib import RDF, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import XSD
+
+logger = logging.getLogger(__name__)
 
 TEYVA = Namespace("http://teyva.local/onto.owl#")
 
 # How many nearest neighbours count as "adjacent" — a centroid-distance approximation of true
 # polygon adjacency (which needs the barrio/comuna polygon file, not yet wired in).
 ADJACENCY_K = 3
+
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# Radius around each commune's centroid to search for hospitals/clinics. Generous on purpose:
+# a centroid is not "the commune", and R-EXPO-01 (domain/rules/catalog.py) cares about proximity
+# to the TERRITORY, not to one point in it.
+FACILITY_SEARCH_RADIUS_M = 3000
 
 
 def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -42,8 +56,10 @@ def _territory_uri(commune_id: str) -> URIRef:
 
 
 def build_static_graph() -> Graph:
-    """Territories + centroid-proximity adjacency. No DB access — pulls from
-    `domain/communes.py` directly, so it can build (and be tested) without a database."""
+    """Territories + centroid-proximity adjacency. No network, no DB access — pulls from
+    `domain/communes.py` directly, so it can build (and be tested) offline. Does NOT include
+    critical facilities: use `add_critical_facilities()` for that, separately, since it needs
+    the network (Overpass API)."""
     from domain.communes import COMMUNES
 
     g = Graph()
@@ -69,6 +85,79 @@ def build_static_graph() -> Graph:
             g.add((_territory_uri(cid), TEYVA.adjacentTo, _territory_uri(other_id)))
 
     return g
+
+
+def _fetch_facilities_near(lat: float, lon: float) -> list[dict[str, Any]]:
+    """Hospitals/clinics within `FACILITY_SEARCH_RADIUS_M` of (lat, lon), via Overpass —
+    same public, keyless API `alerts/evacuation.py::fetch_safe_zones_osm` already uses for
+    parks/schools/stadiums. Synchronous (`requests`, not `httpx`): this module has no async
+    caller today, and keeping it sync means `build_critical_facility_graph()` can run from a
+    plain script (`python -m kg.build`) with no event loop.
+    """
+    import requests
+
+    query = (
+        f"[out:json][timeout:15];"
+        f"(node[amenity~'^(hospital|clinic)$'](around:{FACILITY_SEARCH_RADIUS_M},{lat},{lon});"
+        f"way[amenity~'^(hospital|clinic)$'](around:{FACILITY_SEARCH_RADIUS_M},{lat},{lon}););"
+        f"out center;"
+    )
+    try:
+        r = requests.post(OVERPASS_URL, data=query, timeout=20)
+        r.raise_for_status()
+        data = r.json()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Overpass query failed for (%.4f, %.4f): %s", lat, lon, exc)
+        return []
+
+    out = []
+    for el in data.get("elements") or []:
+        tags = el.get("tags") or {}
+        name = tags.get("name") or tags.get("amenity") or "unnamed"
+        el_lat = el.get("lat") or (el.get("center") or {}).get("lat")
+        el_lon = el.get("lon") or (el.get("center") or {}).get("lon")
+        if el_lat is None or el_lon is None:
+            continue
+        out.append(
+            {
+                "osm_id": f"{el.get('type')}/{el.get('id')}",
+                "name": name,
+                "amenity": tags.get("amenity"),
+                "lat": el_lat,
+                "lon": el_lon,
+            }
+        )
+    return out
+
+
+def add_critical_facilities(g: Graph, *, delay_s: float = 1.0) -> int:
+    """Fetches hospitals/clinics near every commune centroid from Overpass and adds them to
+    `g` as `CriticalFacility` individuals linked via `exposes`, feeding
+    `exposed_facilities.sparql` and, eventually, `domain/rules/catalog.py::R_EXPO_01`'s real
+    proximity data (today that rule's input is a caller-supplied distance, not this graph — see
+    specs/005-knowledge-graph/tasks.md). Returns the number of facilities added. Does one
+    Overpass call per commune (21 total); network-bound, not meant for the hot request path.
+    A 1s pause between calls respects Overpass's public fair-use policy — its free instance
+    rate-limits aggressively, and 21 back-to-back requests were observed hitting that limit
+    during development.
+    """
+    from domain.communes import CENTROIDS, COMMUNES
+
+    n_added = 0
+    for i, c in enumerate(COMMUNES):
+        centroid = CENTROIDS.get(c.id)
+        if centroid is None:
+            continue
+        if i > 0 and delay_s > 0:
+            time.sleep(delay_s)
+        lat, lon = centroid
+        for facility in _fetch_facilities_near(lat, lon):
+            fac_uri = TEYVA[f"facility_{facility['osm_id'].replace('/', '_')}"]
+            g.add((fac_uri, RDF.type, TEYVA.CriticalFacility))
+            g.add((fac_uri, TEYVA.nombre, Literal(facility["name"], datatype=XSD.string)))
+            g.add((_territory_uri(c.id), TEYVA.exposes, fac_uri))
+            n_added += 1
+    return n_added
 
 
 def node_count(g: Graph) -> int:

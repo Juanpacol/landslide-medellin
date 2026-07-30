@@ -1,0 +1,16 @@
+PREFIX teyva: <http://teyva.local/onto.owl#>
+
+# Territories that share a stream (teyva:drainedBy) with a territory that had a recent
+# landslide event. NOT YET POPULATED: hydrography (Stream individuals, drainedBy edges)
+# and LandslideEvent individuals both need Postgres data (infrastructure/repositories/
+# landslide_events.py's non-synthetic filter) that this DB-free build path doesn't have
+# access to (specs/005-knowledge-graph/tasks.md). This query is the declared target for
+# when that data is wired in — it always returns empty against kg.build's current graph,
+# which is the honest state, not a bug.
+SELECT ?territory ?event WHERE {
+  ?territory teyva:canonical_id ?commune_id .
+  ?territory teyva:drainedBy ?stream .
+  ?other teyva:drainedBy ?stream .
+  ?other teyva:hasHistoricalEvent ?event .
+  FILTER (?other != ?territory)
+}

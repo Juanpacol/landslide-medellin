@@ -1,9 +1,10 @@
-- [ ] `db/models/critical_facility.py` + migration — not started
-- [ ] Extend `alerts/evacuation.py` Overpass query for hospitals/clinics — not started
+- [ ] `db/models/critical_facility.py` + migration — not started; critical facilities live only in the RDF graph (`kg.build.add_critical_facilities`), not persisted to Postgres
+- [x] Extend the Overpass-based critical-facility query for hospitals/clinics (`kg/build.py::add_critical_facilities`/`_fetch_facilities_near`, verifies: `pytest tests/test_kg_build.py -q`, mocked). Different path than originally planned: instead of extending `alerts/evacuation.py`'s existing safe-zone query, this is a separate function in `kg/build.py` (own concern: territory exposure, not evacuation routing) using the same public, keyless Overpass API. Live-verified working during development (a single-point query for one hospital near a real centroid returned real OSM data); the full 21-commune loop hit the public Overpass instance's aggressive rate-limiting when run back-to-back — added a 1s delay between calls (`delay_s` param, defaults to 1.0, tests pass `delay_s=0`) to respect fair-use, though a full clean 21/21 live run wasn't captured in this session due to the instance's rate limiting.
 - [x] `kg/build.py` static A-Box (territory nodes + centroid-proximity `adjacentTo`) (verifies: `pytest tests/test_kg_build.py -q` — node count matches commune count, no orphan territory)
-- [ ] Full Postgres A-Box population (barrio_terrain, barrio_hazard, safe_zones, seismic_events, non-synthetic landslide_events) — not started, needs AsyncSession integration
+- [ ] Full Postgres A-Box population (barrio_terrain, barrio_hazard, seismic_events, non-synthetic landslide_events) — not started, needs AsyncSession integration and no DB credentials were available in this session to test against
 - [ ] True polygon-based adjacency via shapely over the barrio/comuna polygon file — not started; current `adjacentTo` is a centroid-proximity (k=3 nearest) approximation, declared as such in `kg/build.py`'s docstring, not the real spatial adjacency the full spec calls for
-- [x] One named SPARQL query (`upslope_neighbours.sparql`) + `run_named_query()` (verifies: `pytest tests/test_kg_build.py -q` — typed results, bounded by ADJACENCY_K)
-- [ ] `exposed_facilities.sparql`, `shared_stream_recent_event.sparql` — not started (need the DB-backed A-Box first)
+- [x] `upslope_neighbours.sparql` + `run_named_query()` (verifies: `pytest tests/test_kg_build.py -q` — typed results, bounded by ADJACENCY_K)
+- [x] `exposed_facilities.sparql` (verifies: same file — returns real facility names once `add_critical_facilities()` has populated the graph)
+- [x] `shared_stream_recent_event.sparql` written as the declared target, honestly returning empty against the current DB-free graph (verifies: `test_shared_stream_query_is_honestly_empty_on_the_static_graph` — hydrography and landslide-event data both need Postgres, not faked here)
 - [ ] `kg/export_cypher.py` optional Neo4j export — not started
-- [x] Static-graph test suite (verifies: `pytest tests/test_kg_build.py -q` — 4 passed; full suite 307 passed, 12 skipped, no regressions)
+- [x] Static-graph test suite (verifies: `pytest tests/test_kg_build.py -q` — 6 passed; full suite 355 passed, 12 skipped, no regressions)

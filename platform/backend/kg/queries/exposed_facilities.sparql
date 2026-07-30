@@ -1,0 +1,11 @@
+PREFIX teyva: <http://teyva.local/onto.owl#>
+
+# Critical facilities (hospitals/clinics) exposed within a territory. Populated by
+# kg.build.add_critical_facilities() from live OpenStreetMap data — this returns
+# empty until that function has been run against the graph being queried.
+SELECT ?facility ?nombre WHERE {
+  ?territory teyva:canonical_id ?commune_id .
+  ?territory teyva:exposes ?facility .
+  ?facility a teyva:CriticalFacility .
+  ?facility teyva:nombre ?nombre .
+}
