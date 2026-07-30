@@ -9,6 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from scraper.dagrd import run_dagrd_scraper
 from scraper.ideam import run_ideam_scraper
 from scraper.medellin_datos import run_medellin_datos_scraper
+from scraper.sgc_sismos import run_sgc_sismos_scraper
 from scraper.siata import run_siata_scraper
 from scraper.siata_sismos import run_siata_sismos_scraper
 
@@ -82,6 +83,14 @@ def build_scheduler() -> AsyncIOScheduler:
         id="siata_sismos",
         replace_existing=True,
         next_run_time=now + timedelta(seconds=65),
+    )
+    scheduler.add_job(
+        run_sgc_sismos_scraper,
+        "interval",
+        minutes=15,
+        id="sgc_sismos",
+        replace_existing=True,
+        next_run_time=now + timedelta(seconds=80),
     )
     # Watchdog: alerts via Slack if any source has gone too long without data.
     # Starts at 5 min (gives the initial scrapers time to populate logs).

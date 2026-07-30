@@ -1,0 +1,60 @@
+name: Scraper SGC Sismos
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-sgc-sismos:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DB_SSL: "true"
+      PYTHONPATH: ./platform/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: platform/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Guard de drift + `alembic upgrade head`. Si la BD quedó adelante del
+      # repo (migración aplicada sin commitear), omite el upgrade en vez de
+      # tumbar la ingesta, y alerta a Slack. Ver docs/RUNBOOK_MIGRATIONS.md.
+      - name: Run database migrations
+        uses: ./.github/actions/db-migrate
+        with:
+          migrate-url: ${{ secrets.DATABASE_URL_MIGRATE }}
+
+      - name: Run SGC sismos scraper
+        working-directory: platform/backend
+        run: python -m scraper.sgc_sismos
+
+      - name: Validate ingested data
+        working-directory: platform/backend
+        continue-on-error: true
+        run: python -m monitoring.scraper_validator
+
+      # Un cron rojo no avisa a nadie por sí solo. Esto sí. Solo bash+curl:
+      # funciona aunque el paso que falló haya sido `pip install`.
+      # cancelled() incluido: un timeout de job no cuenta como failure().
+      - name: Notificar fallo a Slack
+        if: failure() || cancelled()
+        uses: ./.github/actions/notify-failure
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}

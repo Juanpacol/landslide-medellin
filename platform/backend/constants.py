@@ -25,6 +25,7 @@ ALERT_COOLDOWN_MIGRATION_GUARD_HOURS = 6  # Drift alembic BD↔repo (recordatori
 SCRAPER_INTERVALS_MIN: dict[str, int] = {
     "siata": 30,
     "siata_sismos": 30,
+    "sgc": 15,
     "dagrd": 60,
     "ideam": 360,
     "medellin_datos": 1440,
