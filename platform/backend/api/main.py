@@ -1,9 +1,8 @@
-import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.auth import assert_production_auth
+from config import settings
 from api.routes import alerts, chat, rain, risk, scraper
 from errors.error_handler import install_exception_handlers
 from observability.logging_config import configure_logging
@@ -20,7 +19,7 @@ install_exception_handlers(app)
 # CORS restricted per environment. Set ALLOWED_ORIGINS as a comma-separated
 # list (e.g. "https://teyva.co,https://www.teyva.co"). Without the variable,
 # defaults to the local dev frontend. Never use "*" with allow_credentials=True.
-_origins_env = os.getenv("ALLOWED_ORIGINS", "").strip()
+_origins_env = settings.ALLOWED_ORIGINS.strip()
 _allowed_origins = (
     [o.strip() for o in _origins_env.split(",") if o.strip()]
     if _origins_env

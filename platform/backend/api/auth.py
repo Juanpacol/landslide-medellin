@@ -24,15 +24,16 @@ from __future__ import annotations
 
 import hmac
 import logging
-import os
 
 from fastapi import Header, HTTPException, status
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
 
 def _env() -> str:
-    return (os.getenv("ENV") or os.getenv("ENVIRONMENT") or "development").strip().lower()
+    return (settings.ENV or settings.ENVIRONMENT or "development").strip().lower()
 
 
 def is_production() -> bool:
@@ -41,7 +42,7 @@ def is_production() -> bool:
 
 def assert_production_auth() -> None:
     """Call at app startup: in production without API_TOKEN, abort."""
-    if is_production() and not os.getenv("API_TOKEN"):
+    if is_production() and not settings.API_TOKEN:
         raise RuntimeError(
             "ENV=production without API_TOKEN set: mutating endpoints would be "
             "left open. Set API_TOKEN (and optionally API_TOKEN_VIEWER) before starting."
@@ -62,7 +63,7 @@ def _matches(provided: str | None, expected: str | None) -> bool:
 
 async def require_token(authorization: str | None = Header(default=None)) -> None:
     """Admin role: requires the API_TOKEN token."""
-    expected = os.getenv("API_TOKEN")
+    expected = settings.API_TOKEN
 
     if not expected:
         if is_production():
@@ -87,8 +88,8 @@ async def require_token(authorization: str | None = Header(default=None)) -> Non
 
 async def require_viewer(authorization: str | None = Header(default=None)) -> None:
     """Viewer role: accepts API_TOKEN_VIEWER or API_TOKEN (admin ⊇ viewer)."""
-    admin = os.getenv("API_TOKEN")
-    viewer = os.getenv("API_TOKEN_VIEWER")
+    admin = settings.API_TOKEN
+    viewer = settings.API_TOKEN_VIEWER
 
     if not admin and not viewer:
         if is_production():

@@ -1,24 +1,22 @@
-import os
 import ssl
 from collections.abc import AsyncGenerator
 
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-load_dotenv()
+from config import settings
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-DATABASE_URL_SYNC = os.environ.get("DATABASE_URL_SYNC")
+DATABASE_URL = settings.DATABASE_URL
+DATABASE_URL_SYNC = settings.DATABASE_URL_SYNC
 
 if not DATABASE_URL or not DATABASE_URL_SYNC:
     raise RuntimeError("DATABASE_URL y DATABASE_URL_SYNC deben estar definidas en backend/.env")
 
 # SSL configurable vía DB_SSL. Por defecto OFF (Postgres local / Docker no traen
 # TLS). Definir DB_SSL=true para proveedores gestionados que lo exigen (ej. Supabase).
-_db_ssl = os.environ.get("DB_SSL", "false").strip().lower() in ("1", "true", "yes", "on")
+_db_ssl = settings.DB_SSL
 
 # asyncpg no usa sslmode=require como libpq. ssl=True además VERIFICA el
 # certificado, y Supabase firma con CA propia (no en el trust store del
