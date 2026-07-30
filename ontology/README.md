@@ -35,12 +35,20 @@ truth for the territory; a second list anywhere (including here) is a bug.
 ## SWRL
 
 The geotechnical rules in `domain/rules/catalog.py` are the executable specification (see
-ADR-0002 for why: no JVM in crons, testable without I/O). SWRL axioms mirroring that catalog are
-**not yet added** to this ontology — tracked in `specs/001-ontology/tasks.md`. When added, they
-are the formal, non-executable specification; a test must assert every SWRL axiom has a matching
-`Rule.id` in the catalog so the two representations cannot silently drift.
+ADR-0002 for why: no JVM in crons, testable without I/O). This ontology mirrors that catalog as
+`SymbolicRule` individuals (one per `Rule`, generated from `CATALOG`, never hand-typed) carrying
+`rule_id`, `priority`, `provenance` and a `swrl_sketch` string.
+
+`swrl_sketch` is a human-readable condition→effect sketch, **not an executable owlready2 `Imp`/
+SWRL rule** — the ontology's per-feature class model (slope lives on `Slope`, not directly on
+`Territory`) doesn't map cleanly onto flat SWRL rule bodies without a larger ontology redesign
+than this spec's scope covered. It documents the formal correspondence; it does not run.
+
+`tests/test_ontology.py::test_swrl_sketch_rule_ids_match_the_rule_catalog` is the drift guard:
+it asserts the ontology's `SymbolicRule.rule_id` set equals `domain.rules.catalog.CATALOG`'s ids
+exactly, so the two representations cannot silently diverge.
 
 ## Loading at runtime
 
 Use `infrastructure/ontology/loader.py`, never load the file directly elsewhere —
-`ontology_version()` and `individuals_for_commune()` are the supported interface.
+`ontology_version()`, `individuals_for_commune()` and `rule_ids()` are the supported interface.

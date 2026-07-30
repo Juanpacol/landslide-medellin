@@ -108,6 +108,30 @@
   <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#decimal"/>
 </owl:DatatypeProperty>
 
+<owl:DatatypeProperty rdf:about="#rule_id">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#SymbolicRule"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#priority">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#SymbolicRule"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#provenance">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#SymbolicRule"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#swrl_sketch">
+  <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  <rdfs:domain rdf:resource="#SymbolicRule"/>
+  <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+</owl:DatatypeProperty>
+
 <owl:Class rdf:about="#Territory">
   <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
 </owl:Class>
@@ -197,6 +221,10 @@
 </owl:Class>
 
 <owl:Class rdf:about="#DataQualityFlag">
+  <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
+</owl:Class>
+
+<owl:Class rdf:about="#SymbolicRule">
   <rdfs:subClassOf rdf:resource="http://www.w3.org/2002/07/owl#Thing"/>
 </owl:Class>
 
@@ -366,6 +394,70 @@
   <official_code rdf:datatype="http://www.w3.org/2001/XMLSchema#string">90</official_code>
   <nombre rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Santa Elena</nombre>
   <is_ladera rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</is_ladera>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#rule_r_geo_01">
+  <rdf:type rdf:resource="#SymbolicRule"/>
+  <rule_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">R-GEO-01</rule_id>
+  <priority rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">100</priority>
+  <provenance rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Standard geotechnical trigger threshold; slope bound matches domain/susceptibility.py::SLOPE_MAX_DEG saturation point.</provenance>
+  <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Steep slope (&gt;35°) with heavy 72h rain (&gt;120mm) floors risk at 'alto'. =&gt; SetFloor</swrl_sketch>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#rule_r_geo_02">
+  <rdf:type rdf:resource="#SymbolicRule"/>
+  <rule_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">R-GEO-02</rule_id>
+  <priority rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">80</priority>
+  <provenance rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Saturated soil reduces shear strength on moderate slopes; expert judgment consistent with domain/susceptibility.py's SWI-as-trigger design.</provenance>
+  <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Moderate slope (&gt;25°) with saturated soil (SWI&gt;80%) escalates one level. =&gt; Escalate</swrl_sketch>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#rule_r_geo_03">
+  <rdf:type rdf:resource="#SymbolicRule"/>
+  <rule_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">R-GEO-03</rule_id>
+  <priority rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">70</priority>
+  <provenance rdf:datatype="http://www.w3.org/2001/XMLSchema#string">TWI identifies flow-convergence zones (domain/susceptibility.py::TWI_MAX); combined with antecedent moisture this is a classic saturation-front indicator.</provenance>
+  <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">High topographic wetness (water convergence) with high antecedent rain escalates one level. =&gt; Escalate</swrl_sketch>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#rule_r_geo_04">
+  <rdf:type rdf:resource="#SymbolicRule"/>
+  <rule_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">R-GEO-04</rule_id>
+  <priority rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">60</priority>
+  <provenance rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Root cohesion loss on bare, steep terrain; NDVI_BARE threshold shared with domain/susceptibility.py::normalize_ndvi.</provenance>
+  <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Bare soil (low NDVI) on a steep slope escalates one level. =&gt; Escalate</swrl_sketch>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#rule_r_hist_01">
+  <rdf:type rdf:resource="#SymbolicRule"/>
+  <rule_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">R-HIST-01</rule_id>
+  <priority rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">50</priority>
+  <provenance rdf:datatype="http://www.w3.org/2001/XMLSchema#string">'Dangerous zones repeat' — same rationale as domain/susceptibility.py's W_PRIOR component, applied here as a priority signal rather than a score input.</provenance>
+  <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">At least one historical landslide nearby raises operational priority. =&gt; RaisePriority</swrl_sketch>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#rule_r_expo_01">
+  <rdf:type rdf:resource="#SymbolicRule"/>
+  <rule_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">R-EXPO-01</rule_id>
+  <priority rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">90</priority>
+  <provenance rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Consequence-weighted prioritization: equal hazard, higher exposure cost. Data source: SPEC-005's extended Overpass query for amenity=hospital|clinic|school.</provenance>
+  <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">A hospital or school within 200m raises priority to maximum. =&gt; RaisePriority</swrl_sketch>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#rule_r_seis_01">
+  <rdf:type rdf:resource="#SymbolicRule"/>
+  <rule_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">R-SEIS-01</rule_id>
+  <priority rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">65</priority>
+  <provenance rdf:datatype="http://www.w3.org/2001/XMLSchema#string">A quake on saturated soil moves a slope far more readily than on dry soil; matches domain/susceptibility.py::trigger_breakdown's 'seismic modulates, doesn't trigger alone' design.</provenance>
+  <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">High seismic intensity over moderately saturated soil escalates one level. =&gt; Escalate</swrl_sketch>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="#rule_r_qual_01">
+  <rdf:type rdf:resource="#SymbolicRule"/>
+  <rule_id rdf:datatype="http://www.w3.org/2001/XMLSchema#string">R-QUAL-01</rule_id>
+  <priority rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">1000</priority>
+  <provenance rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Direct response to audit finding (docs/research/audit-2026-07.md §5): the declared index silently multiplied by zero when data was simply missing, indistinguishable from a confirmed absence of risk.</provenance>
+  <swrl_sketch rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Zero trigger coverage (no rain, SWI, or seismic signal at all) vetoes the score: absence of signal is not evidence of absence of risk. =&gt; Veto</swrl_sketch>
 </owl:NamedIndividual>
 
 

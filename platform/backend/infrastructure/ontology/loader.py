@@ -55,3 +55,14 @@ def all_territory_individuals() -> list[dict[str, Any]]:
         if info is not None:
             out.append(info)
     return out
+
+
+def rule_ids() -> frozenset[str]:
+    """`rule_id` of every `SymbolicRule` individual in the ontology — the SWRL-sketch side of
+    the drift check `tests/test_ontology.py` runs against
+    `domain.rules.catalog.CATALOG`'s ids (specs/001-ontology/spec.md criterion 4)."""
+    onto = _load()
+    symbolic_rule_cls = onto.search_one(iri="*SymbolicRule")
+    if symbolic_rule_cls is None:
+        return frozenset()
+    return frozenset(ind.rule_id for ind in symbolic_rule_cls.instances() if ind.rule_id)

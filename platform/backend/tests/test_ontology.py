@@ -14,11 +14,13 @@ import pytest
 pytest.importorskip("owlready2")
 
 from domain.communes import COMMUNES  # noqa: E402
+from domain.rules.catalog import CATALOG  # noqa: E402
 from infrastructure.ontology.loader import (  # noqa: E402
     ONTOLOGY_PATH,
     all_territory_individuals,
     individuals_for_commune,
     ontology_version,
+    rule_ids,
 )
 
 
@@ -50,3 +52,11 @@ class TestOntology:
 
     def test_unknown_commune_returns_none(self):
         assert individuals_for_commune("999") is None
+
+    def test_swrl_sketch_rule_ids_match_the_rule_catalog(self):
+        """Drift guard (specs/001-ontology/spec.md criterion 4): every rule in
+        domain/rules/catalog.py must have a matching SymbolicRule individual in the
+        ontology, and vice versa. Fails loudly if either side adds/removes a rule
+        without regenerating (`python -m infrastructure.ontology.build`) or updating
+        the other."""
+        assert rule_ids() == {r.id for r in CATALOG}

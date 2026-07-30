@@ -5,7 +5,7 @@ See `docs/SPEC_PROCESS.md` for how specs work. Status: `draft` → `planned` →
 | Spec | Title | Status | Tests |
 |---|---|---|---|
 | [000](000-docs-english/) | Documentation in English | done | `pytest tests -q` (no regressions) |
-| [001](001-ontology/) | Territory ontology (OWL) | in-progress (T-Box + A-Box done, SWRL pending) | `tests/test_ontology.py` |
+| [001](001-ontology/) | Territory ontology (OWL) | done (SWRL-sketch mirror + drift test, not executable SWRL) | `tests/test_ontology.py` |
 | [002](002-rule-engine/) | Rule engine | done (validator wiring pending) | `tests/test_rules_engine.py`, `tests/test_rules_catalog.py`, `tests/test_domain_quality.py` |
 | [003](003-inference-engine/) | Inference engine | done (migration skipped, reused JSONB) | `tests/test_infer_neurosymbolic.py` |
 | [004](004-explanations/) | Explanations (XAI) | done (backend + frontend panel); SHAP + LLM-rephrasing prose pending | `tests/test_explain_render.py`, `tests/test_generate_explanation_from_verdict.py` |
