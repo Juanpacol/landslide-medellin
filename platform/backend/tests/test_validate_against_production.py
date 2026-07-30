@@ -45,7 +45,9 @@ def test_frozen_signal_flag_is_propagated():
 def test_missing_swi_stays_none_not_zero():
     # swi=None must map to swi_pct=None, never a silent 0.0 (the exact discipline
     # domain/susceptibility.py and domain/rules/facts.py both document).
-    hazard = _FakeHazard(susceptibility_components={"hazard": None}, trigger_components={"swi": None})
+    hazard = _FakeHazard(
+        susceptibility_components={"hazard": None}, trigger_components={"swi": None}
+    )
     snap = _build_snapshot("12", hazard, prior_event_count=0, rain_is_frozen=False)
     assert snap.swi_pct is None
     assert snap.hazard_fraction is None

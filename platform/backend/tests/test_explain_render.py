@@ -30,7 +30,9 @@ def test_render_all_four_risk_levels():
 
 
 def test_render_is_deterministic():
-    snapshot = TerritorySnapshot(commune_id="9", slope_p90_deg=30.0, swi_pct=90.0, precip_72h_mm=5.0)
+    snapshot = TerritorySnapshot(
+        commune_id="9", slope_p90_deg=30.0, swi_pct=90.0, precip_72h_mm=5.0
+    )
     verdict = resolve_verdict("9", 0.2, snapshot)
     tree1 = render(verdict)
     tree2 = render(verdict)

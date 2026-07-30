@@ -47,7 +47,9 @@ def graph_to_cypher(g: Graph) -> str:
     """
     lines: list[str] = []
 
-    territories = set(g.subjects(RDF.type, TEYVA.Commune)) | set(g.subjects(RDF.type, TEYVA.Corregimiento))
+    territories = set(g.subjects(RDF.type, TEYVA.Commune)) | set(
+        g.subjects(RDF.type, TEYVA.Corregimiento)
+    )
     for uri in sorted(territories, key=_local_name):
         cls = TEYVA.Corregimiento if (uri, RDF.type, TEYVA.Corregimiento) in g else TEYVA.Commune
         canonical_id = next(g.objects(uri, TEYVA.canonical_id), None)
@@ -67,14 +69,18 @@ def graph_to_cypher(g: Graph) -> str:
             f"SET f_{_local_name(uri)}.nombre = '{_escape(str(nombre))}';"
         )
 
-    for s, o in sorted(g.subject_objects(TEYVA.adjacentTo), key=lambda so: (_local_name(so[0]), _local_name(so[1]))):
+    for s, o in sorted(
+        g.subject_objects(TEYVA.adjacentTo), key=lambda so: (_local_name(so[0]), _local_name(so[1]))
+    ):
         lines.append(
             f"MATCH (a {{canonical_id: '{_escape(str(next(g.objects(s, TEYVA.canonical_id), '')))}'}}), "
             f"(b {{canonical_id: '{_escape(str(next(g.objects(o, TEYVA.canonical_id), '')))}'}}) "
             f"MERGE (a)-[:ADJACENT_TO]->(b);"
         )
 
-    for s, o in sorted(g.subject_objects(TEYVA.exposes), key=lambda so: (_local_name(so[0]), _local_name(so[1]))):
+    for s, o in sorted(
+        g.subject_objects(TEYVA.exposes), key=lambda so: (_local_name(so[0]), _local_name(so[1]))
+    ):
         lines.append(
             f"MATCH (t {{canonical_id: '{_escape(str(next(g.objects(s, TEYVA.canonical_id), '')))}'}}), "
             f"(f:CriticalFacility {{osm_ref: '{_escape(_local_name(o))}'}}) "

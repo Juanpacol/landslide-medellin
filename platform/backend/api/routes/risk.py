@@ -135,9 +135,7 @@ async def _load_real_commune_polygons() -> list[dict[str, Any]]:
         try:
             _POLYGON_CACHE_FILE.write_text(json.dumps(out), encoding="utf-8")
         except Exception:
-            logging.getLogger(__name__).warning(
-                "Could not write the polygon cache to disk."
-            )
+            logging.getLogger(__name__).warning("Could not write the polygon cache to disk.")
     return out
 
 
@@ -372,7 +370,9 @@ async def get_comuna_detalle(
 
 
 @router.get("/derivation/{commune_id}")
-async def get_derivation(commune_id: str, db: AsyncSession = Depends(get_async_db)) -> dict[str, Any]:
+async def get_derivation(
+    commune_id: str, db: AsyncSession = Depends(get_async_db)
+) -> dict[str, Any]:
     """Neuro-symbolic derivation for a commune's latest prediction: fired rules, conflicts
     between the neural score and the symbolic layer, and confidence — see
     `application/neurosymbolic/infer.py` (specs/003-inference-engine/)."""

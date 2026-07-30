@@ -40,25 +40,37 @@ class ArmResult:
     used_rules: bool
 
 
-def run_arm(arm: Arm, commune_id: str, neural_score: float | None, snapshot: TerritorySnapshot) -> ArmResult:
+def run_arm(
+    arm: Arm, commune_id: str, neural_score: float | None, snapshot: TerritorySnapshot
+) -> ArmResult:
     if arm in ("ml_only", "declared_index"):
         level = risk_level_from_score(neural_score)
-        return ArmResult(arm=arm, commune_id=commune_id, score=neural_score, level=level, used_rules=False)
+        return ArmResult(
+            arm=arm, commune_id=commune_id, score=neural_score, level=level, used_rules=False
+        )
 
     if arm == "rules_only":
         verdict: Verdict = resolve_verdict(commune_id, None, snapshot, rules=CATALOG)
-        return ArmResult(arm=arm, commune_id=commune_id, score=None, level=verdict.level, used_rules=True)
+        return ArmResult(
+            arm=arm, commune_id=commune_id, score=None, level=verdict.level, used_rules=True
+        )
 
     if arm == "neurosymbolic":
         verdict = resolve_verdict(commune_id, neural_score, snapshot, rules=CATALOG)
         return ArmResult(
-            arm=arm, commune_id=commune_id, score=verdict.score, level=verdict.level, used_rules=True
+            arm=arm,
+            commune_id=commune_id,
+            score=verdict.score,
+            level=verdict.level,
+            used_rules=True,
         )
 
     raise ValueError(f"unknown arm: {arm}")
 
 
-def run_all_arms(commune_id: str, neural_score: float | None, snapshot: TerritorySnapshot) -> dict[Arm, ArmResult]:
+def run_all_arms(
+    commune_id: str, neural_score: float | None, snapshot: TerritorySnapshot
+) -> dict[Arm, ArmResult]:
     return {arm: run_arm(arm, commune_id, neural_score, snapshot) for arm in ARMS}
 
 

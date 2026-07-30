@@ -19,7 +19,9 @@ def test_rule_coverage_empty_snapshots():
 
 def test_rule_coverage_reports_fire_rate_per_rule():
     snapshots = [
-        TerritorySnapshot(commune_id="8", slope_p90_deg=40.0, precip_72h_mm=150.0),  # R-GEO-01 fires
+        TerritorySnapshot(
+            commune_id="8", slope_p90_deg=40.0, precip_72h_mm=150.0
+        ),  # R-GEO-01 fires
         TerritorySnapshot(commune_id="9", precip_72h_mm=5.0),  # no geotechnical rule fires
     ]
     report = rule_coverage(snapshots, CATALOG)

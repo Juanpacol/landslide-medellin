@@ -63,6 +63,7 @@ def _commune_is_ladera(commune_id: str) -> bool:
     commune = _BY_ID.get(cid) if cid else None
     return commune.is_ladera if commune else False
 
+
 # ── Structured output schema (JSON mode, OpenAI-compatible) ────────────────────
 
 _EXPLANATION_SCHEMA_HINT = """
@@ -652,6 +653,8 @@ def generate_explanation_from_verdict(verdict: Any) -> tuple[str, str, dict[str,
         "title": f"{nombre} — nivel {level.upper()} ({score_pct}%)",
         "factors": factors,
         "urgency": level,
-        "recommended_action": _RECOMMENDED_ACTION_BY_LEVEL.get(level, "Continuar monitoreo rutinario."),
+        "recommended_action": _RECOMMENDED_ACTION_BY_LEVEL.get(
+            level, "Continuar monitoreo rutinario."
+        ),
     }
     return _render_narrative(structured), "derivation", structured

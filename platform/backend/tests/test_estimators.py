@@ -59,7 +59,9 @@ def test_terrain_no_data_returns_none_value():
 
 
 def test_all_estimators_return_signal_instances():
-    snapshot = TerritorySnapshot(commune_id="1", swi_pct=50.0, seismic_intensity=5.0, hazard_fraction=0.3)
+    snapshot = TerritorySnapshot(
+        commune_id="1", swi_pct=50.0, seismic_intensity=5.0, hazard_fraction=0.3
+    )
     for fn in (estimate_rainfall, estimate_seismic, estimate_terrain):
         assert isinstance(fn(snapshot), Signal)
 

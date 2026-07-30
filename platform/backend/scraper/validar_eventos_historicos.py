@@ -149,9 +149,7 @@ async def main() -> None:
         logger.warning("\nNone evaluable yet. Most common causes:")
         if not df.empty:
             logger.warning(df["motivo"].value_counts().to_string())
-        logger.warning(
-            "\nRun in order: historical_backfill.py → geocode_events.py → this script."
-        )
+        logger.warning("\nRun in order: historical_backfill.py → geocode_events.py → this script.")
         return
 
     hits = int(evaluable_rows["hubiera_alertado"].sum())
@@ -165,9 +163,7 @@ async def main() -> None:
     logger.info(
         f"\nParameters evaluated: drain_rate={DRAIN_RATE_DEFAULT}, critical line={CRITICAL_LINES['default']}"
     )
-    logger.info(
-        "(y = the event day's rain, a proxy for the 60min window live Snake Line uses)"
-    )
+    logger.info("(y = the event day's rain, a proxy for the 60min window live Snake Line uses)")
 
     if rate < 60:
         logger.warning(

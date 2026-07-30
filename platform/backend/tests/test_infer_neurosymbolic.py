@@ -12,7 +12,9 @@ from domain.rules.facts import TerritorySnapshot
 
 def test_neural_only_path_no_rules_fire():
     # Mild slope, light rain: no geotechnical rule should fire, level follows the neural score.
-    snapshot = TerritorySnapshot(commune_id="11", slope_p90_deg=5.0, precip_72h_mm=10.0, swi_pct=20.0)
+    snapshot = TerritorySnapshot(
+        commune_id="11", slope_p90_deg=5.0, precip_72h_mm=10.0, swi_pct=20.0
+    )
     verdict = resolve_verdict("11", 0.5, snapshot)
     assert verdict.level == "medio"  # risk_level_from_score(0.5): >=0.35 and <0.65 -> medio
     assert verdict.conflicts == ()
@@ -44,7 +46,9 @@ def test_veto_path_zero_trigger_coverage():
 
 
 def test_escalation_raises_by_one_category():
-    snapshot = TerritorySnapshot(commune_id="9", slope_p90_deg=30.0, swi_pct=90.0, precip_72h_mm=5.0)
+    snapshot = TerritorySnapshot(
+        commune_id="9", slope_p90_deg=30.0, swi_pct=90.0, precip_72h_mm=5.0
+    )
     verdict = resolve_verdict("9", 0.2, snapshot)  # neural: bajo
     assert verdict.level == "medio"  # escalated one step from bajo
 
@@ -72,10 +76,14 @@ def test_confidence_flags_reduce_confidence():
     flagged = TerritorySnapshot(
         commune_id="8", precip_72h_mm=5.0, swi_pct=10.0, quality_flags=frozenset({"frozen_signal"})
     )
-    assert resolve_verdict("8", 0.3, flagged).confidence < resolve_verdict("8", 0.3, clean).confidence
+    assert (
+        resolve_verdict("8", 0.3, flagged).confidence < resolve_verdict("8", 0.3, clean).confidence
+    )
 
 
 def test_priority_max_when_critical_facility_nearby():
-    snapshot = TerritorySnapshot(commune_id="14", nearest_critical_facility_m=50.0, precip_72h_mm=5.0)
+    snapshot = TerritorySnapshot(
+        commune_id="14", nearest_critical_facility_m=50.0, precip_72h_mm=5.0
+    )
     verdict = resolve_verdict("14", 0.1, snapshot)
     assert verdict.priority == "max"

@@ -81,7 +81,15 @@ def test_add_critical_facilities_populates_exposed_facilities_query(monkeypatch)
     import kg.build as kg_build
 
     def _fake_fetch(lat, lon):
-        return [{"osm_id": "node/123", "name": "Hospital Test", "amenity": "hospital", "lat": lat, "lon": lon}]
+        return [
+            {
+                "osm_id": "node/123",
+                "name": "Hospital Test",
+                "amenity": "hospital",
+                "lat": lat,
+                "lon": lon,
+            }
+        ]
 
     monkeypatch.setattr(kg_build, "_fetch_facilities_near", _fake_fetch)
 

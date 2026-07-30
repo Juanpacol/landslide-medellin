@@ -204,15 +204,21 @@ def _print_report(results: dict[str, Any]) -> None:
         f"Arms disagree (ml_only vs neurosymbolic): {results['n_arms_disagree']}/"
         f"{results['n_communes']} ({results['pct_arms_disagree'] * 100:.1f}%)"
     )
-    print(f"Communes with terrain (slope) data populated: {results['n_terrain_populated']}/{results['n_communes']}")
-    print(f"Communes with a frozen rain signal (audit's 2026-07-29 bug, live today): {results['n_frozen_rain_signal']}/{results['n_communes']}")
+    print(
+        f"Communes with terrain (slope) data populated: {results['n_terrain_populated']}/{results['n_communes']}"
+    )
+    print(
+        f"Communes with a frozen rain signal (audit's 2026-07-29 bug, live today): {results['n_frozen_rain_signal']}/{results['n_communes']}"
+    )
     print("\nRule coverage (real data):")
     for rule_id, rate in results["rule_coverage"]["fire_rate_by_rule"].items():
         evaluable = results["rule_coverage"]["evaluable_rate_by_rule"][rule_id]
         print(f"  {rule_id}: fire={rate:.2f} evaluable={evaluable:.2f}")
 
     print("\nPer-commune (real):")
-    print(f"{'ID':<4}{'Nombre':<24}{'neural':>8}  {'ml_only':<10}{'neurosym':<10}{'vetoed':<8}{'conf':>6}")
+    print(
+        f"{'ID':<4}{'Nombre':<24}{'neural':>8}  {'ml_only':<10}{'neurosym':<10}{'vetoed':<8}{'conf':>6}"
+    )
     for row in results["per_commune"]:
         score = f"{row['neural_score']:.3f}" if row["neural_score"] is not None else "  n/a"
         print(

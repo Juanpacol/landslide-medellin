@@ -90,7 +90,10 @@ def build_static_graph(*, use_polygon_adjacency: bool = True) -> Graph:
 
             polygon_adj = polygon_adjacency()
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Polygon adjacency unavailable, falling back to centroid-proximity for all communes: %s", exc)
+            logger.warning(
+                "Polygon adjacency unavailable, falling back to centroid-proximity for all communes: %s",
+                exc,
+            )
 
     for cid, centroid in CENTROIDS.items():
         if cid in polygon_adj:
@@ -102,7 +105,11 @@ def build_static_graph(*, use_polygon_adjacency: bool = True) -> Graph:
         # barrios-medellin.json — see kg/polygon_adjacency.py's module docstring), or all 21
         # if use_polygon_adjacency=False.
         distances = sorted(
-            ((other_id, _haversine_km(centroid, other_centroid)) for other_id, other_centroid in CENTROIDS.items() if other_id != cid),
+            (
+                (other_id, _haversine_km(centroid, other_centroid))
+                for other_id, other_centroid in CENTROIDS.items()
+                if other_id != cid
+            ),
             key=lambda x: x[1],
         )
         for other_id, _dist in distances[:ADJACENCY_K]:
@@ -203,7 +210,9 @@ def run_named_query(g: Graph, name: str, *, commune_id: str) -> list[dict[str, s
     SPARQL inline — one place to audit every query the reasoner can issue.
     """
     query_text = (QUERIES_DIR / f"{name}.sparql").read_text(encoding="utf-8")
-    results = g.query(query_text, initBindings={"commune_id": Literal(commune_id, datatype=XSD.string)})
+    results = g.query(
+        query_text, initBindings={"commune_id": Literal(commune_id, datatype=XSD.string)}
+    )
     return [{str(k): str(v) for k, v in row.asdict().items()} for row in results]
 
 

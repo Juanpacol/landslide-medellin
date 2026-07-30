@@ -46,7 +46,9 @@ def test_is_stale_true_past_threshold():
 
 def test_data_quality_score_is_trustworthy():
     good = DataQualityScore(source="siata", commune_id="8", coverage=1.0)
-    bad = DataQualityScore(source="siata", commune_id="8", coverage=1.0, flags=frozenset({"frozen_signal"}))
+    bad = DataQualityScore(
+        source="siata", commune_id="8", coverage=1.0, flags=frozenset({"frozen_signal"})
+    )
     empty = DataQualityScore(source="siata", commune_id="8", coverage=0.0)
     assert good.is_trustworthy is True
     assert bad.is_trustworthy is False

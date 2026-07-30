@@ -67,7 +67,11 @@ def test_examples_capped_at_max_examples():
 
 def test_pct_level_changed():
     cases = [
-        AblationCase(commune_id="1", neural_score=0.5, snapshot=TerritorySnapshot(commune_id="1", precip_72h_mm=5.0)),
+        AblationCase(
+            commune_id="1",
+            neural_score=0.5,
+            snapshot=TerritorySnapshot(commune_id="1", precip_72h_mm=5.0),
+        ),
         AblationCase(
             commune_id="8",
             neural_score=0.1,

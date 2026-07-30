@@ -5,7 +5,17 @@ Verifies acceptance criterion 6 of specs/002-rule-engine/spec.md.
 
 from __future__ import annotations
 
-from domain.rules.catalog import CATALOG, R_EXPO_01, R_GEO_01, R_GEO_02, R_GEO_03, R_GEO_04, R_HIST_01, R_QUAL_01, R_SEIS_01
+from domain.rules.catalog import (
+    CATALOG,
+    R_EXPO_01,
+    R_GEO_01,
+    R_GEO_02,
+    R_GEO_03,
+    R_GEO_04,
+    R_HIST_01,
+    R_QUAL_01,
+    R_SEIS_01,
+)
 from domain.rules.engine import Escalate, RaisePriority, SetFloor, Veto, evaluate
 from domain.rules.facts import TerritorySnapshot
 

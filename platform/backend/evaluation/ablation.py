@@ -67,7 +67,9 @@ def _ablated_verdict(target: AblationTarget, case: AblationCase) -> Verdict:
     raise ValueError(f"unknown ablation target: {target}")
 
 
-def run_ablation(target: AblationTarget, cases: list[AblationCase], *, max_examples: int = 5) -> AblationResult:
+def run_ablation(
+    target: AblationTarget, cases: list[AblationCase], *, max_examples: int = 5
+) -> AblationResult:
     """Pure: no I/O. Runs `resolve_verdict` twice per case (full vs. ablated)."""
     if target not in ("rules", "quality"):
         raise ValueError(f"unknown ablation target: {target}")

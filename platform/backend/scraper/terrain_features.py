@@ -124,9 +124,9 @@ async def _fetch_elevations(
     r.raise_for_status()
     data = r.json()
     results = data.get("results") or []
-    return [
-        (res.get("elevation") if isinstance(res, dict) else None) for res in results
-    ] or [None] * len(points)
+    return [(res.get("elevation") if isinstance(res, dict) else None) for res in results] or [
+        None
+    ] * len(points)
 
 
 async def run_terrain_features() -> int:
@@ -169,7 +169,9 @@ async def run_terrain_features() -> int:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 for i in range(0, len(queue), _BATCH_SIZE):
                     batch = queue[i : i + _BATCH_SIZE]
-                    values = await _fetch_elevations(client, [(lat, lon) for *_r, lat, lon in batch])
+                    values = await _fetch_elevations(
+                        client, [(lat, lon) for *_r, lat, lon in batch]
+                    )
                     for (codigo, direction, _lat, _lon), val in zip(batch, values, strict=True):
                         elevations[(codigo, direction)] = val
                     if i + _BATCH_SIZE < len(queue):
@@ -177,9 +179,7 @@ async def run_terrain_features() -> int:
 
             for b in barrios:
                 codigo = b["codigo"]
-                per_dir = {
-                    d: elevations.get((codigo, d)) for d in ("center", "N", "S", "E", "W")
-                }
+                per_dir = {d: elevations.get((codigo, d)) for d in ("center", "N", "S", "E", "W")}
                 slope = _slope_deg_from_elevations(per_dir, SAMPLE_OFFSET_M)
                 elevation_mean = per_dir.get("center")
 

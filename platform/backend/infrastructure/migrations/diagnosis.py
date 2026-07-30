@@ -73,8 +73,7 @@ def diagnose(
                 "repo_heads": list(repo_heads),
                 "unknown_revisions": unknown,
                 "remediation": (
-                    "commit and push the missing migration to main "
-                    "(see docs/RUNBOOK_MIGRATIONS.md)"
+                    "commit and push the missing migration to main (see docs/RUNBOOK_MIGRATIONS.md)"
                 ),
             },
         )

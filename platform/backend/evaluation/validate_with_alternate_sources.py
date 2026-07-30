@@ -51,7 +51,12 @@ from evaluation.primary_metrics import rule_coverage
 from evaluation.run import ARMS, arms_disagree, run_all_arms
 from ml.precip_index import compute_antecedent_precip_index
 from ml.soil_water_index import compute_swi
-from scraper.terrain_features import SAMPLE_OFFSET_M, _fetch_elevations, _offset_points, _slope_deg_from_elevations
+from scraper.terrain_features import (
+    SAMPLE_OFFSET_M,
+    _fetch_elevations,
+    _offset_points,
+    _slope_deg_from_elevations,
+)
 
 # historical_siata is deliberately excluded — confirmed corrupted (see module docstring).
 USABLE_HISTORICAL_SOURCE = "historical_ideam"
@@ -86,7 +91,9 @@ async def _historical_daily_rain(session) -> dict[str, dict[date, float]]:
     return out
 
 
-def _usable_communes(daily_rain_by_commune: dict[str, dict[date, float]], today: date) -> dict[str, date]:
+def _usable_communes(
+    daily_rain_by_commune: dict[str, dict[date, float]], today: date
+) -> dict[str, date]:
     """{commune_id: most_recent_date} for communes whose historical_ideam data is recent
     enough (see MAX_STALENESS_DAYS) to inform today's snapshot."""
     out: dict[str, date] = {}
@@ -160,7 +167,9 @@ async def collect_results() -> dict[str, Any]:
             api = compute_antecedent_precip_index(daily, as_of, window_days=15)
             swi_pct = swi
             antecedent_mm = api
-            rain_source = f"historical_ideam, as_of={as_of.isoformat()} ({(today - as_of).days}d stale)"
+            rain_source = (
+                f"historical_ideam, as_of={as_of.isoformat()} ({(today - as_of).days}d stale)"
+            )
         rain_source_by_commune[cid] = rain_source
 
         snapshots[cid] = TerritorySnapshot(
@@ -178,8 +187,12 @@ async def collect_results() -> dict[str, Any]:
         )
         neural_scores[cid] = hazard.score
 
-    verdicts = {cid: resolve_verdict(cid, neural_scores[cid], snap) for cid, snap in snapshots.items()}
-    arm_results = {cid: run_all_arms(cid, neural_scores[cid], snap) for cid, snap in snapshots.items()}
+    verdicts = {
+        cid: resolve_verdict(cid, neural_scores[cid], snap) for cid, snap in snapshots.items()
+    }
+    arm_results = {
+        cid: run_all_arms(cid, neural_scores[cid], snap) for cid, snap in snapshots.items()
+    }
     coverage = rule_coverage(list(snapshots.values()), CATALOG)
 
     n = len(snapshots)
@@ -231,7 +244,9 @@ async def collect_results() -> dict[str, Any]:
 def _print_report(results: dict[str, Any]) -> None:
     print(f"Generated at: {results['generated_at']}")
     print(f"Communes: {results['n_communes']}")
-    print(f"Live SRTM slope available: {results['n_slope_available_live_srtm']}/{results['n_communes']}")
+    print(
+        f"Live SRTM slope available: {results['n_slope_available_live_srtm']}/{results['n_communes']}"
+    )
     print(
         f"Real (non-corrupted) historical rain available: "
         f"{results['n_real_historical_rain_available']}/{results['n_communes']} "

@@ -93,7 +93,9 @@ def render(verdict: Verdict) -> ExplanationTree:
             text = f"{rule_id} affected the verdict ({effect})."
         nodes.append(ExplanationNode(kind="conflict", text=text, source_id=rule_id))
 
-    confidence_reason = "high data coverage" if verdict.confidence >= 0.6 else "limited data coverage"
+    confidence_reason = (
+        "high data coverage" if verdict.confidence >= 0.6 else "limited data coverage"
+    )
     if verdict.derivation.get("vetoed"):
         confidence_reason = "vetoed: no trigger signal at all"
     nodes.append(

@@ -24,7 +24,9 @@ class RuleCoverageReport:
     pct_snapshots_with_any_fired_rule: float
 
 
-def rule_coverage(snapshots: list[TerritorySnapshot], rules: tuple[Rule, ...]) -> RuleCoverageReport:
+def rule_coverage(
+    snapshots: list[TerritorySnapshot], rules: tuple[Rule, ...]
+) -> RuleCoverageReport:
     """Pure: runs `domain.rules.engine.evaluate` over every snapshot and aggregates.
 
     This is the metric SPEC-002's `RuleTrace.not_evaluable` was built to feed: a rule that

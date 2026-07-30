@@ -24,7 +24,15 @@ from domain.risk_rules import (
     risk_level_from_score,
 )
 from domain.rules.catalog import CATALOG
-from domain.rules.engine import Escalate, MultiplyScore, RaisePriority, RuleTrace, SetFloor, Veto, evaluate
+from domain.rules.engine import (
+    Escalate,
+    MultiplyScore,
+    RaisePriority,
+    RuleTrace,
+    SetFloor,
+    Veto,
+    evaluate,
+)
 from domain.rules.facts import TerritorySnapshot
 from domain.susceptibility import CALIBRATION_NOTE, CALIBRATION_STATUS
 
@@ -83,7 +91,12 @@ def _apply_effects(neural_level: str, trace: RuleTrace) -> tuple[str, list[dict[
         if isinstance(effect, Veto):
             vetoed = True
             conflicts.append(
-                {"rule_id": rule.id, "effect": "veto", "reason": effect.reason, "neural_level": neural_level}
+                {
+                    "rule_id": rule.id,
+                    "effect": "veto",
+                    "reason": effect.reason,
+                    "neural_level": neural_level,
+                }
             )
             continue
         if isinstance(effect, SetFloor):
@@ -185,7 +198,12 @@ def resolve_verdict(
         "neural_score": neural_score,
         "neural_level": neural_level,
         "fired_rules": [
-            {"id": r.id, "description": r.description, "provenance": r.provenance, "priority": r.priority}
+            {
+                "id": r.id,
+                "description": r.description,
+                "provenance": r.provenance,
+                "priority": r.priority,
+            }
             for r in trace.fired
         ],
         "not_evaluable_rules": [r.id for r in trace.not_evaluable],

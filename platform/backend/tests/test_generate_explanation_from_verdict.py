@@ -27,7 +27,9 @@ def test_factors_are_verbatim_derivation_node_text():
 
 def test_no_llm_no_api_key_needed(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    snapshot = TerritorySnapshot(commune_id="9", slope_p90_deg=30.0, swi_pct=90.0, precip_72h_mm=5.0)
+    snapshot = TerritorySnapshot(
+        commune_id="9", slope_p90_deg=30.0, swi_pct=90.0, precip_72h_mm=5.0
+    )
     verdict = resolve_verdict("9", 0.2, snapshot)
     text, generated_by, _ = generate_explanation_from_verdict(verdict)
     assert generated_by == "derivation"

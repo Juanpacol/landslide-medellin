@@ -51,7 +51,7 @@ from evaluation.expert_agreement import cohens_kappa
 
 expert_a = [...]  # 20 category strings, in case order
 expert_b = [...]
-system   = [...]
+system = [...]
 
 expert_reliability = cohens_kappa(expert_a, expert_b)
 system_vs_a = cohens_kappa(system, expert_a)
